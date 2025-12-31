@@ -1,0 +1,39 @@
+########################################
+# Home Assistant runtime (NEVER COMMIT)
+########################################
+.storage/
+*.db
+*.db-shm
+*.db-wal
+home-assistant.log*
+cloud/
+tts/
+
+########################################
+# HACS - installed custom components
+########################################
+www/community/
+
+########################################
+# ESPHome
+########################################
+
+# Ignore all ESPHome device files
+esphome/*.yaml
+
+# Allow shared ESPHome includes
+!esphome/Includes/
+!esphome/Includes/**
+
+########################################
+# Secrets & local overrides
+########################################
+secrets.yaml
+secrets/*.yaml
+
+########################################
+# Editor / OS junk
+########################################
+.DS_Store
+.vscode/
+.idea/
