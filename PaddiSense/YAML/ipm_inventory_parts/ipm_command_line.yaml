@@ -1,0 +1,9 @@
+sensor:
+  - platform: command_line
+    name: ipm_inventory_products
+    unique_id: ipm_inventory_products
+    command: "python3 /config/PaddiSense/Scripts/ipm_inventory.py read"
+    scan_interval: 30
+    value_template: "{{ value_json.total_products | default(0) }}"
+    json_attributes:
+      - products

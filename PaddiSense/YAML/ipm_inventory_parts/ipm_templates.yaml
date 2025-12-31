@@ -1,0 +1,32 @@
+template:
+  - sensor:
+      - name: ipm_products_count
+        unique_id: ipm_products_count
+        state: >
+          {% set products = state_attr('sensor.ipm_inventory_products', 'products') or [] %}
+          {{ products | length }}
+      - name: ipm_filtered_products_count
+        unique_id: ipm_filtered_products_count
+        state: >
+          {% set products = state_attr('sensor.ipm_inventory_products', 'products') or [] %}
+          {% set cat = states('input_select.ipm_category') %}
+          {% set sub = states('input_select.ipm_subcategory') %}
+          {% if cat not in ['All', '', none] %}
+            {% set products = products | selectattr('category', 'eq', cat) | list %}
+          {% endif %}
+          {% if sub not in ['All', '', none] %}
+            {% set products = products | selectattr('subcategory', 'eq', sub) | list %}
+          {% endif %}
+          {{ products | length }}
+        attributes:
+          names: >
+            {% set products = state_attr('sensor.ipm_inventory_products', 'products') or [] %}
+            {% set cat = states('input_select.ipm_category') %}
+            {% set sub = states('input_select.ipm_subcategory') %}
+            {% if cat not in ['All', '', none] %}
+              {% set products = products | selectattr('category', 'eq', cat) | list %}
+            {% endif %}
+            {% if sub not in ['All', '', none] %}
+              {% set products = products | selectattr('subcategory', 'eq', sub) | list %}
+            {% endif %}
+            {{ products | map(attribute='name') | list | sort }}

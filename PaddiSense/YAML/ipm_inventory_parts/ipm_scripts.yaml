@@ -1,0 +1,76 @@
+script:
+  ipm_commit_stock:
+    alias: ipm_ Commit Stock Movement
+    mode: single
+    sequence:
+      - variables:
+          category: "{{ states('input_select.ipm_category') }}"
+          subcategory: "{{ states('input_select.ipm_subcategory') }}"
+          location_sel: "{{ states('input_select.ipm_location') }}"
+          location_custom: "{{ states('input_text.ipm_custom_location') | trim }}"
+          location: >
+            {% if location_sel == 'Other' %}
+              {{ location_custom }}
+            {% else %}
+              {{ location_sel }}
+            {% endif %}
+          product_name: "{{ states('input_text.ipm_product_name') }}"
+          action: "{{ states('input_select.ipm_action') | lower }}"
+          quantity: "{{ states('input_number.ipm_quantity') }}"
+          note: "{{ states('input_text.ipm_note') }}"
+      - condition: template
+        value_template: "{{ product_name | trim != '' and category not in ['', 'All', none] and quantity | float != 0 }}"
+      - service: shell_command.ipm_update_stock
+        data:
+          category: "{{ category }}"
+          subcategory: "{{ subcategory }}"
+          location: "{{ location }}"
+          name: "{{ product_name }}"
+          action: "{{ action }}"
+          quantity: "{{ quantity }}"
+          note: "{{ note }}"
+      - delay: "00:00:01"
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.ipm_inventory_products
+      - service: input_number.set_value
+        data:
+          entity_id: input_number.ipm_quantity
+          value: 0
+
+  ipm_upsert_product:
+    alias: ipm_ Add/Edit Product
+    mode: single
+    sequence:
+      - variables:
+          category: "{{ states('input_select.ipm_category') }}"
+          subcategory: "{{ states('input_select.ipm_subcategory') }}"
+          location_sel: "{{ states('input_select.ipm_location') }}"
+          location_custom: "{{ states('input_text.ipm_custom_location') | trim }}"
+          location: >
+            {% if location_sel == 'Other' %}
+              {{ location_custom }}
+            {% else %}
+              {{ location_sel }}
+            {% endif %}
+          name: "{{ states('input_text.ipm_product_name') }}"
+          active_constituent: "{{ states('input_text.ipm_active_constituent') }}"
+          application_unit: "{{ states('input_text.ipm_application_unit') }}"
+          container_size: "{{ states('input_number.ipm_container_size') }}"
+          note: "{{ states('input_text.ipm_note') }}"
+      - condition: template
+        value_template: "{{ name | trim != '' and category not in ['', 'All', none] }}"
+      - service: shell_command.ipm_upsert_product
+        data:
+          category: "{{ category }}"
+          subcategory: "{{ subcategory }}"
+          location: "{{ location }}"
+          name: "{{ name }}"
+          active_constituent: "{{ active_constituent }}"
+          application_unit: "{{ application_unit }}"
+          container_size: "{{ container_size }}"
+          note: "{{ note }}"
+      - delay: "00:00:01"
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.ipm_inventory_products
