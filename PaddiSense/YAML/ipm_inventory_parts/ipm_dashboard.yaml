@@ -1,8 +1,9 @@
 lovelace:
   dashboards:
     ipm_inventory:
+      url_path: ipm-inventory
       mode: yaml
       title: Inventory Manager
       icon: mdi:clipboard-list
       show_in_sidebar: true
-      filename: /config/PaddiSense/YAML/ipm_inventory_parts/ipm_dashboard_view.yaml
+      filename: /config/PaddiSense/YAML/ipm_inventory_parts/dashboard/ipm_dashboard_view.yaml
