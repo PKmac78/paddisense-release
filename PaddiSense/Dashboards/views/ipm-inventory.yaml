@@ -1,0 +1,353 @@
+button_card_templates:
+
+  template_titleblock:
+    variables:
+      var_name: Name
+    color_type: label-card
+    color: rgb(0,0,0)
+    name: '[[[ return variables.var_name ]]]'
+    styles:
+      card:
+        - height: 50px
+
+  template_textblock:
+    variables:
+      var_name: Name
+    color_type: label-card
+    color: rgb(255,255,51)
+    name: '[[[ return variables.var_name ]]]'
+    styles:
+      card:
+        - height: 80px
+
+  template_numberblock:
+    variables:
+      var_name: Name
+    color_type: label-card
+    color: rgb(140,146,172)
+    name: '[[[ return variables.var_name ]]]'
+    show_icon: false
+    show_state: true
+    tap_action:
+      action: none
+    styles:
+      card:
+        - height: 80px
+        - border-radius: 16px
+        - padding: 10px
+      state:
+        - font-size: 32px
+        - font-weight: bold
+        - text-align: center
+
+  template_numberblock_minus:
+    variables:
+      amount: 1
+      label: "-1"
+    show_icon: false
+    show_name: true
+    show_state: false
+    name: '[[[ return variables.label ]]]'
+    tap_action:
+      action: call-service
+      service: input_number.set_value
+      service_data:
+        entity_id: '[[[ return entity.entity_id ]]]'
+        value: '[[[ return Number(entity.state) - Number(variables.amount); ]]]'
+    styles:
+      card:
+        - height: 80px
+        - border-radius: 12px
+        - padding: 10px
+        - background: '#ff1940'
+      name:
+        - font-size: 20px
+        - font-weight: bold
+        - text-align: center
+        - color: '#000000'
+
+  template_numberblock_plus:
+    variables:
+      amount: 1
+      label: "+1"
+    show_icon: false
+    show_name: true
+    show_state: false
+    name: '[[[ return variables.label ]]]'
+    tap_action:
+      action: call-service
+      service: input_number.set_value
+      service_data:
+        entity_id: '[[[ return entity.entity_id ]]]'
+        value: '[[[ return Number(entity.state) + Number(variables.amount); ]]]'
+    styles:
+      card:
+        - height: 80px
+        - border-radius: 12px
+        - padding: 12px
+        - background: '#19ff19'
+      name:
+        - font-size: 20px
+        - font-weight: bold
+        - text-align: center
+        - color: '#000000'
+
+browser_mod:
+  style:
+    select:
+      font-size: 2.5rem !important
+      min-height: 70px !important
+      padding: 10px !important
+    input:
+      font-size: 2.5rem !important
+      padding: 12px !important
+
+views:
+
+  - type: sections
+    max_columns: 1
+    title: Movement
+    path: inventory-movement
+
+    sections:
+      - type: grid
+        cards:
+
+          - type: vertical-stack
+            cards:
+
+              - type: custom:button-card
+                template: template_titleblock
+                name: FIND PRODUCT
+
+              - type: entities
+                entities:
+                  - entity: input_select.inventory_category
+                    name: Product Type
+                    icon: mdi:playlist-edit
+                card_mod:
+                  style: |
+                    ha-card {
+                      border-radius: 14px;
+                      padding: 6px;
+                    }
+                    .mdc-list-item__primary-text {
+                      font-size: 1.6rem !important;
+                    }
+
+              - type: entities
+                entities:
+                  - entity: input_select.inventory_subcategory_filter
+                    name: Subcategory
+                    icon: mdi:shape-outline
+                card_mod:
+                  style: |
+                    ha-card {
+                      border-radius: 14px;
+                      padding: 6px;
+                    }
+                    .mdc-list-item__primary-text {
+                      font-size: 1.6rem !important;
+                    }
+
+              - type: entities
+                entities:
+                  - entity: input_text.inventory_active_search
+                    name: Search
+                    icon: mdi:magnify
+                card_mod:
+                  style: |
+                    ha-card {
+                      border-radius: 14px;
+                      padding: 6px;
+                    }
+                    .mdc-text-field__input {
+                      font-size: 1.6rem !important;
+                      padding: 16px !important;
+                    }
+
+              - type: entities
+                entities:
+                  - entity: input_select.inventory_product
+                    name: Select Product
+                    icon: mdi:flask-outline
+                card_mod:
+                  style: |
+                    ha-card {
+                      border-radius: 14px;
+                      padding: 6px 8px 10px;
+                    }
+                    .mdc-list-item__primary-text {
+                      font-size: 1.6rem !important;
+                    }
+
+              - type: horizontal-stack
+                cards:
+
+                  - type: custom:button-card
+                    name: STOCK ON HAND
+                    template: template_textblock
+
+                  - type: custom:button-card
+                    template: template_numberblock
+                    entity: sensor.inventory_selected_product_stock
+                    show_name: false
+                    show_icon: false
+                    show_state: true
+                    tap_action:
+                      action: none
+                    state_display: |
+                      [[[ 
+                        const product  = states['input_select.inventory_product'].state;
+                        const category = states['input_select.inventory_category'].state;
+                        const catalog  = states['sensor.inventory_catalog'].attributes.products || [];
+                        const found =
+                          catalog.find(p => p.name === product && p.category === category)
+                          || catalog.find(p => p.name === product);
+                        const unit = found?.unit || "";
+                        return `${Number(entity.state).toFixed(0)} ${unit}`;
+                      ]]]
+
+              - type: vertical-stack
+                cards:
+
+                  - type: custom:button-card
+                    template: template_titleblock
+                    name: ADJUST STOCK
+
+                  - type: grid
+                    square: false
+                    columns: 3
+                    cards:
+                      - type: custom:button-card
+                        template: template_numberblock_minus
+                        entity: input_number.inventory_quantity
+                        variables: { amount: 1, label: "- 1" }
+                      - type: custom:button-card
+                        template: template_numberblock_minus
+                        entity: input_number.inventory_quantity
+                        variables: { amount: 5, label: "- 5" }
+                      - type: custom:button-card
+                        template: template_numberblock_minus
+                        entity: input_number.inventory_quantity
+                        variables: { amount: 20, label: "- 20" }
+                      - type: custom:button-card
+                        template: template_numberblock_minus
+                        entity: input_number.inventory_quantity
+                        variables: { amount: 100, label: "- 100" }
+                      - type: custom:button-card
+                        template: template_numberblock_minus
+                        entity: input_number.inventory_quantity
+                        variables: { amount: 500, label: "- 500" }
+                      - type: custom:button-card
+                        template: template_numberblock_minus
+                        entity: input_number.inventory_quantity
+                        variables: { amount: 2000, label: "- 2000" }
+
+                  - type: horizontal-stack
+                    cards:
+
+                      - type: custom:button-card
+                        template: template_numberblock
+                        entity: input_number.inventory_quantity
+                        name: CHANGE AMOUNT
+                        styles:
+                          state:
+                            - font-size: 32px
+                            - font-weight: bold
+                            - text-align: center
+                            - color: |
+                                [[[ 
+                                  const v = Number(entity.state);
+                                  if (v > 0) return "#15F70A";
+                                  if (v < 0) return "#f90709";
+                                  return "#FFFFFF";
+                                ]]]
+
+                      - type: custom:button-card
+                        name: CLEAR
+                        icon: mdi:backspace
+                        tap_action:
+                          action: call-service
+                          service: input_number.set_value
+                          target:
+                            entity_id: input_number.inventory_quantity
+                          data:
+                            value: 0
+                        styles:
+                          card:
+                            - background: '#444444'
+                            - border-radius: 12px
+                            - padding: 10px
+                            - height: 80px
+                            - width: 100px
+                          name:
+                            - font-size: 18px
+                            - font-weight: bold
+                            - color: white
+                          icon:
+                            - width: 28px
+                            - color: white
+
+                  - type: grid
+                    square: false
+                    columns: 3
+                    cards:
+                      - type: custom:button-card
+                        template: template_numberblock_plus
+                        entity: input_number.inventory_quantity
+                        variables: { amount: 1, label: "+ 1" }
+                      - type: custom:button-card
+                        template: template_numberblock_plus
+                        entity: input_number.inventory_quantity
+                        variables: { amount: 5, label: "+ 5" }
+                      - type: custom:button-card
+                        template: template_numberblock_plus
+                        entity: input_number.inventory_quantity
+                        variables: { amount: 20, label: "+ 20" }
+                      - type: custom:button-card
+                        template: template_numberblock_plus
+                        entity: input_number.inventory_quantity
+                        variables: { amount: 100, label: "+ 100" }
+                      - type: custom:button-card
+                        template: template_numberblock_plus
+                        entity: input_number.inventory_quantity
+                        variables: { amount: 500, label: "+ 500" }
+                      - type: custom:button-card
+                        template: template_numberblock_plus
+                        entity: input_number.inventory_quantity
+                        variables: { amount: 2000, label: "+ 2000" }
+
+                  - type: custom:button-card
+                    template: template_numberblock
+                    entity: sensor.inventory_quantity_update
+                    name: New Amount
+                    tap_action:
+                      action: none
+                    state_display: |
+                      [[[ 
+                        const product  = states['input_select.inventory_product'].state;
+                        const category = states['input_select.inventory_category'].state;
+                        const catalog  = states['sensor.inventory_catalog'].attributes.products || [];
+                        const found =
+                          catalog.find(p => p.name === product && p.category === category)
+                          || catalog.find(p => p.name === product);
+                        const unit = found?.unit || "";
+                        return `${Number(entity.state).toFixed(0)} ${unit}`;
+                      ]]]
+
+              - type: custom:button-card
+                name: SAVE CHANGE
+                tap_action:
+                  action: call-service
+                  service: script.inventory_commit
+                styles:
+                  card:
+                    - background: '#0047FF'
+                    - border-radius: 14px
+                    - padding: 20px
+                    - height: 90px
+                  name:
+                    - color: white
+                    - font-size: 18px
+                    - font-weight: bold

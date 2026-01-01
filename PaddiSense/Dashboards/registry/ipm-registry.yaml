@@ -1,0 +1,6 @@
+mode: yaml
+title: Inventory Manager
+icon: mdi:clipboard-list
+show_in_sidebar: true
+filename: /config/PaddiSense/Dashboards/views/ipm-inventory.yaml
+
