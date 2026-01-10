@@ -1,0 +1,1371 @@
+##############################################################################
+# ASM - Asset Service Manager
+# PaddiSense Farm Management System
+#
+# This package provides complete asset and parts management for:
+#   - Tractors, Pumps, Harvesters, Vehicles
+#   - Parts (Filters, Belts, Oils, etc.) with stock tracking
+#   - Service events that consume parts
+#
+# Features:
+#   - Asset management with custom attributes
+#   - Parts linked to assets (or universal)
+#   - Single-location stock tracking
+#   - Service event recording with auto-deduct
+#   - Low stock alerts
+##############################################################################
+
+#=============================================================================
+# COMMAND LINE SENSOR - Main data source
+#=============================================================================
+command_line:
+  - sensor:
+      name: ASM Data
+      unique_id: asm_data
+      command: 'python3 /config/PaddiSense/asm/python/asm_sensor.py'
+      command_timeout: 30
+      scan_interval: 300
+      value_template: '{{ value_json.total_parts | default(0) }}'
+      json_attributes:
+        - total_assets
+        - total_parts
+        - low_stock_count
+        - assets
+        - parts
+        - asset_names
+        - part_names
+        - asset_id_to_name
+        - part_id_to_name
+        - recent_events
+        - asset_categories
+        - part_categories
+        - service_types
+
+#=============================================================================
+# SHELL COMMANDS - Python backend calls
+#=============================================================================
+shell_command:
+  # Asset commands
+  asm_add_asset: >-
+    python3 /config/PaddiSense/asm/python/asm_backend.py add_asset
+    --name "{{ name }}"
+    --category "{{ category }}"
+    --attributes '{{ attributes }}'
+
+  asm_edit_asset: >-
+    python3 /config/PaddiSense/asm/python/asm_backend.py edit_asset
+    --id "{{ asset_id }}"
+    --name "{{ name }}"
+    --category "{{ category }}"
+    --attributes '{{ attributes }}'
+
+  asm_delete_asset: >-
+    python3 /config/PaddiSense/asm/python/asm_backend.py delete_asset
+    --id "{{ asset_id }}"
+
+  # Part commands
+  asm_add_part: >-
+    python3 /config/PaddiSense/asm/python/asm_backend.py add_part
+    --name "{{ name }}"
+    --part_number "{{ part_number }}"
+    --category "{{ category }}"
+    --unit "{{ unit }}"
+    --stock "{{ stock }}"
+    --min_stock "{{ min_stock }}"
+    --assets '{{ assets }}'
+    --universal "{{ universal }}"
+    --attributes '{{ attributes }}'
+
+  asm_edit_part: >-
+    python3 /config/PaddiSense/asm/python/asm_backend.py edit_part
+    --id "{{ part_id }}"
+    --name "{{ name }}"
+    --part_number "{{ part_number }}"
+    --category "{{ category }}"
+    --unit "{{ unit }}"
+    --min_stock "{{ min_stock }}"
+    --assets '{{ assets }}'
+    --universal "{{ universal }}"
+    --attributes '{{ attributes }}'
+
+  asm_delete_part: >-
+    python3 /config/PaddiSense/asm/python/asm_backend.py delete_part
+    --id "{{ part_id }}"
+
+  asm_adjust_stock: >-
+    python3 /config/PaddiSense/asm/python/asm_backend.py adjust_stock
+    --id "{{ part_id }}"
+    --delta "{{ delta }}"
+
+  # Service event command
+  asm_record_service: >-
+    python3 /config/PaddiSense/asm/python/asm_backend.py record_service
+    --asset "{{ asset_id }}"
+    --type "{{ service_type }}"
+    --parts '{{ parts }}'
+    --notes "{{ notes }}"
+    --hours "{{ hours }}"
+
+#=============================================================================
+# INPUT HELPERS - User interface controls
+#=============================================================================
+input_select:
+  # ----- Asset Management -----
+  asm_asset:
+    name: ASM Asset
+    icon: mdi:tractor
+    options:
+      - Select Asset
+
+  asm_asset_category:
+    name: ASM Asset Category
+    icon: mdi:shape
+    options:
+      - Tractor
+      - Pump
+      - Harvester
+      - Vehicle
+
+  asm_editor_mode:
+    name: ASM Editor Mode
+    icon: mdi:pencil
+    options:
+      - Add New
+      - Edit Existing
+
+  # ----- Part Management -----
+  asm_part:
+    name: ASM Part
+    icon: mdi:cog
+    options:
+      - Select Part
+
+  asm_part_category:
+    name: ASM Part Category
+    icon: mdi:shape-outline
+    options:
+      - Filter
+      - Belt
+      - Oil
+      - Grease
+      - Battery
+      - Tyre
+      - Hose
+
+  asm_part_unit:
+    name: ASM Part Unit
+    icon: mdi:scale
+    options:
+      - ea
+      - L
+      - kg
+      - m
+
+  # Part-to-Asset assignments (up to 5)
+  asm_part_asset_1:
+    name: ASM Part Asset 1
+    icon: mdi:link
+    options:
+      - None
+
+  asm_part_asset_2:
+    name: ASM Part Asset 2
+    icon: mdi:link
+    options:
+      - None
+
+  asm_part_asset_3:
+    name: ASM Part Asset 3
+    icon: mdi:link
+    options:
+      - None
+
+  asm_part_asset_4:
+    name: ASM Part Asset 4
+    icon: mdi:link
+    options:
+      - None
+
+  asm_part_asset_5:
+    name: ASM Part Asset 5
+    icon: mdi:link
+    options:
+      - None
+
+  # ----- Service Event -----
+  asm_service_asset:
+    name: ASM Service Asset
+    icon: mdi:wrench
+    options:
+      - Select Asset
+
+  asm_service_type:
+    name: ASM Service Type
+    icon: mdi:clipboard-check
+    options:
+      - 250 Hr Service
+      - 500 Hr Service
+      - 1000 Hr Service
+      - Annual Service
+      - Repair
+      - Inspection
+      - Other
+
+  # Parts consumed (up to 5)
+  asm_consume_part_1:
+    name: ASM Consume Part 1
+    icon: mdi:minus-circle
+    options:
+      - None
+
+  asm_consume_part_2:
+    name: ASM Consume Part 2
+    icon: mdi:minus-circle
+    options:
+      - None
+
+  asm_consume_part_3:
+    name: ASM Consume Part 3
+    icon: mdi:minus-circle
+    options:
+      - None
+
+  asm_consume_part_4:
+    name: ASM Consume Part 4
+    icon: mdi:minus-circle
+    options:
+      - None
+
+  asm_consume_part_5:
+    name: ASM Consume Part 5
+    icon: mdi:minus-circle
+    options:
+      - None
+
+  # ----- Report View Filter -----
+  asm_report_asset:
+    name: ASM Report Asset Filter
+    icon: mdi:filter
+    options:
+      - All Assets
+
+input_number:
+  # Part stock
+  asm_part_stock:
+    name: ASM Part Stock
+    icon: mdi:package-variant
+    min: 0
+    max: 99999
+    step: 1
+    mode: box
+
+  asm_part_min_stock:
+    name: ASM Part Min Stock
+    icon: mdi:alert-outline
+    min: 0
+    max: 99999
+    step: 1
+    mode: box
+
+  # Stock adjustment
+  asm_stock_delta:
+    name: ASM Stock Adjustment
+    icon: mdi:plus-minus
+    min: -99999
+    max: 99999
+    step: 1
+    mode: box
+
+  # Part consumption quantities
+  asm_consume_qty_1:
+    name: ASM Consume Qty 1
+    icon: mdi:numeric
+    min: 0
+    max: 999
+    step: 1
+    mode: box
+
+  asm_consume_qty_2:
+    name: ASM Consume Qty 2
+    icon: mdi:numeric
+    min: 0
+    max: 999
+    step: 1
+    mode: box
+
+  asm_consume_qty_3:
+    name: ASM Consume Qty 3
+    icon: mdi:numeric
+    min: 0
+    max: 999
+    step: 1
+    mode: box
+
+  asm_consume_qty_4:
+    name: ASM Consume Qty 4
+    icon: mdi:numeric
+    min: 0
+    max: 999
+    step: 1
+    mode: box
+
+  asm_consume_qty_5:
+    name: ASM Consume Qty 5
+    icon: mdi:numeric
+    min: 0
+    max: 999
+    step: 1
+    mode: box
+
+input_text:
+  # Asset name
+  asm_asset_name:
+    name: ASM Asset Name
+    icon: mdi:rename
+    max: 80
+
+  # Part name and number
+  asm_part_name:
+    name: ASM Part Name
+    icon: mdi:rename
+    max: 80
+
+  asm_part_number:
+    name: ASM Part Number
+    icon: mdi:barcode
+    max: 50
+
+  # Asset attributes (5 slots: name/value pairs)
+  asm_attr_1_name:
+    name: ASM Attr 1 Name
+    icon: mdi:tag
+    max: 30
+
+  asm_attr_1_value:
+    name: ASM Attr 1 Value
+    icon: mdi:text
+    max: 50
+
+  asm_attr_2_name:
+    name: ASM Attr 2 Name
+    icon: mdi:tag
+    max: 30
+
+  asm_attr_2_value:
+    name: ASM Attr 2 Value
+    icon: mdi:text
+    max: 50
+
+  asm_attr_3_name:
+    name: ASM Attr 3 Name
+    icon: mdi:tag
+    max: 30
+
+  asm_attr_3_value:
+    name: ASM Attr 3 Value
+    icon: mdi:text
+    max: 50
+
+  asm_attr_4_name:
+    name: ASM Attr 4 Name
+    icon: mdi:tag
+    max: 30
+
+  asm_attr_4_value:
+    name: ASM Attr 4 Value
+    icon: mdi:text
+    max: 50
+
+  asm_attr_5_name:
+    name: ASM Attr 5 Name
+    icon: mdi:tag
+    max: 30
+
+  asm_attr_5_value:
+    name: ASM Attr 5 Value
+    icon: mdi:text
+    max: 50
+
+  # Part attributes (5 slots)
+  asm_part_attr_1_name:
+    name: ASM Part Attr 1 Name
+    icon: mdi:tag
+    max: 30
+
+  asm_part_attr_1_value:
+    name: ASM Part Attr 1 Value
+    icon: mdi:text
+    max: 50
+
+  asm_part_attr_2_name:
+    name: ASM Part Attr 2 Name
+    icon: mdi:tag
+    max: 30
+
+  asm_part_attr_2_value:
+    name: ASM Part Attr 2 Value
+    icon: mdi:text
+    max: 50
+
+  asm_part_attr_3_name:
+    name: ASM Part Attr 3 Name
+    icon: mdi:tag
+    max: 30
+
+  asm_part_attr_3_value:
+    name: ASM Part Attr 3 Value
+    icon: mdi:text
+    max: 50
+
+  asm_part_attr_4_name:
+    name: ASM Part Attr 4 Name
+    icon: mdi:tag
+    max: 30
+
+  asm_part_attr_4_value:
+    name: ASM Part Attr 4 Value
+    icon: mdi:text
+    max: 50
+
+  asm_part_attr_5_name:
+    name: ASM Part Attr 5 Name
+    icon: mdi:tag
+    max: 30
+
+  asm_part_attr_5_value:
+    name: ASM Part Attr 5 Value
+    icon: mdi:text
+    max: 50
+
+  # Service event notes and hours
+  asm_service_notes:
+    name: ASM Service Notes
+    icon: mdi:note-text
+    max: 200
+
+  asm_service_hours:
+    name: ASM Engine Hours
+    icon: mdi:counter
+    max: 20
+
+input_boolean:
+  # Universal part toggle
+  asm_universal_part:
+    name: ASM Universal Part
+    icon: mdi:earth
+
+  # Show additional attribute slots
+  asm_show_attr_2:
+    name: ASM Show Attr 2
+    icon: mdi:plus-circle-outline
+
+  asm_show_attr_3:
+    name: ASM Show Attr 3
+    icon: mdi:plus-circle-outline
+
+  asm_show_attr_4:
+    name: ASM Show Attr 4
+    icon: mdi:plus-circle-outline
+
+  asm_show_attr_5:
+    name: ASM Show Attr 5
+    icon: mdi:plus-circle-outline
+
+  # Show additional part attribute slots
+  asm_show_part_attr_2:
+    name: ASM Show Part Attr 2
+    icon: mdi:plus-circle-outline
+
+  asm_show_part_attr_3:
+    name: ASM Show Part Attr 3
+    icon: mdi:plus-circle-outline
+
+  asm_show_part_attr_4:
+    name: ASM Show Part Attr 4
+    icon: mdi:plus-circle-outline
+
+  asm_show_part_attr_5:
+    name: ASM Show Part Attr 5
+    icon: mdi:plus-circle-outline
+
+  # Show additional consume slots
+  asm_show_consume_2:
+    name: ASM Show Consume 2
+    icon: mdi:plus-circle-outline
+
+  asm_show_consume_3:
+    name: ASM Show Consume 3
+    icon: mdi:plus-circle-outline
+
+  asm_show_consume_4:
+    name: ASM Show Consume 4
+    icon: mdi:plus-circle-outline
+
+  asm_show_consume_5:
+    name: ASM Show Consume 5
+    icon: mdi:plus-circle-outline
+
+  # Show additional asset assignment slots
+  asm_show_asset_2:
+    name: ASM Show Asset 2
+    icon: mdi:plus-circle-outline
+
+  asm_show_asset_3:
+    name: ASM Show Asset 3
+    icon: mdi:plus-circle-outline
+
+  asm_show_asset_4:
+    name: ASM Show Asset 4
+    icon: mdi:plus-circle-outline
+
+  asm_show_asset_5:
+    name: ASM Show Asset 5
+    icon: mdi:plus-circle-outline
+
+#=============================================================================
+# TEMPLATE SENSORS - Computed values for UI
+#=============================================================================
+template:
+  - sensor:
+      #-----------------------------------------------------------------------
+      # Selected asset details
+      #-----------------------------------------------------------------------
+      - name: ASM Selected Asset
+        unique_id: asm_selected_asset
+        state: >
+          {% set selected_name = states('input_select.asm_asset') %}
+          {% if selected_name in ['Select Asset', 'unknown', 'unavailable', ''] %}
+            none
+          {% else %}
+            {% set assets = state_attr('sensor.asm_data', 'assets') or {} %}
+            {% for aid, a in assets.items() %}
+              {% if a.name == selected_name %}
+                {{ aid }}
+              {% endif %}
+            {% endfor %}
+          {% endif %}
+        attributes:
+          id: >
+            {% set selected_name = states('input_select.asm_asset') %}
+            {% set assets = state_attr('sensor.asm_data', 'assets') or {} %}
+            {% for aid, a in assets.items() %}
+              {% if a.name == selected_name %}
+                {{ aid }}
+              {% endif %}
+            {% endfor %}
+          asset: >
+            {% set selected_name = states('input_select.asm_asset') %}
+            {% set assets = state_attr('sensor.asm_data', 'assets') or {} %}
+            {% for aid, a in assets.items() %}
+              {% if a.name == selected_name %}
+                {{ a | tojson }}
+              {% endif %}
+            {% endfor %}
+
+      #-----------------------------------------------------------------------
+      # Selected part details
+      #-----------------------------------------------------------------------
+      - name: ASM Selected Part
+        unique_id: asm_selected_part
+        state: >
+          {% set selected_name = states('input_select.asm_part') %}
+          {% if selected_name in ['Select Part', 'unknown', 'unavailable', ''] %}
+            none
+          {% else %}
+            {% set parts = state_attr('sensor.asm_data', 'parts') or {} %}
+            {% for pid, p in parts.items() %}
+              {% if p.name == selected_name %}
+                {{ pid }}
+              {% endif %}
+            {% endfor %}
+          {% endif %}
+        attributes:
+          id: >
+            {% set selected_name = states('input_select.asm_part') %}
+            {% set parts = state_attr('sensor.asm_data', 'parts') or {} %}
+            {% for pid, p in parts.items() %}
+              {% if p.name == selected_name %}
+                {{ pid }}
+              {% endif %}
+            {% endfor %}
+          part: >
+            {% set selected_name = states('input_select.asm_part') %}
+            {% set parts = state_attr('sensor.asm_data', 'parts') or {} %}
+            {% for pid, p in parts.items() %}
+              {% if p.name == selected_name %}
+                {{ p | tojson }}
+              {% endif %}
+            {% endfor %}
+
+      #-----------------------------------------------------------------------
+      # Filtered parts for report view
+      #-----------------------------------------------------------------------
+      - name: ASM Filtered Parts
+        unique_id: asm_filtered_parts
+        state: >
+          {% set filter_asset = states('input_select.asm_report_asset') %}
+          {% set parts = state_attr('sensor.asm_data', 'parts') or {} %}
+          {% set assets = state_attr('sensor.asm_data', 'assets') or {} %}
+
+          {% if filter_asset in ['All Assets', 'unknown', 'unavailable', ''] %}
+            {{ parts | length }}
+          {% else %}
+            {# Find asset ID from name #}
+            {% set ns = namespace(asset_id='') %}
+            {% for aid, a in assets.items() %}
+              {% if a.name == filter_asset %}
+                {% set ns.asset_id = aid %}
+              {% endif %}
+            {% endfor %}
+
+            {% set count = namespace(val=0) %}
+            {% for pid, p in parts.items() %}
+              {% if p.universal or ns.asset_id in (p.applicable_assets | default([])) %}
+                {% set count.val = count.val + 1 %}
+              {% endif %}
+            {% endfor %}
+            {{ count.val }}
+          {% endif %}
+        attributes:
+          parts: >
+            {% set filter_asset = states('input_select.asm_report_asset') %}
+            {% set parts = state_attr('sensor.asm_data', 'parts') or {} %}
+            {% set assets = state_attr('sensor.asm_data', 'assets') or {} %}
+
+            {% if filter_asset in ['All Assets', 'unknown', 'unavailable', ''] %}
+              {{ parts | tojson }}
+            {% else %}
+              {% set ns = namespace(asset_id='') %}
+              {% for aid, a in assets.items() %}
+                {% if a.name == filter_asset %}
+                  {% set ns.asset_id = aid %}
+                {% endif %}
+              {% endfor %}
+
+              {% set filtered = namespace(items={}) %}
+              {% for pid, p in parts.items() %}
+                {% if p.universal or ns.asset_id in (p.applicable_assets | default([])) %}
+                  {% set filtered.items = dict(filtered.items, **{pid: p}) %}
+                {% endif %}
+              {% endfor %}
+              {{ filtered.items | tojson }}
+            {% endif %}
+
+      #-----------------------------------------------------------------------
+      # Low stock count
+      #-----------------------------------------------------------------------
+      - name: ASM Low Stock Count
+        unique_id: asm_low_stock_count
+        icon: mdi:alert
+        state: >
+          {{ state_attr('sensor.asm_data', 'low_stock_count') | default(0) }}
+
+#=============================================================================
+# AUTOMATIONS - Keep dropdowns in sync
+#=============================================================================
+automation:
+  #---------------------------------------------------------------------------
+  # Update asset dropdown on data change
+  #---------------------------------------------------------------------------
+  - id: asm_update_asset_options
+    alias: "ASM: Update Asset Options"
+    mode: restart
+    trigger:
+      - platform: state
+        entity_id: sensor.asm_data
+      - platform: homeassistant
+        event: start
+    action:
+      - delay: "00:00:01"
+      - variables:
+          asset_names: "{{ state_attr('sensor.asm_data', 'asset_names') or [] }}"
+      - service: input_select.set_options
+        target:
+          entity_id:
+            - input_select.asm_asset
+            - input_select.asm_service_asset
+        data:
+          options: "{{ ['Select Asset'] + asset_names }}"
+      - service: input_select.set_options
+        target:
+          entity_id: input_select.asm_report_asset
+        data:
+          options: "{{ ['All Assets'] + asset_names }}"
+      # Update part-to-asset dropdowns
+      - service: input_select.set_options
+        target:
+          entity_id:
+            - input_select.asm_part_asset_1
+            - input_select.asm_part_asset_2
+            - input_select.asm_part_asset_3
+            - input_select.asm_part_asset_4
+            - input_select.asm_part_asset_5
+        data:
+          options: "{{ ['None'] + asset_names }}"
+
+  #---------------------------------------------------------------------------
+  # Update part dropdown on data change
+  #---------------------------------------------------------------------------
+  - id: asm_update_part_options
+    alias: "ASM: Update Part Options"
+    mode: restart
+    trigger:
+      - platform: state
+        entity_id: sensor.asm_data
+      - platform: homeassistant
+        event: start
+    action:
+      - delay: "00:00:01"
+      - variables:
+          part_names: "{{ state_attr('sensor.asm_data', 'part_names') or [] }}"
+      - service: input_select.set_options
+        target:
+          entity_id: input_select.asm_part
+        data:
+          options: "{{ ['Select Part'] + part_names }}"
+      # Update consume part dropdowns
+      - service: input_select.set_options
+        target:
+          entity_id:
+            - input_select.asm_consume_part_1
+            - input_select.asm_consume_part_2
+            - input_select.asm_consume_part_3
+            - input_select.asm_consume_part_4
+            - input_select.asm_consume_part_5
+        data:
+          options: "{{ ['None'] + part_names }}"
+
+#=============================================================================
+# SCRIPTS - User actions
+#=============================================================================
+script:
+  #---------------------------------------------------------------------------
+  # Add new asset
+  #---------------------------------------------------------------------------
+  asm_add_asset:
+    alias: "ASM: Add Asset"
+    mode: single
+    sequence:
+      - variables:
+          name: "{{ states('input_text.asm_asset_name') | trim }}"
+          category: "{{ states('input_select.asm_asset_category') }}"
+          # Build attributes JSON
+          attrs_json: >
+            {% set attrs = {} %}
+            {% set a1n = states('input_text.asm_attr_1_name') | trim %}
+            {% set a1v = states('input_text.asm_attr_1_value') | trim %}
+            {% if a1n %}{% set attrs = dict(attrs, **{a1n: a1v}) %}{% endif %}
+            {% set a2n = states('input_text.asm_attr_2_name') | trim %}
+            {% set a2v = states('input_text.asm_attr_2_value') | trim %}
+            {% if a2n %}{% set attrs = dict(attrs, **{a2n: a2v}) %}{% endif %}
+            {% set a3n = states('input_text.asm_attr_3_name') | trim %}
+            {% set a3v = states('input_text.asm_attr_3_value') | trim %}
+            {% if a3n %}{% set attrs = dict(attrs, **{a3n: a3v}) %}{% endif %}
+            {% set a4n = states('input_text.asm_attr_4_name') | trim %}
+            {% set a4v = states('input_text.asm_attr_4_value') | trim %}
+            {% if a4n %}{% set attrs = dict(attrs, **{a4n: a4v}) %}{% endif %}
+            {% set a5n = states('input_text.asm_attr_5_name') | trim %}
+            {% set a5v = states('input_text.asm_attr_5_value') | trim %}
+            {% if a5n %}{% set attrs = dict(attrs, **{a5n: a5v}) %}{% endif %}
+            {{ attrs | tojson }}
+
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ name == '' }}"
+            sequence:
+              - service: persistent_notification.create
+                data:
+                  title: "ASM Add Asset"
+                  message: "Asset name is required."
+              - stop: "No name"
+
+      - service: shell_command.asm_add_asset
+        data:
+          name: "{{ name }}"
+          category: "{{ category }}"
+          attributes: "{{ attrs_json }}"
+
+      - service: script.asm_clear_asset_form
+
+      - delay: "00:00:01"
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.asm_data
+
+      - service: persistent_notification.create
+        data:
+          title: "ASM Add Asset"
+          message: "Asset '{{ name }}' added."
+
+  #---------------------------------------------------------------------------
+  # Load asset into editor
+  #---------------------------------------------------------------------------
+  asm_load_asset:
+    alias: "ASM: Load Asset"
+    mode: single
+    sequence:
+      - variables:
+          asset_id: "{{ states('sensor.asm_selected_asset') }}"
+          assets: "{{ state_attr('sensor.asm_data', 'assets') or {} }}"
+
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ asset_id in ['none', 'unknown', 'unavailable', ''] }}"
+            sequence:
+              - service: persistent_notification.create
+                data:
+                  title: "ASM Load Asset"
+                  message: "Select an asset first."
+              - stop: "No asset"
+
+      - variables:
+          a: "{{ assets.get(asset_id, {}) }}"
+          attrs: "{{ a.get('attributes', {}) }}"
+          attr_keys: "{{ attrs.keys() | list }}"
+
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.asm_editor_mode
+        data:
+          option: "Edit Existing"
+
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_asset_name
+        data:
+          value: "{{ a.get('name', '') }}"
+
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.asm_asset_category
+        data:
+          option: "{{ a.get('category', 'Tractor') }}"
+
+      # Load attributes
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_attr_1_name
+        data:
+          value: "{{ attr_keys[0] if attr_keys | length > 0 else '' }}"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_attr_1_value
+        data:
+          value: "{{ attrs.get(attr_keys[0], '') if attr_keys | length > 0 else '' }}"
+
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_attr_2_name
+        data:
+          value: "{{ attr_keys[1] if attr_keys | length > 1 else '' }}"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_attr_2_value
+        data:
+          value: "{{ attrs.get(attr_keys[1], '') if attr_keys | length > 1 else '' }}"
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.asm_show_attr_2
+        condition:
+          - condition: template
+            value_template: "{{ attr_keys | length > 1 }}"
+
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_attr_3_name
+        data:
+          value: "{{ attr_keys[2] if attr_keys | length > 2 else '' }}"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_attr_3_value
+        data:
+          value: "{{ attrs.get(attr_keys[2], '') if attr_keys | length > 2 else '' }}"
+
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_attr_4_name
+        data:
+          value: "{{ attr_keys[3] if attr_keys | length > 3 else '' }}"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_attr_4_value
+        data:
+          value: "{{ attrs.get(attr_keys[3], '') if attr_keys | length > 3 else '' }}"
+
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_attr_5_name
+        data:
+          value: "{{ attr_keys[4] if attr_keys | length > 4 else '' }}"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_attr_5_value
+        data:
+          value: "{{ attrs.get(attr_keys[4], '') if attr_keys | length > 4 else '' }}"
+
+      - service: persistent_notification.create
+        data:
+          title: "ASM Load Asset"
+          message: "Loaded '{{ a.get('name', asset_id) }}'."
+
+  #---------------------------------------------------------------------------
+  # Save asset (edit existing)
+  #---------------------------------------------------------------------------
+  asm_save_asset:
+    alias: "ASM: Save Asset"
+    mode: single
+    sequence:
+      - variables:
+          mode: "{{ states('input_select.asm_editor_mode') }}"
+          asset_id: "{{ states('sensor.asm_selected_asset') }}"
+          name: "{{ states('input_text.asm_asset_name') | trim }}"
+          category: "{{ states('input_select.asm_asset_category') }}"
+          attrs_json: >
+            {% set attrs = {} %}
+            {% set a1n = states('input_text.asm_attr_1_name') | trim %}
+            {% set a1v = states('input_text.asm_attr_1_value') | trim %}
+            {% if a1n %}{% set attrs = dict(attrs, **{a1n: a1v}) %}{% endif %}
+            {% set a2n = states('input_text.asm_attr_2_name') | trim %}
+            {% set a2v = states('input_text.asm_attr_2_value') | trim %}
+            {% if a2n %}{% set attrs = dict(attrs, **{a2n: a2v}) %}{% endif %}
+            {% set a3n = states('input_text.asm_attr_3_name') | trim %}
+            {% set a3v = states('input_text.asm_attr_3_value') | trim %}
+            {% if a3n %}{% set attrs = dict(attrs, **{a3n: a3v}) %}{% endif %}
+            {% set a4n = states('input_text.asm_attr_4_name') | trim %}
+            {% set a4v = states('input_text.asm_attr_4_value') | trim %}
+            {% if a4n %}{% set attrs = dict(attrs, **{a4n: a4v}) %}{% endif %}
+            {% set a5n = states('input_text.asm_attr_5_name') | trim %}
+            {% set a5v = states('input_text.asm_attr_5_value') | trim %}
+            {% if a5n %}{% set attrs = dict(attrs, **{a5n: a5v}) %}{% endif %}
+            {{ attrs | tojson }}
+
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ 'Add' in mode }}"
+            sequence:
+              - service: script.asm_add_asset
+              - stop: "Delegated to add"
+
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ asset_id in ['none', 'unknown', 'unavailable', ''] }}"
+            sequence:
+              - service: persistent_notification.create
+                data:
+                  title: "ASM Save Asset"
+                  message: "No asset loaded. Use Load first."
+              - stop: "No asset"
+
+      - service: shell_command.asm_edit_asset
+        data:
+          asset_id: "{{ asset_id }}"
+          name: "{{ name }}"
+          category: "{{ category }}"
+          attributes: "{{ attrs_json }}"
+
+      - service: script.asm_clear_asset_form
+
+      - delay: "00:00:01"
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.asm_data
+
+      - service: persistent_notification.create
+        data:
+          title: "ASM Save Asset"
+          message: "Asset '{{ name }}' updated."
+
+  #---------------------------------------------------------------------------
+  # Clear asset form
+  #---------------------------------------------------------------------------
+  asm_clear_asset_form:
+    alias: "ASM: Clear Asset Form"
+    mode: single
+    sequence:
+      - service: input_text.set_value
+        target:
+          entity_id:
+            - input_text.asm_asset_name
+            - input_text.asm_attr_1_name
+            - input_text.asm_attr_1_value
+            - input_text.asm_attr_2_name
+            - input_text.asm_attr_2_value
+            - input_text.asm_attr_3_name
+            - input_text.asm_attr_3_value
+            - input_text.asm_attr_4_name
+            - input_text.asm_attr_4_value
+            - input_text.asm_attr_5_name
+            - input_text.asm_attr_5_value
+        data:
+          value: ""
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.asm_editor_mode
+        data:
+          option: "Add New"
+      - service: input_boolean.turn_off
+        target:
+          entity_id:
+            - input_boolean.asm_show_attr_2
+            - input_boolean.asm_show_attr_3
+            - input_boolean.asm_show_attr_4
+            - input_boolean.asm_show_attr_5
+
+  #---------------------------------------------------------------------------
+  # Add new part
+  #---------------------------------------------------------------------------
+  asm_add_part:
+    alias: "ASM: Add Part"
+    mode: single
+    sequence:
+      - variables:
+          name: "{{ states('input_text.asm_part_name') | trim }}"
+          part_number: "{{ states('input_text.asm_part_number') | trim }}"
+          category: "{{ states('input_select.asm_part_category') }}"
+          unit: "{{ states('input_select.asm_part_unit') }}"
+          stock: "{{ states('input_number.asm_part_stock') | float(0) }}"
+          min_stock: "{{ states('input_number.asm_part_min_stock') | float(0) }}"
+          universal: "{{ is_state('input_boolean.asm_universal_part', 'on') }}"
+          assets: "{{ state_attr('sensor.asm_data', 'assets') or {} }}"
+          # Build assets array from selections
+          assets_json: >
+            {% set arr = [] %}
+            {% set a1 = states('input_select.asm_part_asset_1') %}
+            {% if a1 != 'None' %}
+              {% for aid, a in assets.items() if a.name == a1 %}
+                {% set arr = arr + [aid] %}
+              {% endfor %}
+            {% endif %}
+            {% set a2 = states('input_select.asm_part_asset_2') %}
+            {% if a2 != 'None' %}
+              {% for aid, a in assets.items() if a.name == a2 %}
+                {% set arr = arr + [aid] %}
+              {% endfor %}
+            {% endif %}
+            {% set a3 = states('input_select.asm_part_asset_3') %}
+            {% if a3 != 'None' %}
+              {% for aid, a in assets.items() if a.name == a3 %}
+                {% set arr = arr + [aid] %}
+              {% endfor %}
+            {% endif %}
+            {% set a4 = states('input_select.asm_part_asset_4') %}
+            {% if a4 != 'None' %}
+              {% for aid, a in assets.items() if a.name == a4 %}
+                {% set arr = arr + [aid] %}
+              {% endfor %}
+            {% endif %}
+            {% set a5 = states('input_select.asm_part_asset_5') %}
+            {% if a5 != 'None' %}
+              {% for aid, a in assets.items() if a.name == a5 %}
+                {% set arr = arr + [aid] %}
+              {% endfor %}
+            {% endif %}
+            {{ arr | tojson }}
+          # Build part attributes
+          attrs_json: >
+            {% set attrs = {} %}
+            {% set a1n = states('input_text.asm_part_attr_1_name') | trim %}
+            {% set a1v = states('input_text.asm_part_attr_1_value') | trim %}
+            {% if a1n %}{% set attrs = dict(attrs, **{a1n: a1v}) %}{% endif %}
+            {% set a2n = states('input_text.asm_part_attr_2_name') | trim %}
+            {% set a2v = states('input_text.asm_part_attr_2_value') | trim %}
+            {% if a2n %}{% set attrs = dict(attrs, **{a2n: a2v}) %}{% endif %}
+            {% set a3n = states('input_text.asm_part_attr_3_name') | trim %}
+            {% set a3v = states('input_text.asm_part_attr_3_value') | trim %}
+            {% if a3n %}{% set attrs = dict(attrs, **{a3n: a3v}) %}{% endif %}
+            {% set a4n = states('input_text.asm_part_attr_4_name') | trim %}
+            {% set a4v = states('input_text.asm_part_attr_4_value') | trim %}
+            {% if a4n %}{% set attrs = dict(attrs, **{a4n: a4v}) %}{% endif %}
+            {% set a5n = states('input_text.asm_part_attr_5_name') | trim %}
+            {% set a5v = states('input_text.asm_part_attr_5_value') | trim %}
+            {% if a5n %}{% set attrs = dict(attrs, **{a5n: a5v}) %}{% endif %}
+            {{ attrs | tojson }}
+
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ name == '' }}"
+            sequence:
+              - service: persistent_notification.create
+                data:
+                  title: "ASM Add Part"
+                  message: "Part name is required."
+              - stop: "No name"
+
+      - service: shell_command.asm_add_part
+        data:
+          name: "{{ name }}"
+          part_number: "{{ part_number }}"
+          category: "{{ category }}"
+          unit: "{{ unit }}"
+          stock: "{{ stock }}"
+          min_stock: "{{ min_stock }}"
+          assets: "{{ assets_json }}"
+          universal: "{{ 'true' if universal else 'false' }}"
+          attributes: "{{ attrs_json }}"
+
+      - service: script.asm_clear_part_form
+
+      - delay: "00:00:01"
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.asm_data
+
+      - service: persistent_notification.create
+        data:
+          title: "ASM Add Part"
+          message: "Part '{{ name }}' added."
+
+  #---------------------------------------------------------------------------
+  # Clear part form
+  #---------------------------------------------------------------------------
+  asm_clear_part_form:
+    alias: "ASM: Clear Part Form"
+    mode: single
+    sequence:
+      - service: input_text.set_value
+        target:
+          entity_id:
+            - input_text.asm_part_name
+            - input_text.asm_part_number
+            - input_text.asm_part_attr_1_name
+            - input_text.asm_part_attr_1_value
+            - input_text.asm_part_attr_2_name
+            - input_text.asm_part_attr_2_value
+            - input_text.asm_part_attr_3_name
+            - input_text.asm_part_attr_3_value
+            - input_text.asm_part_attr_4_name
+            - input_text.asm_part_attr_4_value
+            - input_text.asm_part_attr_5_name
+            - input_text.asm_part_attr_5_value
+        data:
+          value: ""
+      - service: input_number.set_value
+        target:
+          entity_id:
+            - input_number.asm_part_stock
+            - input_number.asm_part_min_stock
+        data:
+          value: 0
+      - service: input_select.select_option
+        target:
+          entity_id:
+            - input_select.asm_part_asset_1
+            - input_select.asm_part_asset_2
+            - input_select.asm_part_asset_3
+            - input_select.asm_part_asset_4
+            - input_select.asm_part_asset_5
+        data:
+          option: "None"
+      - service: input_boolean.turn_off
+        target:
+          entity_id:
+            - input_boolean.asm_universal_part
+            - input_boolean.asm_show_part_attr_2
+            - input_boolean.asm_show_part_attr_3
+            - input_boolean.asm_show_part_attr_4
+            - input_boolean.asm_show_part_attr_5
+            - input_boolean.asm_show_asset_2
+            - input_boolean.asm_show_asset_3
+            - input_boolean.asm_show_asset_4
+            - input_boolean.asm_show_asset_5
+
+  #---------------------------------------------------------------------------
+  # Adjust stock
+  #---------------------------------------------------------------------------
+  asm_adjust_stock:
+    alias: "ASM: Adjust Stock"
+    mode: single
+    sequence:
+      - variables:
+          part_id: "{{ states('sensor.asm_selected_part') }}"
+          delta: "{{ states('input_number.asm_stock_delta') | float(0) }}"
+          parts: "{{ state_attr('sensor.asm_data', 'parts') or {} }}"
+
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ part_id in ['none', 'unknown', 'unavailable', ''] }}"
+            sequence:
+              - service: persistent_notification.create
+                data:
+                  title: "ASM Adjust Stock"
+                  message: "Select a part first."
+              - stop: "No part"
+
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ delta == 0 }}"
+            sequence:
+              - service: persistent_notification.create
+                data:
+                  title: "ASM Adjust Stock"
+                  message: "Adjustment is zero."
+              - stop: "Zero delta"
+
+      - service: shell_command.asm_adjust_stock
+        data:
+          part_id: "{{ part_id }}"
+          delta: "{{ delta }}"
+
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.asm_stock_delta
+        data:
+          value: 0
+
+      - delay: "00:00:01"
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.asm_data
+
+      - service: persistent_notification.create
+        data:
+          title: "ASM Adjust Stock"
+          message: >
+            {% set p = parts.get(part_id, {}) %}
+            {{ p.name | default(part_id) }} adjusted by {{ delta | float | round(1) }}.
+
+  #---------------------------------------------------------------------------
+  # Record service event
+  #---------------------------------------------------------------------------
+  asm_record_service:
+    alias: "ASM: Record Service"
+    mode: single
+    sequence:
+      - variables:
+          asset_name: "{{ states('input_select.asm_service_asset') }}"
+          service_type: "{{ states('input_select.asm_service_type') }}"
+          notes: "{{ states('input_text.asm_service_notes') | trim }}"
+          hours: "{{ states('input_text.asm_service_hours') | trim }}"
+          assets: "{{ state_attr('sensor.asm_data', 'assets') or {} }}"
+          parts: "{{ state_attr('sensor.asm_data', 'parts') or {} }}"
+          # Find asset ID
+          asset_id: >
+            {% for aid, a in assets.items() %}
+              {% if a.name == asset_name %}
+                {{ aid }}
+              {% endif %}
+            {% endfor %}
+          # Build parts consumed array
+          parts_json: >
+            {% set consumed = [] %}
+            {% set p1 = states('input_select.asm_consume_part_1') %}
+            {% set q1 = states('input_number.asm_consume_qty_1') | float(0) %}
+            {% if p1 != 'None' and q1 > 0 %}
+              {% for pid, p in parts.items() if p.name == p1 %}
+                {% set consumed = consumed + [{"part_id": pid, "quantity": q1}] %}
+              {% endfor %}
+            {% endif %}
+            {% set p2 = states('input_select.asm_consume_part_2') %}
+            {% set q2 = states('input_number.asm_consume_qty_2') | float(0) %}
+            {% if p2 != 'None' and q2 > 0 %}
+              {% for pid, p in parts.items() if p.name == p2 %}
+                {% set consumed = consumed + [{"part_id": pid, "quantity": q2}] %}
+              {% endfor %}
+            {% endif %}
+            {% set p3 = states('input_select.asm_consume_part_3') %}
+            {% set q3 = states('input_number.asm_consume_qty_3') | float(0) %}
+            {% if p3 != 'None' and q3 > 0 %}
+              {% for pid, p in parts.items() if p.name == p3 %}
+                {% set consumed = consumed + [{"part_id": pid, "quantity": q3}] %}
+              {% endfor %}
+            {% endif %}
+            {% set p4 = states('input_select.asm_consume_part_4') %}
+            {% set q4 = states('input_number.asm_consume_qty_4') | float(0) %}
+            {% if p4 != 'None' and q4 > 0 %}
+              {% for pid, p in parts.items() if p.name == p4 %}
+                {% set consumed = consumed + [{"part_id": pid, "quantity": q4}] %}
+              {% endfor %}
+            {% endif %}
+            {% set p5 = states('input_select.asm_consume_part_5') %}
+            {% set q5 = states('input_number.asm_consume_qty_5') | float(0) %}
+            {% if p5 != 'None' and q5 > 0 %}
+              {% for pid, p in parts.items() if p.name == p5 %}
+                {% set consumed = consumed + [{"part_id": pid, "quantity": q5}] %}
+              {% endfor %}
+            {% endif %}
+            {{ consumed | tojson }}
+
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ asset_name in ['Select Asset', 'unknown', 'unavailable', ''] }}"
+            sequence:
+              - service: persistent_notification.create
+                data:
+                  title: "ASM Record Service"
+                  message: "Select an asset first."
+              - stop: "No asset"
+
+      - service: shell_command.asm_record_service
+        data:
+          asset_id: "{{ asset_id | trim }}"
+          service_type: "{{ service_type }}"
+          parts: "{{ parts_json }}"
+          notes: "{{ notes }}"
+          hours: "{{ hours }}"
+
+      - service: script.asm_clear_service_form
+
+      - delay: "00:00:01"
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.asm_data
+
+      - service: persistent_notification.create
+        data:
+          title: "ASM Record Service"
+          message: "{{ service_type }} recorded for {{ asset_name }}."
+
+  #---------------------------------------------------------------------------
+  # Clear service form
+  #---------------------------------------------------------------------------
+  asm_clear_service_form:
+    alias: "ASM: Clear Service Form"
+    mode: single
+    sequence:
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.asm_service_asset
+        data:
+          option: "Select Asset"
+      - service: input_text.set_value
+        target:
+          entity_id:
+            - input_text.asm_service_notes
+            - input_text.asm_service_hours
+        data:
+          value: ""
+      - service: input_select.select_option
+        target:
+          entity_id:
+            - input_select.asm_consume_part_1
+            - input_select.asm_consume_part_2
+            - input_select.asm_consume_part_3
+            - input_select.asm_consume_part_4
+            - input_select.asm_consume_part_5
+        data:
+          option: "None"
+      - service: input_number.set_value
+        target:
+          entity_id:
+            - input_number.asm_consume_qty_1
+            - input_number.asm_consume_qty_2
+            - input_number.asm_consume_qty_3
+            - input_number.asm_consume_qty_4
+            - input_number.asm_consume_qty_5
+        data:
+          value: 0
+      - service: input_boolean.turn_off
+        target:
+          entity_id:
+            - input_boolean.asm_show_consume_2
+            - input_boolean.asm_show_consume_3
+            - input_boolean.asm_show_consume_4
+            - input_boolean.asm_show_consume_5

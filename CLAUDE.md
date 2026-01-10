@@ -7,9 +7,9 @@ This file provides guidance to Claude Code when working with this repository.
 This is a Home Assistant configuration repository for a farm/agricultural operation. The system is called **PaddiSense** - a modular farm management platform with multiple packages:
 
 - **IPM** (Inventory Product Manager) - Track chemicals, fertilisers, seeds, lubricants
+- **ASM** (Asset Service Manager) - Track assets, parts, and service events
 - **WSS** (Work Safety System) - Coming soon
 - **PWM** (Precision Water Management) - Coming soon
-- **ASM** (Asset Manager) - Coming soon
 - **HFM** (Hey Farmer) - Coming soon
 
 ## Directory Structure
@@ -18,18 +18,27 @@ This is a Home Assistant configuration repository for a farm/agricultural operat
 /config/
 ├── configuration.yaml          # Main HA config
 ├── PaddiSense/                 # All distributable modules
-│   └── ipm/                    # Inventory Product Manager
-│       ├── package.yaml        # All HA config (helpers, templates, scripts, automations)
+│   ├── ipm/                    # Inventory Product Manager
+│   │   ├── package.yaml        # All HA config (helpers, templates, scripts, automations)
+│   │   ├── python/
+│   │   │   ├── ipm_backend.py  # Write operations (add/edit product, move stock)
+│   │   │   └── ipm_sensor.py   # Read-only JSON output for HA sensor
+│   │   └── dashboards/
+│   │       └── inventory.yaml  # Dashboard views
+│   │
+│   └── asm/                    # Asset Service Manager
+│       ├── package.yaml        # All HA config
 │       ├── python/
-│       │   ├── ipm_backend.py  # Write operations (add/edit product, move stock)
-│       │   └── ipm_sensor.py   # Read-only JSON output for HA sensor
+│       │   ├── asm_backend.py  # Write operations (assets, parts, services)
+│       │   └── asm_sensor.py   # Read-only JSON output for HA sensor
 │       └── dashboards/
-│           ├── registry.yaml   # Dashboard registration
-│           └── inventory.yaml  # Dashboard views
+│           └── views.yaml      # Dashboard views (Assets, Parts, Report, Service)
 │
 └── local_data/                 # Runtime data - NOT in git
-    └── ipm/
-        └── inventory.json      # Product inventory data
+    ├── ipm/
+    │   └── inventory.json      # Product inventory data
+    └── asm/
+        └── data.json           # Asset, part, and service event data
 ```
 
 ## Module Design Principles
@@ -67,6 +76,43 @@ Lubricant   → Engine Oil, Hydraulic Oil, Grease, Gear Oil, Transmission Fluid,
 
 ### Storage Locations
 Chem Shed, Seed Shed, Oil Shed, Silo 1-13
+
+## ASM System Architecture
+
+### Data Flow
+1. `sensor.asm_data` runs Python sensor script every 5 minutes
+2. Template sensors filter parts by asset selection
+3. User interactions trigger scripts
+4. Scripts call shell commands which invoke Python backend
+5. Python backend updates `data.json`
+6. Service events auto-deduct parts from stock
+7. Sensor refreshes to reflect changes
+
+### Key Entities
+- `sensor.asm_data` - Main data source (JSON attributes: assets, parts, events)
+- `input_select.asm_asset` - Asset selection by NAME
+- `input_select.asm_part` - Part selection
+- `input_select.asm_service_asset` - Asset for service recording
+- `input_select.asm_service_type` - Service type selection
+- `script.asm_add_asset` / `script.asm_save_asset` - Asset management
+- `script.asm_add_part` - Part management
+- `script.asm_record_service` - Record service with auto-deduct
+
+### Asset Categories
+Tractor, Pump, Harvester, Vehicle
+
+### Part Categories
+Filter, Belt, Oil, Grease, Battery, Tyre, Hose
+
+### Service Types
+250 Hr Service, 500 Hr Service, 1000 Hr Service, Annual Service, Repair, Inspection, Other
+
+### Key Features
+- Parts can be assigned to specific assets or marked as "universal" (all assets)
+- Flexible custom attributes (5 slots) for both assets and parts
+- Single stock count per part (simpler than IPM's multi-location)
+- Service events consume parts and auto-deduct from stock
+- Transaction logging for audit trail
 
 ## Git Workflow
 

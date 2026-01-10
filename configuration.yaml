@@ -18,6 +18,7 @@ scene: !include scenes.yaml
 homeassistant:
   packages:
     ipm: !include PaddiSense/ipm/package.yaml
+    asm: !include PaddiSense/asm/package.yaml
 
 # Dashboards: Each module registers its own dashboard
 lovelace:
@@ -29,6 +30,12 @@ lovelace:
       icon: mdi:warehouse
       show_in_sidebar: true
       filename: PaddiSense/ipm/dashboards/inventory.yaml
+    asm-service:
+      mode: yaml
+      title: Asset Service Manager
+      icon: mdi:tractor
+      show_in_sidebar: true
+      filename: PaddiSense/asm/dashboards/views.yaml
 
 ##############################################################################
 # Database Settings

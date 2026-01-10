@@ -1,0 +1,464 @@
+# ASM Dashboard Views
+# PaddiSense Farm Management System
+#
+# Include this in your dashboard configuration or use as reference
+# for building your own views.
+#
+# Views:
+#   1. Asset Manager - Add/edit assets
+#   2. Part Manager - Add/edit parts, set stock
+#   3. Report - View parts by asset, stock levels
+#   4. Event - Record service events
+
+title: ASM - Asset Service Manager
+views:
+  #===========================================================================
+  # ASSET MANAGER VIEW
+  #===========================================================================
+  - title: Assets
+    path: asm-assets
+    icon: mdi:tractor
+    cards:
+      - type: markdown
+        content: |
+          ## Asset Manager
+          Add and manage your farm assets.
+
+      # Asset selector
+      - type: entities
+        title: Select Asset
+        entities:
+          - entity: input_select.asm_asset
+            name: Asset
+          - type: button
+            name: Load Asset
+            icon: mdi:download
+            tap_action:
+              action: call-service
+              service: script.asm_load_asset
+
+      # Asset editor form
+      - type: entities
+        title: Asset Details
+        entities:
+          - entity: input_select.asm_editor_mode
+            name: Mode
+          - entity: input_text.asm_asset_name
+            name: Name
+          - entity: input_select.asm_asset_category
+            name: Category
+          - type: divider
+          - type: section
+            label: Attributes
+          - entity: input_text.asm_attr_1_name
+            name: Attribute 1
+          - entity: input_text.asm_attr_1_value
+            name: Value 1
+          - type: conditional
+            conditions:
+              - entity: input_boolean.asm_show_attr_2
+                state: "on"
+            row:
+              entity: input_text.asm_attr_2_name
+              name: Attribute 2
+          - type: conditional
+            conditions:
+              - entity: input_boolean.asm_show_attr_2
+                state: "on"
+            row:
+              entity: input_text.asm_attr_2_value
+              name: Value 2
+          - entity: input_boolean.asm_show_attr_2
+            name: Add Attribute 2
+          - type: conditional
+            conditions:
+              - entity: input_boolean.asm_show_attr_3
+                state: "on"
+            row:
+              entity: input_text.asm_attr_3_name
+              name: Attribute 3
+          - type: conditional
+            conditions:
+              - entity: input_boolean.asm_show_attr_3
+                state: "on"
+            row:
+              entity: input_text.asm_attr_3_value
+              name: Value 3
+          - type: conditional
+            conditions:
+              - entity: input_boolean.asm_show_attr_2
+                state: "on"
+            row:
+              entity: input_boolean.asm_show_attr_3
+              name: Add Attribute 3
+
+      # Action buttons
+      - type: horizontal-stack
+        cards:
+          - type: button
+            name: Save
+            icon: mdi:content-save
+            tap_action:
+              action: call-service
+              service: script.asm_save_asset
+          - type: button
+            name: Clear
+            icon: mdi:eraser
+            tap_action:
+              action: call-service
+              service: script.asm_clear_asset_form
+
+      # Asset list
+      - type: markdown
+        content: |
+          ### Asset List
+          {% set assets = state_attr('sensor.asm_data', 'assets') or {} %}
+          {% if assets | length == 0 %}
+          *No assets yet. Add one above.*
+          {% else %}
+          | Asset | Category | Attributes |
+          |-------|----------|------------|
+          {% for aid, a in assets.items() %}
+          | {{ a.name }} | {{ a.category }} | {{ a.attributes | length }} attrs |
+          {% endfor %}
+          {% endif %}
+
+  #===========================================================================
+  # PART MANAGER VIEW
+  #===========================================================================
+  - title: Parts
+    path: asm-parts
+    icon: mdi:cog
+    cards:
+      - type: markdown
+        content: |
+          ## Part Manager
+          Add and manage parts, set stock levels.
+
+      # Part selector
+      - type: entities
+        title: Select Part
+        entities:
+          - entity: input_select.asm_part
+            name: Part
+          - type: button
+            name: Load Part
+            icon: mdi:download
+            tap_action:
+              action: call-service
+              service: script.asm_load_part
+
+      # Part editor form
+      - type: entities
+        title: Part Details
+        entities:
+          - entity: input_text.asm_part_name
+            name: Name
+          - entity: input_text.asm_part_number
+            name: Part Number
+          - entity: input_select.asm_part_category
+            name: Category
+          - entity: input_select.asm_part_unit
+            name: Unit
+          - entity: input_number.asm_part_stock
+            name: Initial Stock
+          - entity: input_number.asm_part_min_stock
+            name: Min Stock
+          - type: divider
+          - type: section
+            label: Applies To Assets
+          - entity: input_boolean.asm_universal_part
+            name: Universal (All Assets)
+          - entity: input_select.asm_part_asset_1
+            name: Asset 1
+          - type: conditional
+            conditions:
+              - entity: input_boolean.asm_show_asset_2
+                state: "on"
+            row:
+              entity: input_select.asm_part_asset_2
+              name: Asset 2
+          - entity: input_boolean.asm_show_asset_2
+            name: Add Asset 2
+          - type: conditional
+            conditions:
+              - entity: input_boolean.asm_show_asset_3
+                state: "on"
+            row:
+              entity: input_select.asm_part_asset_3
+              name: Asset 3
+          - type: conditional
+            conditions:
+              - entity: input_boolean.asm_show_asset_2
+                state: "on"
+            row:
+              entity: input_boolean.asm_show_asset_3
+              name: Add Asset 3
+
+      # Part attributes
+      - type: entities
+        title: Part Attributes
+        entities:
+          - entity: input_text.asm_part_attr_1_name
+            name: Attribute 1
+          - entity: input_text.asm_part_attr_1_value
+            name: Value 1
+          - type: conditional
+            conditions:
+              - entity: input_boolean.asm_show_part_attr_2
+                state: "on"
+            row:
+              entity: input_text.asm_part_attr_2_name
+              name: Attribute 2
+          - type: conditional
+            conditions:
+              - entity: input_boolean.asm_show_part_attr_2
+                state: "on"
+            row:
+              entity: input_text.asm_part_attr_2_value
+              name: Value 2
+          - entity: input_boolean.asm_show_part_attr_2
+            name: Add Attribute 2
+
+      # Action buttons
+      - type: horizontal-stack
+        cards:
+          - type: button
+            name: Add Part
+            icon: mdi:plus
+            tap_action:
+              action: call-service
+              service: script.asm_add_part
+          - type: button
+            name: Clear
+            icon: mdi:eraser
+            tap_action:
+              action: call-service
+              service: script.asm_clear_part_form
+
+      # Stock adjustment
+      - type: entities
+        title: Adjust Stock
+        entities:
+          - entity: input_select.asm_part
+            name: Part
+          - entity: input_number.asm_stock_delta
+            name: Adjustment (+/-)
+          - type: button
+            name: Apply
+            icon: mdi:check
+            tap_action:
+              action: call-service
+              service: script.asm_adjust_stock
+
+  #===========================================================================
+  # REPORT VIEW
+  #===========================================================================
+  - title: Report
+    path: asm-report
+    icon: mdi:chart-box
+    cards:
+      - type: markdown
+        content: |
+          ## Parts Report
+          View parts by asset and stock levels.
+
+      # Summary stats
+      - type: glance
+        entities:
+          - entity: sensor.asm_data
+            name: Total Parts
+          - entity: sensor.asm_low_stock_count
+            name: Low Stock
+        columns: 2
+
+      # Filter by asset
+      - type: entities
+        title: Filter
+        entities:
+          - entity: input_select.asm_report_asset
+            name: Asset
+
+      # Parts table
+      - type: markdown
+        content: |
+          ### Parts List
+          {% set filter_asset = states('input_select.asm_report_asset') %}
+          {% set parts = state_attr('sensor.asm_data', 'parts') or {} %}
+          {% set assets = state_attr('sensor.asm_data', 'assets') or {} %}
+          {% set asset_id_to_name = state_attr('sensor.asm_data', 'asset_id_to_name') or {} %}
+
+          {% set ns = namespace(asset_id='') %}
+          {% if filter_asset not in ['All Assets', 'unknown', 'unavailable', ''] %}
+            {% for aid, a in assets.items() %}
+              {% if a.name == filter_asset %}
+                {% set ns.asset_id = aid %}
+              {% endif %}
+            {% endfor %}
+          {% endif %}
+
+          | Part | Category | Stock | Min | Status | Assets |
+          |------|----------|-------|-----|--------|--------|
+          {% for pid, p in parts.items() %}
+            {% set show = (filter_asset in ['All Assets', ''] or p.universal or ns.asset_id in (p.applicable_assets | default([]))) %}
+            {% if show %}
+              {% set status = 'OK' if p.stock >= p.min_stock or p.min_stock == 0 else 'LOW' %}
+              {% set asset_names = [] %}
+              {% if p.universal %}
+                {% set asset_names = ['Universal'] %}
+              {% else %}
+                {% for aid in p.applicable_assets | default([]) %}
+                  {% set asset_names = asset_names + [asset_id_to_name.get(aid, aid)] %}
+                {% endfor %}
+              {% endif %}
+          | {{ p.name }} | {{ p.category }} | {{ p.stock }} {{ p.unit }} | {{ p.min_stock }} | {{ status }} | {{ asset_names | join(', ') }} |
+            {% endif %}
+          {% endfor %}
+
+      # Low stock alert
+      - type: conditional
+        conditions:
+          - entity: sensor.asm_low_stock_count
+            state_not: "0"
+        card:
+          type: markdown
+          content: |
+            ### Low Stock Alert
+            {% set parts = state_attr('sensor.asm_data', 'parts') or {} %}
+            {% for pid, p in parts.items() %}
+              {% if p.min_stock > 0 and p.stock < p.min_stock %}
+            - **{{ p.name }}**: {{ p.stock }} {{ p.unit }} (min: {{ p.min_stock }})
+              {% endif %}
+            {% endfor %}
+
+  #===========================================================================
+  # EVENT VIEW (Service Recording)
+  #===========================================================================
+  - title: Service
+    path: asm-service
+    icon: mdi:wrench
+    cards:
+      - type: markdown
+        content: |
+          ## Record Service Event
+          Log services and auto-deduct parts.
+
+      # Service form
+      - type: entities
+        title: Service Details
+        entities:
+          - entity: input_select.asm_service_asset
+            name: Asset
+          - entity: input_select.asm_service_type
+            name: Service Type
+          - entity: input_text.asm_service_hours
+            name: Engine Hours
+          - entity: input_text.asm_service_notes
+            name: Notes
+          - type: divider
+          - type: section
+            label: Parts Consumed
+          - entity: input_select.asm_consume_part_1
+            name: Part 1
+          - entity: input_number.asm_consume_qty_1
+            name: Qty 1
+          - type: conditional
+            conditions:
+              - entity: input_boolean.asm_show_consume_2
+                state: "on"
+            row:
+              entity: input_select.asm_consume_part_2
+              name: Part 2
+          - type: conditional
+            conditions:
+              - entity: input_boolean.asm_show_consume_2
+                state: "on"
+            row:
+              entity: input_number.asm_consume_qty_2
+              name: Qty 2
+          - entity: input_boolean.asm_show_consume_2
+            name: Add Part 2
+          - type: conditional
+            conditions:
+              - entity: input_boolean.asm_show_consume_3
+                state: "on"
+            row:
+              entity: input_select.asm_consume_part_3
+              name: Part 3
+          - type: conditional
+            conditions:
+              - entity: input_boolean.asm_show_consume_3
+                state: "on"
+            row:
+              entity: input_number.asm_consume_qty_3
+              name: Qty 3
+          - type: conditional
+            conditions:
+              - entity: input_boolean.asm_show_consume_2
+                state: "on"
+            row:
+              entity: input_boolean.asm_show_consume_3
+              name: Add Part 3
+          - type: conditional
+            conditions:
+              - entity: input_boolean.asm_show_consume_4
+                state: "on"
+            row:
+              entity: input_select.asm_consume_part_4
+              name: Part 4
+          - type: conditional
+            conditions:
+              - entity: input_boolean.asm_show_consume_4
+                state: "on"
+            row:
+              entity: input_number.asm_consume_qty_4
+              name: Qty 4
+          - type: conditional
+            conditions:
+              - entity: input_boolean.asm_show_consume_5
+                state: "on"
+            row:
+              entity: input_select.asm_consume_part_5
+              name: Part 5
+          - type: conditional
+            conditions:
+              - entity: input_boolean.asm_show_consume_5
+                state: "on"
+            row:
+              entity: input_number.asm_consume_qty_5
+              name: Qty 5
+
+      # Action buttons
+      - type: horizontal-stack
+        cards:
+          - type: button
+            name: Record Service
+            icon: mdi:check
+            tap_action:
+              action: call-service
+              service: script.asm_record_service
+          - type: button
+            name: Clear
+            icon: mdi:eraser
+            tap_action:
+              action: call-service
+              service: script.asm_clear_service_form
+
+      # Recent service history
+      - type: markdown
+        content: |
+          ### Recent Service History
+          {% set events = state_attr('sensor.asm_data', 'recent_events') or [] %}
+          {% if events | length == 0 %}
+          *No service events recorded yet.*
+          {% else %}
+          | Date | Asset | Service | Parts |
+          |------|-------|---------|-------|
+          {% for e in events[:10] %}
+            {% set parts_list = [] %}
+            {% for pc in e.parts_consumed | default([]) %}
+              {% set parts_list = parts_list + [pc.part_id ~ ' x' ~ pc.quantity] %}
+            {% endfor %}
+          | {{ e.timestamp[:10] }} | {{ e.asset_name | default(e.asset_id) }} | {{ e.service_type }} | {{ parts_list | join(', ') if parts_list else '-' }} |
+          {% endfor %}
+          {% endif %}
