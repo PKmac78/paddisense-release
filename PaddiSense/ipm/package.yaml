@@ -1,0 +1,1675 @@
+##############################################################################
+# IPM - Inventory Product Manager
+# PaddiSense Farm Management System
+#
+# This package provides complete inventory management for:
+#   - Chemicals (herbicides, fungicides, etc.)
+#   - Fertilisers
+#   - Seeds
+#   - Lubricants
+#
+# Features:
+#   - Multi-location stock tracking
+#   - User-friendly product selection by name (not ID)
+#   - Category/subcategory filtering
+#   - Stock movement with +/- buttons
+#   - Product add/edit functionality
+#   - Stock overview reports
+##############################################################################
+
+#=============================================================================
+# COMMAND LINE SENSOR - Main data source
+#=============================================================================
+command_line:
+  - sensor:
+      name: IPM Products
+      unique_id: ipm_products
+      command: 'python3 /config/PaddiSense/ipm/python/ipm_sensor.py'
+      command_timeout: 30
+      scan_interval: 300
+      value_template: '{{ value_json.total_products | default(0) }}'
+      json_attributes:
+        - products
+        - product_names
+        - product_locations
+        - categories
+        - category_subcategories
+        - locations
+
+#=============================================================================
+# SHELL COMMANDS - Python backend calls
+#=============================================================================
+shell_command:
+  ipm_add_product: >-
+    python3 /config/PaddiSense/ipm/python/ipm_backend.py add_product
+    --name "{{ name }}"
+    --category "{{ category }}"
+    --subcategory "{{ subcategory }}"
+    --unit "{{ unit }}"
+    --container_size "{{ container_size }}"
+    --min_stock "{{ min_stock }}"
+    --chemical_group "{{ chemical_group }}"
+    --application_unit "{{ application_unit }}"
+    --location "{{ location }}"
+    --initial_stock "{{ initial_stock }}"
+    --actives '{{ actives }}'
+
+  ipm_edit_product: >-
+    python3 /config/PaddiSense/ipm/python/ipm_backend.py edit_product
+    --id "{{ product_id }}"
+    --name "{{ name }}"
+    --category "{{ category }}"
+    --subcategory "{{ subcategory }}"
+    --unit "{{ unit }}"
+    --container_size "{{ container_size }}"
+    --min_stock "{{ min_stock }}"
+    --chemical_group "{{ chemical_group }}"
+    --application_unit "{{ application_unit }}"
+    --actives '{{ actives }}'
+
+  ipm_move_stock: >-
+    python3 /config/PaddiSense/ipm/python/ipm_backend.py move_stock
+    --id "{{ product_id }}"
+    --location "{{ location }}"
+    --delta "{{ delta }}"
+    --note "{{ note }}"
+
+  ipm_delete_product: >-
+    python3 /config/PaddiSense/ipm/python/ipm_backend.py delete_product
+    --id "{{ product_id }}"
+
+#=============================================================================
+# INPUT HELPERS - User interface controls
+#=============================================================================
+input_select:
+  # ----- Movement View Filters -----
+  ipm_category:
+    name: IPM Category Filter
+    icon: mdi:shape
+    options:
+      - All
+      - Chemical
+      - Fertiliser
+      - Seed
+      - Lubricant
+
+  ipm_subcategory:
+    name: IPM Subcategory Filter
+    icon: mdi:shape-outline
+    options:
+      - All
+
+  # Product selection by NAME (user-friendly)
+  ipm_product:
+    name: IPM Product
+    icon: mdi:package-variant
+    options:
+      - Select Product
+
+  # Location selection (for stock movement - uses same fixed list as editor)
+  ipm_location:
+    name: IPM Location
+    icon: mdi:map-marker
+    options:
+      - Select Location
+      - Chem Shed
+      - Seed Shed
+      - Oil Shed
+      - Silo 1
+      - Silo 2
+      - Silo 3
+      - Silo 4
+      - Silo 5
+      - Silo 6
+      - Silo 7
+      - Silo 8
+      - Silo 9
+      - Silo 10
+      - Silo 11
+      - Silo 12
+      - Silo 13
+
+  # ----- Product Editor -----
+  ipm_editor_mode:
+    name: IPM Editor Mode
+    icon: mdi:pencil
+    options:
+      - Add New Product
+      - Edit Existing Product
+
+  ipm_edit_category:
+    name: IPM Edit Category
+    icon: mdi:shape
+    options:
+      - Chemical
+      - Fertiliser
+      - Seed
+      - Lubricant
+
+  ipm_edit_subcategory:
+    name: IPM Edit Subcategory
+    icon: mdi:shape-outline
+    options:
+      - Select Subcategory
+
+  ipm_edit_unit:
+    name: IPM Edit Unit
+    icon: mdi:scale
+    options:
+      - L
+      - kg
+      - t
+
+  ipm_edit_container:
+    name: IPM Edit Container Size
+    icon: mdi:cube-outline
+    options:
+      - "1"
+      - "5"
+      - "10"
+      - "20"
+      - "110"
+      - "200"
+      - "1000"
+      - bulk
+
+  ipm_edit_location:
+    name: IPM Edit Storage Location
+    icon: mdi:warehouse
+    options:
+      - Chem Shed
+      - Seed Shed
+      - Oil Shed
+      - Silo 1
+      - Silo 2
+      - Silo 3
+      - Silo 4
+      - Silo 5
+      - Silo 6
+      - Silo 7
+      - Silo 8
+      - Silo 9
+      - Silo 10
+      - Silo 11
+      - Silo 12
+      - Silo 13
+
+  ipm_edit_chem_group:
+    name: IPM Edit Chemical Group
+    icon: mdi:flask
+    options:
+      - None
+      - "1"
+      - "2"
+      - "3"
+      - "4"
+      - "5"
+      - "6"
+      - "7"
+      - "8"
+      - "9"
+      - "11"
+      - "12"
+      - "13"
+      - "14"
+      - "15"
+      - "22"
+      - "M"
+
+  ipm_edit_app_unit:
+    name: IPM Edit Application Unit
+    icon: mdi:ruler
+    options:
+      - L/ha
+      - mL/ha
+      - kg/ha
+      - g/ha
+      - t/ha
+      - mL/100L
+      - g/100L
+
+  # Active constituent units
+  ipm_active_1_unit:
+    name: IPM Active 1 Unit
+    icon: mdi:scale
+    options:
+      - g/L
+      - g/kg
+      - ml/L
+      - "%"
+
+  ipm_active_2_unit:
+    name: IPM Active 2 Unit
+    icon: mdi:scale
+    options:
+      - g/L
+      - g/kg
+      - ml/L
+      - "%"
+
+  ipm_active_3_unit:
+    name: IPM Active 3 Unit
+    icon: mdi:scale
+    options:
+      - g/L
+      - g/kg
+      - ml/L
+      - "%"
+
+  ipm_active_4_unit:
+    name: IPM Active 4 Unit
+    icon: mdi:scale
+    options:
+      - g/L
+      - g/kg
+      - ml/L
+      - "%"
+
+  ipm_active_5_unit:
+    name: IPM Active 5 Unit
+    icon: mdi:scale
+    options:
+      - g/L
+      - g/kg
+      - ml/L
+      - "%"
+
+  ipm_active_6_unit:
+    name: IPM Active 6 Unit
+    icon: mdi:scale
+    options:
+      - g/L
+      - g/kg
+      - ml/L
+      - "%"
+
+input_number:
+  # Stock movement quantity
+  ipm_quantity:
+    name: IPM Quantity Change
+    icon: mdi:plus-minus
+    min: -99999
+    max: 99999
+    step: 1
+    mode: box
+
+  # Product editor fields
+  ipm_edit_min_stock:
+    name: IPM Edit Min Stock
+    icon: mdi:alert-outline
+    min: 0
+    max: 99999
+    step: 1
+    mode: box
+
+  ipm_edit_initial_stock:
+    name: IPM Edit Initial Stock
+    icon: mdi:package-variant-plus
+    min: 0
+    max: 99999
+    step: 1
+    mode: box
+
+  # Active constituent concentrations (number only)
+  ipm_active_1_conc:
+    name: IPM Active 1 Concentration
+    icon: mdi:percent
+    min: 0
+    max: 9999
+    step: 0.1
+    mode: box
+
+  ipm_active_2_conc:
+    name: IPM Active 2 Concentration
+    icon: mdi:percent
+    min: 0
+    max: 9999
+    step: 0.1
+    mode: box
+
+  ipm_active_3_conc:
+    name: IPM Active 3 Concentration
+    icon: mdi:percent
+    min: 0
+    max: 9999
+    step: 0.1
+    mode: box
+
+  ipm_active_4_conc:
+    name: IPM Active 4 Concentration
+    icon: mdi:percent
+    min: 0
+    max: 9999
+    step: 0.1
+    mode: box
+
+  ipm_active_5_conc:
+    name: IPM Active 5 Concentration
+    icon: mdi:percent
+    min: 0
+    max: 9999
+    step: 0.1
+    mode: box
+
+  ipm_active_6_conc:
+    name: IPM Active 6 Concentration
+    icon: mdi:percent
+    min: 0
+    max: 9999
+    step: 0.1
+    mode: box
+
+input_text:
+  # Search filter
+  ipm_search:
+    name: IPM Search
+    icon: mdi:magnify
+    max: 50
+
+  # Product editor name field
+  ipm_edit_name:
+    name: IPM Edit Product Name
+    icon: mdi:rename
+    max: 80
+
+  # Active constituent names (for Chemicals and Fertilisers)
+  ipm_active_1_name:
+    name: IPM Active 1 Name
+    icon: mdi:flask
+    max: 50
+
+  ipm_active_2_name:
+    name: IPM Active 2 Name
+    icon: mdi:flask
+    max: 50
+
+  ipm_active_3_name:
+    name: IPM Active 3 Name
+    icon: mdi:flask
+    max: 50
+
+  ipm_active_4_name:
+    name: IPM Active 4 Name
+    icon: mdi:flask
+    max: 50
+
+  ipm_active_5_name:
+    name: IPM Active 5 Name
+    icon: mdi:flask
+    max: 50
+
+  ipm_active_6_name:
+    name: IPM Active 6 Name
+    icon: mdi:flask
+    max: 50
+
+input_boolean:
+  # Toggle to show additional active constituent fields
+  ipm_show_active_2:
+    name: IPM Show Active 2
+    icon: mdi:plus-circle-outline
+
+  ipm_show_active_3:
+    name: IPM Show Active 3
+    icon: mdi:plus-circle-outline
+
+  ipm_show_active_4:
+    name: IPM Show Active 4
+    icon: mdi:plus-circle-outline
+
+  ipm_show_active_5:
+    name: IPM Show Active 5
+    icon: mdi:plus-circle-outline
+
+  ipm_show_active_6:
+    name: IPM Show Active 6
+    icon: mdi:plus-circle-outline
+
+  # Toggle to show/hide form after save
+  ipm_show_form:
+    name: IPM Show Form
+    icon: mdi:form-select
+    initial: true
+
+#=============================================================================
+# TEMPLATE SENSORS - Computed values for UI
+#=============================================================================
+template:
+  - sensor:
+      #-----------------------------------------------------------------------
+      # Filtered product list based on category, subcategory, and search
+      #-----------------------------------------------------------------------
+      - name: IPM Filtered Products
+        unique_id: ipm_filtered_products
+        state: >
+          {% set products = state_attr('sensor.ipm_products', 'products') or {} %}
+          {% set category = states('input_select.ipm_category') %}
+          {% set subcategory = states('input_select.ipm_subcategory') %}
+          {% set search = states('input_text.ipm_search') | lower | trim %}
+
+          {% set ns = namespace(count=0) %}
+          {% for pid, p in products.items() %}
+            {% set cat_match = (category == 'All' or p.category == category) %}
+            {% set sub_match = (subcategory == 'All' or p.subcategory == subcategory) %}
+            {% set search_match = (search == '' or search in (p.name | lower) or search in (pid | lower)) %}
+            {% if cat_match and sub_match and search_match %}
+              {% set ns.count = ns.count + 1 %}
+            {% endif %}
+          {% endfor %}
+          {{ ns.count }}
+        attributes:
+          product_names: >
+            {% set products = state_attr('sensor.ipm_products', 'products') or {} %}
+            {% set category = states('input_select.ipm_category') %}
+            {% set subcategory = states('input_select.ipm_subcategory') %}
+            {% set search = states('input_text.ipm_search') | lower | trim %}
+
+            {% set ns = namespace(names=[]) %}
+            {% for pid, p in products.items() %}
+              {% set cat_match = (category == 'All' or p.category == category) %}
+              {% set sub_match = (subcategory == 'All' or p.subcategory == subcategory) %}
+              {% set search_match = (search == '' or search in (p.name | lower) or search in (pid | lower)) %}
+              {% if cat_match and sub_match and search_match %}
+                {% set ns.names = ns.names + [p.name] %}
+              {% endif %}
+            {% endfor %}
+            {{ ns.names | sort }}
+
+      #-----------------------------------------------------------------------
+      # Count of products below minimum stock
+      #-----------------------------------------------------------------------
+      - name: IPM Low Stock Count
+        unique_id: ipm_low_stock_count
+        icon: mdi:alert
+        state: >
+          {% set products = state_attr('sensor.ipm_products', 'products') or {} %}
+          {% set ns = namespace(count=0) %}
+          {% for pid, p in products.items() %}
+            {% set sbl = p.stock_by_location if p.stock_by_location is defined else {} %}
+            {% set total = sbl.values() | map('float', 0) | sum %}
+            {% set min_stock = p.min_stock | default(0) | float %}
+            {% if min_stock > 0 and total < min_stock %}
+              {% set ns.count = ns.count + 1 %}
+            {% endif %}
+          {% endfor %}
+          {{ ns.count }}
+
+      #-----------------------------------------------------------------------
+      # Subcategory options based on selected category
+      #-----------------------------------------------------------------------
+      - name: IPM Subcategory Options
+        unique_id: ipm_subcategory_options
+        state: "ok"
+        attributes:
+          options: >
+            {% set category = states('input_select.ipm_category') %}
+            {% set mapping = state_attr('sensor.ipm_products', 'category_subcategories') or {} %}
+            {% if category == 'All' %}
+              {{ ['All'] }}
+            {% elif category in mapping %}
+              {{ ['All'] + mapping[category] }}
+            {% else %}
+              {{ ['All'] }}
+            {% endif %}
+
+      #-----------------------------------------------------------------------
+      # Selected product details (lookup by name)
+      #-----------------------------------------------------------------------
+      - name: IPM Selected Product
+        unique_id: ipm_selected_product
+        state: >
+          {% set selected_name = states('input_select.ipm_product') %}
+          {% if selected_name in ['Select Product', 'unknown', 'unavailable', ''] %}
+            none
+          {% else %}
+            {% set products = state_attr('sensor.ipm_products', 'products') or {} %}
+            {% for pid, p in products.items() %}
+              {% if p.name == selected_name %}
+                {{ pid }}
+              {% endif %}
+            {% endfor %}
+          {% endif %}
+        attributes:
+          id: >
+            {% set selected_name = states('input_select.ipm_product') %}
+            {% set products = state_attr('sensor.ipm_products', 'products') or {} %}
+            {% for pid, p in products.items() %}
+              {% if p.name == selected_name %}
+                {{ pid }}
+              {% endif %}
+            {% endfor %}
+          name: >
+            {{ states('input_select.ipm_product') }}
+          product: >
+            {% set selected_name = states('input_select.ipm_product') %}
+            {% set products = state_attr('sensor.ipm_products', 'products') or {} %}
+            {% for pid, p in products.items() %}
+              {% if p.name == selected_name %}
+                {{ p | tojson }}
+              {% endif %}
+            {% endfor %}
+
+      #-----------------------------------------------------------------------
+      # Locations for selected product (for multi-location dropdown)
+      #-----------------------------------------------------------------------
+      - name: IPM Product Locations
+        unique_id: ipm_product_locations
+        state: >
+          {% set product_id = states('sensor.ipm_selected_product') %}
+          {% set locations = state_attr('sensor.ipm_products', 'product_locations') or {} %}
+          {% if product_id in locations %}
+            {{ locations[product_id] | length }}
+          {% else %}
+            0
+          {% endif %}
+        attributes:
+          locations: >
+            {% set product_id = states('sensor.ipm_selected_product') %}
+            {% set locations = state_attr('sensor.ipm_products', 'product_locations') or {} %}
+            {% if product_id in locations %}
+              {{ locations[product_id] }}
+            {% else %}
+              []
+            {% endif %}
+          needs_location_select: >
+            {% set product_id = states('sensor.ipm_selected_product') %}
+            {% set locations = state_attr('sensor.ipm_products', 'product_locations') or {} %}
+            {{ product_id in locations and locations[product_id] | length > 1 }}
+
+      #-----------------------------------------------------------------------
+      # Current stock at selected product + location
+      #-----------------------------------------------------------------------
+      - name: IPM Current Stock
+        unique_id: ipm_current_stock
+        unit_of_measurement: ""
+        state: >
+          {% set product_id = states('sensor.ipm_selected_product') %}
+          {% set location = states('input_select.ipm_location') %}
+          {% set products = state_attr('sensor.ipm_products', 'products') or {} %}
+
+          {% if product_id in ['none', 'unknown', 'unavailable', ''] %}
+            0
+          {% elif product_id in products %}
+            {% set p = products[product_id] %}
+            {% set sbl = p.stock_by_location if p.stock_by_location is defined else {} %}
+            {% if location in ['Select Location', 'unknown', 'unavailable', ''] %}
+              {# If no location selected but product only has one location, use that #}
+              {% if sbl | length == 1 %}
+                {{ (sbl.values() | list)[0] | float(0) }}
+              {% else %}
+                {{ p.total_stock | default(0) }}
+              {% endif %}
+            {% else %}
+              {{ sbl.get(location, 0) | float(0) }}
+            {% endif %}
+          {% else %}
+            0
+          {% endif %}
+        attributes:
+          unit: >
+            {% set product_id = states('sensor.ipm_selected_product') %}
+            {% set products = state_attr('sensor.ipm_products', 'products') or {} %}
+            {% if product_id in products %}
+              {{ products[product_id].unit | default('') }}
+            {% else %}
+
+            {% endif %}
+          location: >
+            {{ states('input_select.ipm_location') }}
+
+      #-----------------------------------------------------------------------
+      # New stock after applying quantity change
+      #-----------------------------------------------------------------------
+      - name: IPM New Stock
+        unique_id: ipm_new_stock
+        state: >
+          {% set current = states('sensor.ipm_current_stock') | float(0) %}
+          {% set delta = states('input_number.ipm_quantity') | float(0) %}
+          {{ [0, current + delta] | max | round(2) }}
+        attributes:
+          unit: >
+            {{ state_attr('sensor.ipm_current_stock', 'unit') }}
+
+      #-----------------------------------------------------------------------
+      # Edit subcategory options based on selected edit category
+      #-----------------------------------------------------------------------
+      - name: IPM Edit Subcategory Options
+        unique_id: ipm_edit_subcategory_options
+        state: "ok"
+        attributes:
+          options: >
+            {% set category = states('input_select.ipm_edit_category') %}
+            {% set mapping = state_attr('sensor.ipm_products', 'category_subcategories') or {} %}
+            {% if category in mapping %}
+              {{ mapping[category] }}
+            {% else %}
+              []
+            {% endif %}
+
+#=============================================================================
+# AUTOMATIONS - Keep dropdowns in sync
+#=============================================================================
+automation:
+  #---------------------------------------------------------------------------
+  # Update product dropdown when filters change
+  #---------------------------------------------------------------------------
+  - id: ipm_update_product_options
+    alias: "IPM: Update Product Options"
+    mode: restart
+    trigger:
+      - platform: state
+        entity_id:
+          - input_select.ipm_category
+          - input_select.ipm_subcategory
+          - input_text.ipm_search
+          - sensor.ipm_filtered_products
+      - platform: homeassistant
+        event: start
+    action:
+      - delay: "00:00:01"
+      - service: input_select.set_options
+        target:
+          entity_id: input_select.ipm_product
+        data:
+          options: >
+            {% set names = state_attr('sensor.ipm_filtered_products', 'product_names') or [] %}
+            {{ ['Select Product'] + names }}
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.ipm_product
+        data:
+          option: "Select Product"
+
+  #---------------------------------------------------------------------------
+  # Update subcategory dropdown when category changes
+  #---------------------------------------------------------------------------
+  - id: ipm_update_subcategory_options
+    alias: "IPM: Update Subcategory Options"
+    mode: restart
+    trigger:
+      - platform: state
+        entity_id: input_select.ipm_category
+      - platform: homeassistant
+        event: start
+    action:
+      - service: input_select.set_options
+        target:
+          entity_id: input_select.ipm_subcategory
+        data:
+          options: >
+            {% set category = states('input_select.ipm_category') %}
+            {% set mapping = state_attr('sensor.ipm_products', 'category_subcategories') or {} %}
+            {% if category == 'All' %}
+              {{ ['All'] }}
+            {% elif category in mapping %}
+              {{ ['All'] + mapping[category] }}
+            {% else %}
+              {{ ['All'] }}
+            {% endif %}
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.ipm_subcategory
+        data:
+          option: "All"
+
+  #---------------------------------------------------------------------------
+  # Auto-select location when product changes (if single location)
+  #---------------------------------------------------------------------------
+  - id: ipm_update_location_options
+    alias: "IPM: Update Location on Product Change"
+    mode: restart
+    trigger:
+      - platform: state
+        entity_id: input_select.ipm_product
+    action:
+      - delay: "00:00:00.5"
+      - variables:
+          locations: "{{ state_attr('sensor.ipm_product_locations', 'locations') or [] }}"
+      - choose:
+          # If product has only one location, auto-select it
+          - conditions:
+              - condition: template
+                value_template: "{{ locations | length == 1 }}"
+            sequence:
+              - service: input_select.select_option
+                target:
+                  entity_id: input_select.ipm_location
+                data:
+                  option: "{{ locations[0] }}"
+        default:
+          # Otherwise reset to Select Location
+          - service: input_select.select_option
+            target:
+              entity_id: input_select.ipm_location
+            data:
+              option: "Select Location"
+
+  #---------------------------------------------------------------------------
+  # Update edit subcategory when edit category changes
+  #---------------------------------------------------------------------------
+  - id: ipm_update_edit_subcategory
+    alias: "IPM: Update Edit Subcategory Options"
+    mode: restart
+    trigger:
+      - platform: state
+        entity_id: input_select.ipm_edit_category
+    action:
+      - service: input_select.set_options
+        target:
+          entity_id: input_select.ipm_edit_subcategory
+        data:
+          options: >
+            {% set category = states('input_select.ipm_edit_category') %}
+            {% set mapping = state_attr('sensor.ipm_products', 'category_subcategories') or {} %}
+            {% if category in mapping %}
+              {{ ['Select Subcategory'] + mapping[category] }}
+            {% else %}
+              {{ ['Select Subcategory'] }}
+            {% endif %}
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.ipm_edit_subcategory
+        data:
+          option: "Select Subcategory"
+
+  #---------------------------------------------------------------------------
+  # Reset quantity to 0 when product changes
+  #---------------------------------------------------------------------------
+  - id: ipm_reset_quantity_on_product_change
+    alias: "IPM: Reset Quantity on Product Change"
+    mode: restart
+    trigger:
+      - platform: state
+        entity_id: input_select.ipm_product
+    action:
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.ipm_quantity
+        data:
+          value: 0
+
+#=============================================================================
+# SCRIPTS - User actions
+#=============================================================================
+script:
+  #---------------------------------------------------------------------------
+  # Save stock movement
+  #---------------------------------------------------------------------------
+  ipm_save_movement:
+    alias: "IPM: Save Stock Movement"
+    mode: single
+    sequence:
+      - variables:
+          product_id: "{{ states('sensor.ipm_selected_product') }}"
+          location: "{{ states('input_select.ipm_location') }}"
+          delta: "{{ states('input_number.ipm_quantity') | float(0) }}"
+          products: "{{ state_attr('sensor.ipm_products', 'products') or {} }}"
+
+      # Validate product selected
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ product_id in ['none', 'unknown', 'unavailable', ''] }}"
+            sequence:
+              - service: persistent_notification.create
+                data:
+                  title: "IPM Movement"
+                  message: "Please select a product first."
+              - stop: "No product selected"
+
+      # Validate location (for multi-location products)
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: >
+                  {% set locs = state_attr('sensor.ipm_product_locations', 'locations') or [] %}
+                  {{ locs | length > 1 and location in ['Select Location', 'unknown', 'unavailable', ''] }}
+            sequence:
+              - service: persistent_notification.create
+                data:
+                  title: "IPM Movement"
+                  message: "This product is in multiple locations. Please select a location."
+              - stop: "No location selected"
+
+      # Validate quantity not zero
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ delta == 0 }}"
+            sequence:
+              - service: persistent_notification.create
+                data:
+                  title: "IPM Movement"
+                  message: "Quantity is zero. Nothing to save."
+              - stop: "Delta is zero"
+
+      # Determine actual location
+      - variables:
+          actual_location: >
+            {% set locs = state_attr('sensor.ipm_product_locations', 'locations') or [] %}
+            {% if locs | length == 1 %}
+              {{ locs[0] }}
+            {% else %}
+              {{ location }}
+            {% endif %}
+
+      # Execute the move
+      - service: shell_command.ipm_move_stock
+        data:
+          product_id: "{{ product_id }}"
+          location: "{{ actual_location }}"
+          delta: "{{ delta }}"
+          note: "HA Dashboard"
+
+      # Reset quantity
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.ipm_quantity
+        data:
+          value: 0
+
+      # Refresh data
+      - delay: "00:00:01"
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.ipm_products
+
+      # Confirmation
+      - service: persistent_notification.create
+        data:
+          title: "IPM Movement"
+          message: >
+            {% set p = products.get(product_id, {}) %}
+            Stock updated: {{ p.name | default(product_id) }} at {{ actual_location }}
+            Change: {{ delta | float | round(1) }} {{ p.unit | default('') }}
+
+  #---------------------------------------------------------------------------
+  # Add new product
+  #---------------------------------------------------------------------------
+  ipm_add_product:
+    alias: "IPM: Add New Product"
+    mode: single
+    sequence:
+      - variables:
+          name: "{{ states('input_text.ipm_edit_name') | trim }}"
+          category: "{{ states('input_select.ipm_edit_category') }}"
+          subcategory: "{{ states('input_select.ipm_edit_subcategory') }}"
+          unit: "{{ states('input_select.ipm_edit_unit') }}"
+          container_size: "{{ states('input_select.ipm_edit_container') }}"
+          min_stock: "{{ states('input_number.ipm_edit_min_stock') | float(0) }}"
+          initial_stock: "{{ states('input_number.ipm_edit_initial_stock') | float(0) }}"
+          location: "{{ states('input_select.ipm_edit_location') }}"
+          chem_group: "{{ states('input_select.ipm_edit_chem_group') }}"
+          app_unit: "{{ states('input_select.ipm_edit_app_unit') }}"
+          # Collect active constituents (name + concentration number + unit)
+          actives_json: >
+            {% set actives = [] %}
+            {% set a1_name = states('input_text.ipm_active_1_name') | trim %}
+            {% set a1_conc = states('input_number.ipm_active_1_conc') | float(0) %}
+            {% set a1_unit = states('input_select.ipm_active_1_unit') %}
+            {% if a1_name %}{% set actives = actives + [{"name": a1_name, "concentration": a1_conc, "unit": a1_unit}] %}{% endif %}
+            {% set a2_name = states('input_text.ipm_active_2_name') | trim %}
+            {% set a2_conc = states('input_number.ipm_active_2_conc') | float(0) %}
+            {% set a2_unit = states('input_select.ipm_active_2_unit') %}
+            {% if a2_name %}{% set actives = actives + [{"name": a2_name, "concentration": a2_conc, "unit": a2_unit}] %}{% endif %}
+            {% set a3_name = states('input_text.ipm_active_3_name') | trim %}
+            {% set a3_conc = states('input_number.ipm_active_3_conc') | float(0) %}
+            {% set a3_unit = states('input_select.ipm_active_3_unit') %}
+            {% if a3_name %}{% set actives = actives + [{"name": a3_name, "concentration": a3_conc, "unit": a3_unit}] %}{% endif %}
+            {% set a4_name = states('input_text.ipm_active_4_name') | trim %}
+            {% set a4_conc = states('input_number.ipm_active_4_conc') | float(0) %}
+            {% set a4_unit = states('input_select.ipm_active_4_unit') %}
+            {% if a4_name %}{% set actives = actives + [{"name": a4_name, "concentration": a4_conc, "unit": a4_unit}] %}{% endif %}
+            {% set a5_name = states('input_text.ipm_active_5_name') | trim %}
+            {% set a5_conc = states('input_number.ipm_active_5_conc') | float(0) %}
+            {% set a5_unit = states('input_select.ipm_active_5_unit') %}
+            {% if a5_name %}{% set actives = actives + [{"name": a5_name, "concentration": a5_conc, "unit": a5_unit}] %}{% endif %}
+            {% set a6_name = states('input_text.ipm_active_6_name') | trim %}
+            {% set a6_conc = states('input_number.ipm_active_6_conc') | float(0) %}
+            {% set a6_unit = states('input_select.ipm_active_6_unit') %}
+            {% if a6_name %}{% set actives = actives + [{"name": a6_name, "concentration": a6_conc, "unit": a6_unit}] %}{% endif %}
+            {{ actives | tojson }}
+
+      # Validate name
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ name == '' }}"
+            sequence:
+              - service: persistent_notification.create
+                data:
+                  title: "IPM Add Product"
+                  message: "Product name is required."
+              - stop: "No product name"
+
+      # Validate subcategory
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ subcategory in ['Select Subcategory', ''] }}"
+            sequence:
+              - service: persistent_notification.create
+                data:
+                  title: "IPM Add Product"
+                  message: "Please select a subcategory."
+              - stop: "No subcategory"
+
+      # Execute add
+      - service: shell_command.ipm_add_product
+        data:
+          name: "{{ name }}"
+          category: "{{ category }}"
+          subcategory: "{{ subcategory }}"
+          unit: "{{ unit }}"
+          container_size: "{{ container_size }}"
+          min_stock: "{{ min_stock }}"
+          chemical_group: "{{ chem_group if chem_group != 'None' else '' }}"
+          application_unit: "{{ app_unit }}"
+          location: "{{ location }}"
+          initial_stock: "{{ initial_stock }}"
+          actives: "{{ actives_json }}"
+
+      # Clear form (call the clear script)
+      - service: script.ipm_clear_form
+
+      # Refresh data
+      - delay: "00:00:01"
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.ipm_products
+
+      # Confirmation
+      - service: persistent_notification.create
+        data:
+          title: "IPM Add Product"
+          message: "Product '{{ name }}' added successfully."
+
+  #---------------------------------------------------------------------------
+  # Load product into editor
+  #---------------------------------------------------------------------------
+  ipm_load_product:
+    alias: "IPM: Load Product into Editor"
+    mode: single
+    sequence:
+      - variables:
+          product_id: "{{ states('sensor.ipm_selected_product') }}"
+          products: "{{ state_attr('sensor.ipm_products', 'products') | default({}, true) }}"
+          mapping: "{{ state_attr('sensor.ipm_products', 'category_subcategories') | default({}, true) }}"
+
+          # Force every options attr into a real list (never None)
+          mode_opts: "{{ state_attr('input_select.ipm_editor_mode', 'options') | default([], true) }}"
+          cat_opts: "{{ state_attr('input_select.ipm_edit_category', 'options') | default([], true) }}"
+          unit_opts: "{{ state_attr('input_select.ipm_edit_unit', 'options') | default([], true) }}"
+          container_opts: "{{ state_attr('input_select.ipm_edit_container', 'options') | default([], true) }}"
+          chem_group_opts: "{{ state_attr('input_select.ipm_edit_chem_group', 'options') | default([], true) }}"
+          app_unit_opts: "{{ state_attr('input_select.ipm_edit_app_unit', 'options') | default([], true) }}"
+
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ product_id in ['none', 'unknown', 'unavailable', ''] }}"
+            sequence:
+              - service: persistent_notification.create
+                data:
+                  title: "IPM Load Product"
+                  message: "Please select a product first."
+              - stop: "No product selected"
+
+      # Pull record safely
+      - variables:
+          p: "{{ products.get(product_id, {}) if products is mapping else {} }}"
+
+          # Extract fields as strings (never None)
+          p_name: "{{ (p.get('name') | default('', true) | string | trim) }}"
+          p_category_raw: "{{ (p.get('category') | default('', true) | string | trim) }}"
+          p_subcategory_raw: "{{ (p.get('subcategory') | default('', true) | string | trim) }}"
+          p_unit_raw: "{{ (p.get('unit') | default('', true) | string | trim) }}"
+          p_container_raw: "{{ (p.get('container_size') | default('', true) | string | trim) }}"
+          p_chem_group_raw: "{{ (p.get('chemical_group') | default('', true) | string | trim) }}"
+          p_app_unit_raw: "{{ (p.get('application_unit') | default('', true) | string | trim) }}"
+          p_min_stock: "{{ p.get('min_stock') | default(0, true) | float(0) }}"
+
+          # Category: default Chemical; if options list exists, enforce membership
+          p_category: >-
+            {% set v = p_category_raw if p_category_raw != '' else 'Chemical' %}
+            {% set opts = cat_opts | default([], true) %}
+            {{ v if (opts | count == 0) or (v in opts) else ('Chemical' if 'Chemical' in opts else (opts[0] if (opts | count) > 0 else 'Chemical')) }}
+
+          # Unit: default L; enforce membership if options exist
+          p_unit: >-
+            {% set v = p_unit_raw if p_unit_raw != '' else 'L' %}
+            {% set opts = unit_opts | default([], true) %}
+            {{ v if (opts | count == 0) or (v in opts) else ('L' if 'L' in opts else (opts[0] if (opts | count) > 0 else 'L')) }}
+
+          # Container: normalize then enforce membership
+          p_container: >-
+            {% set cs = p_container_raw %}
+            {% set v = cs if cs in ['1','5','10','20','110','200','1000','bulk'] else '20' %}
+            {% set opts = container_opts | default([], true) %}
+            {{ v if (opts | count == 0) or (v in opts) else ('20' if '20' in opts else (opts[0] if (opts | count) > 0 else '20')) }}
+
+          # Chemical group: default None; enforce membership if options exist
+          p_chem_group: >-
+            {% set v = p_chem_group_raw if p_chem_group_raw != '' else 'None' %}
+            {% set opts = chem_group_opts | default([], true) %}
+            {{ v if (opts | count == 0) or (v in opts) else 'None' }}
+
+          # App unit: default L/ha; enforce membership if options exist
+          p_app_unit: >-
+            {% set v = p_app_unit_raw if p_app_unit_raw != '' else 'L/ha' %}
+            {% set opts = app_unit_opts | default([], true) %}
+            {{ v if (opts | count == 0) or (v in opts) else 'L/ha' }}
+
+      # Set editor mode (safe)
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.ipm_editor_mode
+        data:
+          option: >-
+            {% set v = 'Edit Existing Product' %}
+            {% set opts = mode_opts | default([], true) %}
+            {{ v if (opts | count == 0) or (v in opts) else (opts[0] if (opts | count) > 0 else v) }}
+
+      # Set category
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.ipm_edit_category
+        data:
+          option: "{{ p_category }}"
+
+      # Set subcategory options for this category immediately
+      - service: input_select.set_options
+        target:
+          entity_id: input_select.ipm_edit_subcategory
+        data:
+          options: >-
+            {% set subs = mapping.get(p_category, []) if mapping is mapping else [] %}
+            {{ ['Select Subcategory'] + subs if subs else ['Select Subcategory'] }}
+
+      # Read back subcategory options and validate chosen value
+      - variables:
+          subcat_opts: "{{ state_attr('input_select.ipm_edit_subcategory', 'options') | default(['Select Subcategory'], true) }}"
+          p_subcategory: >-
+            {% set opts = subcat_opts | default(['Select Subcategory'], true) %}
+            {% set v = p_subcategory_raw if p_subcategory_raw != '' else 'Select Subcategory' %}
+            {{ v if v in opts else 'Select Subcategory' }}
+
+      # Set name
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.ipm_edit_name
+        data:
+          value: "{{ p_name }}"
+
+      # Set subcategory
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.ipm_edit_subcategory
+        data:
+          option: "{{ p_subcategory }}"
+
+      # Set unit
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.ipm_edit_unit
+        data:
+          option: "{{ p_unit }}"
+
+      # Set container
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.ipm_edit_container
+        data:
+          option: "{{ p_container }}"
+
+      # Set min stock
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.ipm_edit_min_stock
+        data:
+          value: "{{ p_min_stock | float(0) }}"
+
+      # Set chemical group (string-safe)
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.ipm_edit_chem_group
+        data:
+          option: >-
+            {% set opts = state_attr('input_select.ipm_edit_chem_group', 'options') | default([], true) %}
+            {% set raw = products.get(product_id, {}).get('chemical_group') %}
+            {% set val = (raw | default('', true) | string | trim) %}
+            {% set chosen = val if val != '' else 'None' %}
+            {{ chosen if (opts | count == 0) or (chosen in opts) else 'None' }}
+
+
+      # Set application unit (string-safe)
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.ipm_edit_app_unit
+        data:
+          option: "{{ p_app_unit }}"
+
+      # Load active constituents (for Chemical/Fertiliser)
+      - variables:
+          actives: "{{ p.get('active_constituents', []) if p is mapping else [] }}"
+          a1: "{{ actives[0] if actives | length > 0 else {} }}"
+          a2: "{{ actives[1] if actives | length > 1 else {} }}"
+          a3: "{{ actives[2] if actives | length > 2 else {} }}"
+          a4: "{{ actives[3] if actives | length > 3 else {} }}"
+          a5: "{{ actives[4] if actives | length > 4 else {} }}"
+          a6: "{{ actives[5] if actives | length > 5 else {} }}"
+
+      # Clear existing active name fields
+      - service: input_text.set_value
+        target:
+          entity_id:
+            - input_text.ipm_active_1_name
+            - input_text.ipm_active_2_name
+            - input_text.ipm_active_3_name
+            - input_text.ipm_active_4_name
+            - input_text.ipm_active_5_name
+            - input_text.ipm_active_6_name
+        data:
+          value: ""
+
+      # Clear existing active concentration fields
+      - service: input_number.set_value
+        target:
+          entity_id:
+            - input_number.ipm_active_1_conc
+            - input_number.ipm_active_2_conc
+            - input_number.ipm_active_3_conc
+            - input_number.ipm_active_4_conc
+            - input_number.ipm_active_5_conc
+            - input_number.ipm_active_6_conc
+        data:
+          value: 0
+
+      # Reset active unit dropdowns to default
+      - service: input_select.select_option
+        target:
+          entity_id:
+            - input_select.ipm_active_1_unit
+            - input_select.ipm_active_2_unit
+            - input_select.ipm_active_3_unit
+            - input_select.ipm_active_4_unit
+            - input_select.ipm_active_5_unit
+            - input_select.ipm_active_6_unit
+        data:
+          option: "g/L"
+
+      # Hide all additional active toggles first
+      - service: input_boolean.turn_off
+        target:
+          entity_id:
+            - input_boolean.ipm_show_active_2
+            - input_boolean.ipm_show_active_3
+            - input_boolean.ipm_show_active_4
+            - input_boolean.ipm_show_active_5
+            - input_boolean.ipm_show_active_6
+
+      # Set active 1 (if exists)
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ actives | length > 0 and a1.get('name', '') | trim != '' }}"
+            sequence:
+              - service: input_text.set_value
+                target:
+                  entity_id: input_text.ipm_active_1_name
+                data:
+                  value: "{{ a1.get('name', '') | default('', true) }}"
+              - service: input_number.set_value
+                target:
+                  entity_id: input_number.ipm_active_1_conc
+                data:
+                  value: "{{ a1.get('concentration', 0) | float(0) }}"
+              - service: input_select.select_option
+                target:
+                  entity_id: input_select.ipm_active_1_unit
+                data:
+                  option: "{{ a1.get('unit', 'g/L') | default('g/L', true) }}"
+
+      # Set active 2 if exists
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ actives | length > 1 and a2.get('name', '') | trim != '' }}"
+            sequence:
+              - service: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.ipm_show_active_2
+              - service: input_text.set_value
+                target:
+                  entity_id: input_text.ipm_active_2_name
+                data:
+                  value: "{{ a2.get('name', '') | default('', true) }}"
+              - service: input_number.set_value
+                target:
+                  entity_id: input_number.ipm_active_2_conc
+                data:
+                  value: "{{ a2.get('concentration', 0) | float(0) }}"
+              - service: input_select.select_option
+                target:
+                  entity_id: input_select.ipm_active_2_unit
+                data:
+                  option: "{{ a2.get('unit', 'g/L') | default('g/L', true) }}"
+
+      # Set active 3 if exists
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ actives | length > 2 and a3.get('name', '') | trim != '' }}"
+            sequence:
+              - service: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.ipm_show_active_3
+              - service: input_text.set_value
+                target:
+                  entity_id: input_text.ipm_active_3_name
+                data:
+                  value: "{{ a3.get('name', '') | default('', true) }}"
+              - service: input_number.set_value
+                target:
+                  entity_id: input_number.ipm_active_3_conc
+                data:
+                  value: "{{ a3.get('concentration', 0) | float(0) }}"
+              - service: input_select.select_option
+                target:
+                  entity_id: input_select.ipm_active_3_unit
+                data:
+                  option: "{{ a3.get('unit', 'g/L') | default('g/L', true) }}"
+
+      # Set active 4 if exists
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ actives | length > 3 and a4.get('name', '') | trim != '' }}"
+            sequence:
+              - service: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.ipm_show_active_4
+              - service: input_text.set_value
+                target:
+                  entity_id: input_text.ipm_active_4_name
+                data:
+                  value: "{{ a4.get('name', '') | default('', true) }}"
+              - service: input_number.set_value
+                target:
+                  entity_id: input_number.ipm_active_4_conc
+                data:
+                  value: "{{ a4.get('concentration', 0) | float(0) }}"
+              - service: input_select.select_option
+                target:
+                  entity_id: input_select.ipm_active_4_unit
+                data:
+                  option: "{{ a4.get('unit', 'g/L') | default('g/L', true) }}"
+
+      # Set active 5 if exists
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ actives | length > 4 and a5.get('name', '') | trim != '' }}"
+            sequence:
+              - service: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.ipm_show_active_5
+              - service: input_text.set_value
+                target:
+                  entity_id: input_text.ipm_active_5_name
+                data:
+                  value: "{{ a5.get('name', '') | default('', true) }}"
+              - service: input_number.set_value
+                target:
+                  entity_id: input_number.ipm_active_5_conc
+                data:
+                  value: "{{ a5.get('concentration', 0) | float(0) }}"
+              - service: input_select.select_option
+                target:
+                  entity_id: input_select.ipm_active_5_unit
+                data:
+                  option: "{{ a5.get('unit', 'g/L') | default('g/L', true) }}"
+
+      # Set active 6 if exists
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ actives | length > 5 and a6.get('name', '') | trim != '' }}"
+            sequence:
+              - service: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.ipm_show_active_6
+              - service: input_text.set_value
+                target:
+                  entity_id: input_text.ipm_active_6_name
+                data:
+                  value: "{{ a6.get('name', '') | default('', true) }}"
+              - service: input_number.set_value
+                target:
+                  entity_id: input_number.ipm_active_6_conc
+                data:
+                  value: "{{ a6.get('concentration', 0) | float(0) }}"
+              - service: input_select.select_option
+                target:
+                  entity_id: input_select.ipm_active_6_unit
+                data:
+                  option: "{{ a6.get('unit', 'g/L') | default('g/L', true) }}"
+
+      - service: persistent_notification.create
+        data:
+          title: "IPM Load Product"
+          message: >-
+            Loaded '{{ (p_name | default('', true) | string) if (p_name | default('', true) | string) != '' else (product_id | string) }}' into editor.
+
+  #---------------------------------------------------------------------------
+  # Edit/Save existing product
+  #---------------------------------------------------------------------------
+  ipm_save_product:
+    alias: "IPM: Save Product Changes"
+    mode: single
+    sequence:
+      - variables:
+          mode: "{{ states('input_select.ipm_editor_mode') }}"
+          product_id: "{{ states('sensor.ipm_selected_product') }}"
+          name: "{{ states('input_text.ipm_edit_name') | trim }}"
+          category: "{{ states('input_select.ipm_edit_category') }}"
+          subcategory: "{{ states('input_select.ipm_edit_subcategory') }}"
+          unit: "{{ states('input_select.ipm_edit_unit') }}"
+          container_size: "{{ states('input_select.ipm_edit_container') }}"
+          min_stock: "{{ states('input_number.ipm_edit_min_stock') | float(0) }}"
+          chem_group: "{{ states('input_select.ipm_edit_chem_group') }}"
+          app_unit: "{{ states('input_select.ipm_edit_app_unit') }}"
+          # Collect active constituents (name + concentration number + unit)
+          actives_json: >
+            {% set actives = [] %}
+            {% set a1_name = states('input_text.ipm_active_1_name') | trim %}
+            {% set a1_conc = states('input_number.ipm_active_1_conc') | float(0) %}
+            {% set a1_unit = states('input_select.ipm_active_1_unit') %}
+            {% if a1_name %}{% set actives = actives + [{"name": a1_name, "concentration": a1_conc, "unit": a1_unit}] %}{% endif %}
+            {% set a2_name = states('input_text.ipm_active_2_name') | trim %}
+            {% set a2_conc = states('input_number.ipm_active_2_conc') | float(0) %}
+            {% set a2_unit = states('input_select.ipm_active_2_unit') %}
+            {% if a2_name %}{% set actives = actives + [{"name": a2_name, "concentration": a2_conc, "unit": a2_unit}] %}{% endif %}
+            {% set a3_name = states('input_text.ipm_active_3_name') | trim %}
+            {% set a3_conc = states('input_number.ipm_active_3_conc') | float(0) %}
+            {% set a3_unit = states('input_select.ipm_active_3_unit') %}
+            {% if a3_name %}{% set actives = actives + [{"name": a3_name, "concentration": a3_conc, "unit": a3_unit}] %}{% endif %}
+            {% set a4_name = states('input_text.ipm_active_4_name') | trim %}
+            {% set a4_conc = states('input_number.ipm_active_4_conc') | float(0) %}
+            {% set a4_unit = states('input_select.ipm_active_4_unit') %}
+            {% if a4_name %}{% set actives = actives + [{"name": a4_name, "concentration": a4_conc, "unit": a4_unit}] %}{% endif %}
+            {% set a5_name = states('input_text.ipm_active_5_name') | trim %}
+            {% set a5_conc = states('input_number.ipm_active_5_conc') | float(0) %}
+            {% set a5_unit = states('input_select.ipm_active_5_unit') %}
+            {% if a5_name %}{% set actives = actives + [{"name": a5_name, "concentration": a5_conc, "unit": a5_unit}] %}{% endif %}
+            {% set a6_name = states('input_text.ipm_active_6_name') | trim %}
+            {% set a6_conc = states('input_number.ipm_active_6_conc') | float(0) %}
+            {% set a6_unit = states('input_select.ipm_active_6_unit') %}
+            {% if a6_name %}{% set actives = actives + [{"name": a6_name, "concentration": a6_conc, "unit": a6_unit}] %}{% endif %}
+            {{ actives | tojson }}
+
+      # If adding new, use the add script
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ 'Add' in mode }}"
+            sequence:
+              - service: script.ipm_add_product
+              - stop: "Delegated to add script"
+
+      # Editing existing - validate product selected
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ product_id in ['none', 'unknown', 'unavailable', ''] }}"
+            sequence:
+              - service: persistent_notification.create
+                data:
+                  title: "IPM Save Product"
+                  message: "No product loaded. Use 'Load Product' first."
+              - stop: "No product to edit"
+
+      # Execute edit
+      - service: shell_command.ipm_edit_product
+        data:
+          product_id: "{{ product_id }}"
+          name: "{{ name }}"
+          category: "{{ category }}"
+          subcategory: "{{ subcategory if subcategory != 'Select Subcategory' else '' }}"
+          unit: "{{ unit }}"
+          container_size: "{{ container_size }}"
+          min_stock: "{{ min_stock }}"
+          chemical_group: "{{ chem_group if chem_group != 'None' else '' }}"
+          application_unit: "{{ app_unit }}"
+          actives: "{{ actives_json }}"
+
+      # Clear form after successful edit
+      - service: script.ipm_clear_form
+
+      # Refresh data
+      - delay: "00:00:01"
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.ipm_products
+
+      # Confirmation
+      - service: persistent_notification.create
+        data:
+          title: "IPM Save Product"
+          message: "Product '{{ name }}' updated successfully."
+
+  #---------------------------------------------------------------------------
+  # Clear editor form
+  #---------------------------------------------------------------------------
+  ipm_clear_form:
+    alias: "IPM: Clear Editor Form"
+    mode: single
+    sequence:
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.ipm_edit_name
+        data:
+          value: ""
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.ipm_edit_initial_stock
+        data:
+          value: 0
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.ipm_edit_min_stock
+        data:
+          value: 0
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.ipm_editor_mode
+        data:
+          option: "Add New Product"
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.ipm_edit_subcategory
+        data:
+          option: "Select Subcategory"
+      # Clear all active constituent name fields
+      - service: input_text.set_value
+        target:
+          entity_id:
+            - input_text.ipm_active_1_name
+            - input_text.ipm_active_2_name
+            - input_text.ipm_active_3_name
+            - input_text.ipm_active_4_name
+            - input_text.ipm_active_5_name
+            - input_text.ipm_active_6_name
+        data:
+          value: ""
+      # Clear all active concentration fields
+      - service: input_number.set_value
+        target:
+          entity_id:
+            - input_number.ipm_active_1_conc
+            - input_number.ipm_active_2_conc
+            - input_number.ipm_active_3_conc
+            - input_number.ipm_active_4_conc
+            - input_number.ipm_active_5_conc
+            - input_number.ipm_active_6_conc
+        data:
+          value: 0
+      # Reset all active unit fields to default
+      - service: input_select.select_option
+        target:
+          entity_id:
+            - input_select.ipm_active_1_unit
+            - input_select.ipm_active_2_unit
+            - input_select.ipm_active_3_unit
+            - input_select.ipm_active_4_unit
+            - input_select.ipm_active_5_unit
+            - input_select.ipm_active_6_unit
+        data:
+          option: "g/L"
+      # Hide additional active toggles
+      - service: input_boolean.turn_off
+        target:
+          entity_id:
+            - input_boolean.ipm_show_active_2
+            - input_boolean.ipm_show_active_3
+            - input_boolean.ipm_show_active_4
+            - input_boolean.ipm_show_active_5
+            - input_boolean.ipm_show_active_6
+
+  #---------------------------------------------------------------------------
+  # Clear individual active constituent fields
+  #---------------------------------------------------------------------------
+  ipm_clear_active_1:
+    alias: "IPM: Clear Active 1"
+    mode: single
+    sequence:
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.ipm_active_1_name
+        data:
+          value: ""
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.ipm_active_1_conc
+        data:
+          value: 0
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.ipm_active_1_unit
+        data:
+          option: "g/L"
+
+  ipm_clear_active_2:
+    alias: "IPM: Clear Active 2"
+    mode: single
+    sequence:
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.ipm_active_2_name
+        data:
+          value: ""
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.ipm_active_2_conc
+        data:
+          value: 0
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.ipm_active_2_unit
+        data:
+          option: "g/L"
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.ipm_show_active_2
+
+  ipm_clear_active_3:
+    alias: "IPM: Clear Active 3"
+    mode: single
+    sequence:
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.ipm_active_3_name
+        data:
+          value: ""
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.ipm_active_3_conc
+        data:
+          value: 0
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.ipm_active_3_unit
+        data:
+          option: "g/L"
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.ipm_show_active_3
+
+  ipm_clear_active_4:
+    alias: "IPM: Clear Active 4"
+    mode: single
+    sequence:
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.ipm_active_4_name
+        data:
+          value: ""
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.ipm_active_4_conc
+        data:
+          value: 0
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.ipm_active_4_unit
+        data:
+          option: "g/L"
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.ipm_show_active_4
+
+  ipm_clear_active_5:
+    alias: "IPM: Clear Active 5"
+    mode: single
+    sequence:
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.ipm_active_5_name
+        data:
+          value: ""
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.ipm_active_5_conc
+        data:
+          value: 0
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.ipm_active_5_unit
+        data:
+          option: "g/L"
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.ipm_show_active_5
+
+  ipm_clear_active_6:
+    alias: "IPM: Clear Active 6"
+    mode: single
+    sequence:
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.ipm_active_6_name
+        data:
+          value: ""
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.ipm_active_6_conc
+        data:
+          value: 0
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.ipm_active_6_unit
+        data:
+          option: "g/L"
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.ipm_show_active_6

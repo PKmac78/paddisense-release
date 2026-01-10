@@ -1,0 +1,1335 @@
+##############################################################################
+# IPM Dashboard - Inventory Product Manager
+# PaddiSense Farm Management System
+#
+# Views:
+#   1. Stock Movement - Adjust stock levels with +/- buttons
+#   2. Product Editor - Add new or edit existing products
+#   3. Stock Overview - View inventory reports
+##############################################################################
+
+button_card_templates:
+  #---------------------------------------------------------------------------
+  # Section title bar (black background)
+  #---------------------------------------------------------------------------
+  ipm_title:
+    color_type: label-card
+    color: rgb(30, 30, 30)
+    show_icon: false
+    show_state: false
+    styles:
+      card:
+        - height: 50px
+        - border-radius: 12px
+        - padding: 8px
+      name:
+        - font-size: 18px
+        - font-weight: 700
+        - text-align: center
+        - color: white
+
+  #---------------------------------------------------------------------------
+  # Info display block (grey background)
+  #---------------------------------------------------------------------------
+  ipm_info_block:
+    color_type: label-card
+    color: rgb(100, 110, 130)
+    show_icon: false
+    show_state: true
+    tap_action:
+      action: none
+    styles:
+      card:
+        - height: 80px
+        - border-radius: 12px
+        - padding: 10px
+      state:
+        - font-size: 32px
+        - font-weight: 800
+        - text-align: center
+        - color: white
+      name:
+        - font-size: 14px
+        - font-weight: 600
+        - text-align: center
+        - color: white
+
+  #---------------------------------------------------------------------------
+  # Minus button (red)
+  #---------------------------------------------------------------------------
+  ipm_minus:
+    variables:
+      amount: 1
+      label: "-1"
+    show_icon: false
+    show_name: true
+    show_state: false
+    name: "[[[ return variables.label ]]]"
+    tap_action:
+      action: call-service
+      service: input_number.set_value
+      service_data:
+        entity_id: input_number.ipm_quantity
+        value: "[[[ return Number(entity.state) - Number(variables.amount); ]]]"
+    styles:
+      card:
+        - height: 70px
+        - border-radius: 12px
+        - background: "#dc3545"
+      name:
+        - font-size: 20px
+        - font-weight: 800
+        - color: white
+
+  #---------------------------------------------------------------------------
+  # Plus button (green)
+  #---------------------------------------------------------------------------
+  ipm_plus:
+    variables:
+      amount: 1
+      label: "+1"
+    show_icon: false
+    show_name: true
+    show_state: false
+    name: "[[[ return variables.label ]]]"
+    tap_action:
+      action: call-service
+      service: input_number.set_value
+      service_data:
+        entity_id: input_number.ipm_quantity
+        value: "[[[ return Number(entity.state) + Number(variables.amount); ]]]"
+    styles:
+      card:
+        - height: 70px
+        - border-radius: 12px
+        - background: "#28a745"
+      name:
+        - font-size: 20px
+        - font-weight: 800
+        - color: white
+
+  #---------------------------------------------------------------------------
+  # Action button (blue)
+  #---------------------------------------------------------------------------
+  ipm_action:
+    show_icon: true
+    show_name: true
+    show_state: false
+    styles:
+      card:
+        - height: 70px
+        - border-radius: 12px
+        - background: "#0066cc"
+      name:
+        - font-size: 16px
+        - font-weight: 700
+        - color: white
+      icon:
+        - color: white
+        - width: 28px
+
+  #---------------------------------------------------------------------------
+  # Secondary action button (dark grey)
+  #---------------------------------------------------------------------------
+  ipm_secondary:
+    show_icon: true
+    show_name: true
+    show_state: false
+    styles:
+      card:
+        - height: 60px
+        - border-radius: 12px
+        - background: "#555555"
+      name:
+        - font-size: 14px
+        - font-weight: 600
+        - color: white
+      icon:
+        - color: white
+        - width: 24px
+
+  #---------------------------------------------------------------------------
+  # Stock overview chip (Mushroom-style)
+  #---------------------------------------------------------------------------
+  ipm_stat_chip:
+    show_icon: true
+    show_name: true
+    show_state: true
+    styles:
+      card:
+        - height: 50px
+        - border-radius: 25px
+        - padding: 0 16px
+        - background: var(--chip-bg, #424242)
+      grid:
+        - grid-template-areas: '"i n s"'
+        - grid-template-columns: 24px auto auto
+        - gap: 8px
+      name:
+        - font-size: 12px
+        - color: rgba(255,255,255,0.7)
+        - justify-self: start
+      state:
+        - font-size: 18px
+        - font-weight: 700
+        - color: white
+        - justify-self: end
+      icon:
+        - color: white
+        - width: 22px
+
+##############################################################################
+# VIEWS
+##############################################################################
+views:
+  #============================================================================
+  # VIEW 1: STOCK MOVEMENT
+  #============================================================================
+  - title: Stock Movement
+    path: movement
+    icon: mdi:swap-horizontal
+    type: sections
+    max_columns: 1
+    sections:
+      - type: grid
+        cards:
+          - type: vertical-stack
+            cards:
+              #----------------------------------------------------------------
+              # FIND PRODUCT section
+              #----------------------------------------------------------------
+              - type: custom:button-card
+                template: ipm_title
+                name: FIND PRODUCT
+
+              # Category filter
+              - type: entities
+                entities:
+                  - entity: input_select.ipm_category
+                    name: Category
+                card_mod:
+                  style: |
+                    ha-card {
+                      border-radius: 12px;
+                      padding: 4px;
+                    }
+                    .mdc-list-item__primary-text {
+                      font-size: 1.3rem !important;
+                    }
+
+              # Subcategory filter
+              - type: entities
+                entities:
+                  - entity: input_select.ipm_subcategory
+                    name: Subcategory
+                card_mod:
+                  style: |
+                    ha-card {
+                      border-radius: 12px;
+                      padding: 4px;
+                    }
+                    .mdc-list-item__primary-text {
+                      font-size: 1.3rem !important;
+                    }
+
+              # Search
+              - type: entities
+                entities:
+                  - entity: input_text.ipm_search
+                    name: Search
+                card_mod:
+                  style: |
+                    ha-card {
+                      border-radius: 12px;
+                      padding: 4px;
+                    }
+                    .mdc-text-field__input {
+                      font-size: 1.3rem !important;
+                    }
+
+              # Product selection (by NAME)
+              - type: entities
+                entities:
+                  - entity: input_select.ipm_product
+                    name: Product
+                card_mod:
+                  style: |
+                    ha-card {
+                      border-radius: 12px;
+                      padding: 4px;
+                      background: #e8f5e9;
+                    }
+                    .mdc-list-item__primary-text {
+                      font-size: 1.4rem !important;
+                      font-weight: 600;
+                    }
+
+              # Location selection (always visible)
+              - type: entities
+                entities:
+                  - entity: input_select.ipm_location
+                    name: Stock Location
+                card_mod:
+                  style: |
+                    ha-card {
+                      border-radius: 12px;
+                      padding: 4px;
+                      background: #fff3e0;
+                    }
+                    .mdc-list-item__primary-text {
+                      font-size: 1.3rem !important;
+                    }
+
+              #----------------------------------------------------------------
+              # CURRENT STOCK display
+              #----------------------------------------------------------------
+              - type: custom:button-card
+                template: ipm_title
+                name: CURRENT STOCK
+
+              - type: custom:button-card
+                template: ipm_info_block
+                entity: sensor.ipm_current_stock
+                show_name: true
+                name: |
+                  [[[
+                    const location = entity.attributes.location || 'Select Location';
+                    if (location === 'Select Location') return 'Select a location';
+                    return location;
+                  ]]]
+                state_display: |
+                  [[[
+                    const stock = Number(entity.state) || 0;
+                    const unit = entity.attributes.unit || '';
+                    return stock.toFixed(0) + ' ' + unit;
+                  ]]]
+                styles:
+                  card:
+                    - background: "#5c6bc0"
+
+              #----------------------------------------------------------------
+              # ADJUST STOCK section
+              #----------------------------------------------------------------
+              - type: custom:button-card
+                template: ipm_title
+                name: ADJUST STOCK
+
+              # Minus buttons row 1
+              - type: grid
+                columns: 3
+                square: false
+                cards:
+                  - type: custom:button-card
+                    template: ipm_minus
+                    entity: input_number.ipm_quantity
+                    variables:
+                      amount: 1
+                      label: "- 1"
+                  - type: custom:button-card
+                    template: ipm_minus
+                    entity: input_number.ipm_quantity
+                    variables:
+                      amount: 5
+                      label: "- 5"
+                  - type: custom:button-card
+                    template: ipm_minus
+                    entity: input_number.ipm_quantity
+                    variables:
+                      amount: 20
+                      label: "- 20"
+
+              # Minus buttons row 2
+              - type: grid
+                columns: 3
+                square: false
+                cards:
+                  - type: custom:button-card
+                    template: ipm_minus
+                    entity: input_number.ipm_quantity
+                    variables:
+                      amount: 100
+                      label: "- 100"
+                  - type: custom:button-card
+                    template: ipm_minus
+                    entity: input_number.ipm_quantity
+                    variables:
+                      amount: 500
+                      label: "- 500"
+                  - type: custom:button-card
+                    template: ipm_minus
+                    entity: input_number.ipm_quantity
+                    variables:
+                      amount: 2000
+                      label: "- 2000"
+
+              # Change amount display
+              - type: horizontal-stack
+                cards:
+                  - type: custom:button-card
+                    template: ipm_info_block
+                    entity: input_number.ipm_quantity
+                    name: CHANGE
+                    show_name: true
+                    styles:
+                      card:
+                        - background: "#37474f"
+                      state:
+                        - color: |
+                            [[[
+                              const v = Number(entity.state);
+                              if (v > 0) return "#4caf50";
+                              if (v < 0) return "#f44336";
+                              return "#ffffff";
+                            ]]]
+
+                  - type: custom:button-card
+                    template: ipm_secondary
+                    name: CLEAR
+                    icon: mdi:backspace
+                    tap_action:
+                      action: call-service
+                      service: input_number.set_value
+                      target:
+                        entity_id: input_number.ipm_quantity
+                      data:
+                        value: 0
+                    styles:
+                      card:
+                        - height: 80px
+                        - width: 100px
+
+              # Plus buttons row 1
+              - type: grid
+                columns: 3
+                square: false
+                cards:
+                  - type: custom:button-card
+                    template: ipm_plus
+                    entity: input_number.ipm_quantity
+                    variables:
+                      amount: 1
+                      label: "+ 1"
+                  - type: custom:button-card
+                    template: ipm_plus
+                    entity: input_number.ipm_quantity
+                    variables:
+                      amount: 5
+                      label: "+ 5"
+                  - type: custom:button-card
+                    template: ipm_plus
+                    entity: input_number.ipm_quantity
+                    variables:
+                      amount: 20
+                      label: "+ 20"
+
+              # Plus buttons row 2
+              - type: grid
+                columns: 3
+                square: false
+                cards:
+                  - type: custom:button-card
+                    template: ipm_plus
+                    entity: input_number.ipm_quantity
+                    variables:
+                      amount: 100
+                      label: "+ 100"
+                  - type: custom:button-card
+                    template: ipm_plus
+                    entity: input_number.ipm_quantity
+                    variables:
+                      amount: 500
+                      label: "+ 500"
+                  - type: custom:button-card
+                    template: ipm_plus
+                    entity: input_number.ipm_quantity
+                    variables:
+                      amount: 2000
+                      label: "+ 2000"
+
+              #----------------------------------------------------------------
+              # NEW STOCK display
+              #----------------------------------------------------------------
+              - type: custom:button-card
+                template: ipm_info_block
+                entity: sensor.ipm_new_stock
+                show_name: true
+                name: |
+                  [[[
+                    const location = states['input_select.ipm_location']?.state || 'Select Location';
+                    if (location === 'Select Location') return 'NEW STOCK LEVEL';
+                    return 'NEW STOCK @ ' + location;
+                  ]]]
+                state_display: |
+                  [[[
+                    const stock = Number(entity.state) || 0;
+                    const unit = entity.attributes.unit || '';
+                    return stock.toFixed(0) + ' ' + unit;
+                  ]]]
+                styles:
+                  card:
+                    - background: "#7b1fa2"
+
+              #----------------------------------------------------------------
+              # SAVE button
+              #----------------------------------------------------------------
+              - type: custom:button-card
+                template: ipm_action
+                name: SAVE CHANGE
+                icon: mdi:content-save
+                tap_action:
+                  action: call-service
+                  service: script.ipm_save_movement
+                styles:
+                  card:
+                    - height: 80px
+                    - background: "#1565c0"
+
+
+  #============================================================================
+  # VIEW 2: PRODUCT EDITOR
+  #============================================================================
+  - title: Product Editor
+    path: editor
+    icon: mdi:pencil-box
+    type: sections
+    max_columns: 1
+    sections:
+      - type: grid
+        cards:
+          - type: vertical-stack
+            cards:
+              #----------------------------------------------------------------
+              # Editor mode selection
+              #----------------------------------------------------------------
+              - type: custom:button-card
+                template: ipm_title
+                name: PRODUCT EDITOR
+
+              - type: entities
+                entities:
+                  - entity: input_select.ipm_editor_mode
+                    name: Mode
+                card_mod:
+                  style: |
+                    ha-card {
+                      border-radius: 12px;
+                      padding: 4px;
+                    }
+                    .mdc-list-item__primary-text {
+                      font-size: 1.3rem !important;
+                    }
+
+              #----------------------------------------------------------------
+              # Load existing product (only in Edit mode)
+              #----------------------------------------------------------------
+              - type: conditional
+                conditions:
+                  - condition: state
+                    entity: input_select.ipm_editor_mode
+                    state: "Edit Existing Product"
+                card:
+                  type: vertical-stack
+                  cards:
+                    - type: markdown
+                      content: |
+                        **To edit a product:** Select it using the filters below, then tap **Load Product**.
+                      card_mod:
+                        style: |
+                          ha-card {
+                            border-radius: 12px;
+                            padding: 8px;
+                            background: #fff3e0;
+                          }
+
+                    - type: entities
+                      entities:
+                        - entity: input_select.ipm_category
+                          name: Category
+                        - entity: input_select.ipm_subcategory
+                          name: Subcategory
+                        - entity: input_text.ipm_search
+                          name: Search
+                      card_mod:
+                        style: |
+                          ha-card {
+                            border-radius: 12px;
+                            padding: 4px;
+                          }
+
+                    - type: entities
+                      entities:
+                        - entity: input_select.ipm_product
+                          name: Product to Edit
+                      card_mod:
+                        style: |
+                          ha-card {
+                            border-radius: 12px;
+                            padding: 4px;
+                            background: #e3f2fd;
+                          }
+                          .mdc-list-item__primary-text {
+                            font-size: 1.3rem !important;
+                          }
+
+                    - type: custom:button-card
+                      template: ipm_action
+                      name: LOAD PRODUCT
+                      icon: mdi:download
+                      tap_action:
+                        action: call-service
+                        service: script.ipm_load_product
+
+              #----------------------------------------------------------------
+              # Product details form
+              #----------------------------------------------------------------
+              - type: custom:button-card
+                template: ipm_title
+                name: PRODUCT DETAILS
+
+              - type: entities
+                entities:
+                  - entity: input_text.ipm_edit_name
+                    name: Product Name
+                  - entity: input_select.ipm_edit_category
+                    name: Category
+                  - entity: input_select.ipm_edit_subcategory
+                    name: Subcategory
+                  - entity: input_select.ipm_edit_unit
+                    name: Unit
+                  - entity: input_select.ipm_edit_container
+                    name: Container Size
+                  - entity: input_select.ipm_edit_location
+                    name: Storage Location
+                  - entity: input_number.ipm_edit_min_stock
+                    name: Minimum Stock Alert
+                card_mod:
+                  style: |
+                    ha-card {
+                      border-radius: 12px;
+                      padding: 6px;
+                      background: #e8f5e9;
+                    }
+                    .mdc-list-item__primary-text {
+                      font-size: 1.2rem !important;
+                    }
+
+              # Chemical-specific fields (only for Chemical category)
+              - type: conditional
+                conditions:
+                  - condition: state
+                    entity: input_select.ipm_edit_category
+                    state: "Chemical"
+                card:
+                  type: entities
+                  entities:
+                    - entity: input_select.ipm_edit_chem_group
+                      name: Chemical Group
+                    - entity: input_select.ipm_edit_app_unit
+                      name: Application Unit
+                  card_mod:
+                    style: |
+                      ha-card {
+                        border-radius: 12px;
+                        padding: 6px;
+                        background: #fff8e1;
+                      }
+
+              #----------------------------------------------------------------
+              # Active Constituents (for Chemical and Fertiliser)
+              #----------------------------------------------------------------
+              - type: conditional
+                conditions:
+                  - condition: or
+                    conditions:
+                      - condition: state
+                        entity: input_select.ipm_edit_category
+                        state: "Chemical"
+                      - condition: state
+                        entity: input_select.ipm_edit_category
+                        state: "Fertiliser"
+                card:
+                  type: vertical-stack
+                  cards:
+                    - type: custom:button-card
+                      template: ipm_title
+                      name: ACTIVE CONSTITUENTS
+                      styles:
+                        card:
+                          - height: 40px
+                        name:
+                          - font-size: 14px
+
+                    # Active 1 (always visible for Chemical/Fertiliser)
+                    - type: entities
+                      entities:
+                        - entity: input_text.ipm_active_1_name
+                          name: "Active 1 Name"
+                        - entity: input_number.ipm_active_1_conc
+                          name: "Concentration"
+                        - entity: input_select.ipm_active_1_unit
+                          name: "Unit"
+                      card_mod:
+                        style: |
+                          ha-card {
+                            border-radius: 12px;
+                            padding: 6px;
+                            background: #e8eaf6;
+                          }
+                    - type: custom:button-card
+                      name: "Clear Active 1"
+                      icon: mdi:close
+                      show_icon: true
+                      show_name: true
+                      tap_action:
+                        action: call-service
+                        service: script.ipm_clear_active_1
+                      styles:
+                        card:
+                          - height: 35px
+                          - border-radius: 12px
+                          - background: "#ef5350"
+                        name:
+                          - font-size: 12px
+                          - color: white
+                        icon:
+                          - color: white
+                          - width: 18px
+
+                    # Add Active 2 button (only when not showing active 2)
+                    - type: conditional
+                      conditions:
+                        - condition: state
+                          entity: input_boolean.ipm_show_active_2
+                          state: "off"
+                      card:
+                        type: custom:button-card
+                        name: "+ Add Another Active"
+                        icon: mdi:plus
+                        show_icon: true
+                        show_name: true
+                        tap_action:
+                          action: call-service
+                          service: input_boolean.turn_on
+                          target:
+                            entity_id: input_boolean.ipm_show_active_2
+                        styles:
+                          card:
+                            - height: 45px
+                            - border-radius: 12px
+                            - background: "#78909c"
+                          name:
+                            - font-size: 14px
+                            - color: white
+                          icon:
+                            - color: white
+
+                    # Active 2 (shown when toggle is on)
+                    - type: conditional
+                      conditions:
+                        - condition: state
+                          entity: input_boolean.ipm_show_active_2
+                          state: "on"
+                      card:
+                        type: vertical-stack
+                        cards:
+                          - type: entities
+                            entities:
+                              - entity: input_text.ipm_active_2_name
+                                name: "Active 2 Name"
+                              - entity: input_number.ipm_active_2_conc
+                                name: "Concentration"
+                              - entity: input_select.ipm_active_2_unit
+                                name: "Unit"
+                            card_mod:
+                              style: |
+                                ha-card {
+                                  border-radius: 12px;
+                                  padding: 6px;
+                                  background: #e8eaf6;
+                                }
+                          - type: custom:button-card
+                            name: "Remove Active 2"
+                            icon: mdi:close
+                            show_icon: true
+                            show_name: true
+                            tap_action:
+                              action: call-service
+                              service: script.ipm_clear_active_2
+                            styles:
+                              card:
+                                - height: 35px
+                                - border-radius: 12px
+                                - background: "#ef5350"
+                              name:
+                                - font-size: 12px
+                                - color: white
+                              icon:
+                                - color: white
+                                - width: 18px
+                          # Add Active 3 button
+                          - type: conditional
+                            conditions:
+                              - condition: state
+                                entity: input_boolean.ipm_show_active_3
+                                state: "off"
+                            card:
+                              type: custom:button-card
+                              name: "+ Add Another Active"
+                              icon: mdi:plus
+                              show_icon: true
+                              show_name: true
+                              tap_action:
+                                action: call-service
+                                service: input_boolean.turn_on
+                                target:
+                                  entity_id: input_boolean.ipm_show_active_3
+                              styles:
+                                card:
+                                  - height: 45px
+                                  - border-radius: 12px
+                                  - background: "#78909c"
+                                name:
+                                  - font-size: 14px
+                                  - color: white
+                                icon:
+                                  - color: white
+
+                    # Active 3 (shown when toggle is on)
+                    - type: conditional
+                      conditions:
+                        - condition: state
+                          entity: input_boolean.ipm_show_active_3
+                          state: "on"
+                      card:
+                        type: vertical-stack
+                        cards:
+                          - type: entities
+                            entities:
+                              - entity: input_text.ipm_active_3_name
+                                name: "Active 3 Name"
+                              - entity: input_number.ipm_active_3_conc
+                                name: "Concentration"
+                              - entity: input_select.ipm_active_3_unit
+                                name: "Unit"
+                            card_mod:
+                              style: |
+                                ha-card {
+                                  border-radius: 12px;
+                                  padding: 6px;
+                                  background: #e8eaf6;
+                                }
+                          - type: custom:button-card
+                            name: "Remove Active 3"
+                            icon: mdi:close
+                            show_icon: true
+                            show_name: true
+                            tap_action:
+                              action: call-service
+                              service: script.ipm_clear_active_3
+                            styles:
+                              card:
+                                - height: 35px
+                                - border-radius: 12px
+                                - background: "#ef5350"
+                              name:
+                                - font-size: 12px
+                                - color: white
+                              icon:
+                                - color: white
+                                - width: 18px
+                          # Add Active 4 button
+                          - type: conditional
+                            conditions:
+                              - condition: state
+                                entity: input_boolean.ipm_show_active_4
+                                state: "off"
+                            card:
+                              type: custom:button-card
+                              name: "+ Add Another Active"
+                              icon: mdi:plus
+                              show_icon: true
+                              show_name: true
+                              tap_action:
+                                action: call-service
+                                service: input_boolean.turn_on
+                                target:
+                                  entity_id: input_boolean.ipm_show_active_4
+                              styles:
+                                card:
+                                  - height: 45px
+                                  - border-radius: 12px
+                                  - background: "#78909c"
+                                name:
+                                  - font-size: 14px
+                                  - color: white
+                                icon:
+                                  - color: white
+
+                    # Active 4 (shown when toggle is on)
+                    - type: conditional
+                      conditions:
+                        - condition: state
+                          entity: input_boolean.ipm_show_active_4
+                          state: "on"
+                      card:
+                        type: vertical-stack
+                        cards:
+                          - type: entities
+                            entities:
+                              - entity: input_text.ipm_active_4_name
+                                name: "Active 4 Name"
+                              - entity: input_number.ipm_active_4_conc
+                                name: "Concentration"
+                              - entity: input_select.ipm_active_4_unit
+                                name: "Unit"
+                            card_mod:
+                              style: |
+                                ha-card {
+                                  border-radius: 12px;
+                                  padding: 6px;
+                                  background: #e8eaf6;
+                                }
+                          - type: custom:button-card
+                            name: "Remove Active 4"
+                            icon: mdi:close
+                            show_icon: true
+                            show_name: true
+                            tap_action:
+                              action: call-service
+                              service: script.ipm_clear_active_4
+                            styles:
+                              card:
+                                - height: 35px
+                                - border-radius: 12px
+                                - background: "#ef5350"
+                              name:
+                                - font-size: 12px
+                                - color: white
+                              icon:
+                                - color: white
+                                - width: 18px
+                          # Add Active 5 button
+                          - type: conditional
+                            conditions:
+                              - condition: state
+                                entity: input_boolean.ipm_show_active_5
+                                state: "off"
+                            card:
+                              type: custom:button-card
+                              name: "+ Add Another Active"
+                              icon: mdi:plus
+                              show_icon: true
+                              show_name: true
+                              tap_action:
+                                action: call-service
+                                service: input_boolean.turn_on
+                                target:
+                                  entity_id: input_boolean.ipm_show_active_5
+                              styles:
+                                card:
+                                  - height: 45px
+                                  - border-radius: 12px
+                                  - background: "#78909c"
+                                name:
+                                  - font-size: 14px
+                                  - color: white
+                                icon:
+                                  - color: white
+
+                    # Active 5 (shown when toggle is on)
+                    - type: conditional
+                      conditions:
+                        - condition: state
+                          entity: input_boolean.ipm_show_active_5
+                          state: "on"
+                      card:
+                        type: vertical-stack
+                        cards:
+                          - type: entities
+                            entities:
+                              - entity: input_text.ipm_active_5_name
+                                name: "Active 5 Name"
+                              - entity: input_number.ipm_active_5_conc
+                                name: "Concentration"
+                              - entity: input_select.ipm_active_5_unit
+                                name: "Unit"
+                            card_mod:
+                              style: |
+                                ha-card {
+                                  border-radius: 12px;
+                                  padding: 6px;
+                                  background: #e8eaf6;
+                                }
+                          - type: custom:button-card
+                            name: "Remove Active 5"
+                            icon: mdi:close
+                            show_icon: true
+                            show_name: true
+                            tap_action:
+                              action: call-service
+                              service: script.ipm_clear_active_5
+                            styles:
+                              card:
+                                - height: 35px
+                                - border-radius: 12px
+                                - background: "#ef5350"
+                              name:
+                                - font-size: 12px
+                                - color: white
+                              icon:
+                                - color: white
+                                - width: 18px
+                          # Add Active 6 button
+                          - type: conditional
+                            conditions:
+                              - condition: state
+                                entity: input_boolean.ipm_show_active_6
+                                state: "off"
+                            card:
+                              type: custom:button-card
+                              name: "+ Add Another Active"
+                              icon: mdi:plus
+                              show_icon: true
+                              show_name: true
+                              tap_action:
+                                action: call-service
+                                service: input_boolean.turn_on
+                                target:
+                                  entity_id: input_boolean.ipm_show_active_6
+                              styles:
+                                card:
+                                  - height: 45px
+                                  - border-radius: 12px
+                                  - background: "#78909c"
+                                name:
+                                  - font-size: 14px
+                                  - color: white
+                                icon:
+                                  - color: white
+
+                    # Active 6 (shown when toggle is on)
+                    - type: conditional
+                      conditions:
+                        - condition: state
+                          entity: input_boolean.ipm_show_active_6
+                          state: "on"
+                      card:
+                        type: vertical-stack
+                        cards:
+                          - type: entities
+                            entities:
+                              - entity: input_text.ipm_active_6_name
+                                name: "Active 6 Name"
+                              - entity: input_number.ipm_active_6_conc
+                                name: "Concentration"
+                              - entity: input_select.ipm_active_6_unit
+                                name: "Unit"
+                            card_mod:
+                              style: |
+                                ha-card {
+                                  border-radius: 12px;
+                                  padding: 6px;
+                                  background: #e8eaf6;
+                                }
+                          - type: custom:button-card
+                            name: "Remove Active 6"
+                            icon: mdi:close
+                            show_icon: true
+                            show_name: true
+                            tap_action:
+                              action: call-service
+                              service: script.ipm_clear_active_6
+                            styles:
+                              card:
+                                - height: 35px
+                                - border-radius: 12px
+                                - background: "#ef5350"
+                              name:
+                                - font-size: 12px
+                                - color: white
+                              icon:
+                                - color: white
+                                - width: 18px
+
+              # Initial stock (only for Add mode)
+              - type: conditional
+                conditions:
+                  - condition: state
+                    entity: input_select.ipm_editor_mode
+                    state: "Add New Product"
+                card:
+                  type: entities
+                  entities:
+                    - entity: input_number.ipm_edit_initial_stock
+                      name: Initial Stock Quantity
+                  card_mod:
+                    style: |
+                      ha-card {
+                        border-radius: 12px;
+                        padding: 6px;
+                        background: #e1f5fe;
+                      }
+
+              #----------------------------------------------------------------
+              # Action buttons
+              #----------------------------------------------------------------
+              - type: horizontal-stack
+                cards:
+                  - type: custom:button-card
+                    template: ipm_secondary
+                    name: CLEAR
+                    icon: mdi:eraser
+                    tap_action:
+                      action: call-service
+                      service: script.ipm_clear_form
+                    styles:
+                      card:
+                        - height: 70px
+
+                  - type: custom:button-card
+                    template: ipm_action
+                    name: SAVE
+                    icon: mdi:content-save
+                    tap_action:
+                      action: call-service
+                      service: script.ipm_save_product
+                    styles:
+                      card:
+                        - height: 70px
+                        - background: "#2e7d32"
+
+
+  #============================================================================
+  # VIEW 3: STOCK OVERVIEW
+  #============================================================================
+  - title: Stock Overview
+    path: overview
+    icon: mdi:chart-bar
+    type: sections
+    max_columns: 1
+    sections:
+      - type: grid
+        cards:
+          - type: vertical-stack
+            cards:
+              - type: custom:button-card
+                template: ipm_title
+                name: STOCK OVERVIEW
+
+              # Filters
+              - type: entities
+                entities:
+                  - entity: input_select.ipm_category
+                    name: Category
+                  - entity: input_select.ipm_subcategory
+                    name: Subcategory
+                  - entity: input_text.ipm_search
+                    name: Search
+                card_mod:
+                  style: |
+                    ha-card {
+                      border-radius: 12px;
+                      padding: 4px;
+                    }
+
+              # Summary stats chips
+              - type: horizontal-stack
+                cards:
+                  - type: custom:button-card
+                    template: ipm_stat_chip
+                    entity: sensor.ipm_products
+                    icon: mdi:package-variant-closed
+                    name: Products
+                    styles:
+                      card:
+                        - background: "#455a64"
+
+                  - type: custom:button-card
+                    template: ipm_stat_chip
+                    entity: sensor.ipm_filtered_products
+                    icon: mdi:filter-variant
+                    name: Matching
+                    styles:
+                      card:
+                        - background: "#00796b"
+
+                  - type: custom:button-card
+                    template: ipm_stat_chip
+                    entity: sensor.ipm_low_stock_count
+                    icon: mdi:alert
+                    name: Low Stock
+                    styles:
+                      card:
+                        - background: |
+                            [[[
+                              return Number(entity.state) > 0 ? '#d32f2f' : '#388e3c';
+                            ]]]
+
+              # Product cards grid
+              - type: custom:button-card
+                entity: sensor.ipm_products
+                show_icon: false
+                show_name: false
+                show_state: false
+                styles:
+                  card:
+                    - background: transparent
+                    - box-shadow: none
+                    - padding: 0
+                    - margin: 0
+                    - overflow-y: auto
+                    - max-height: 65vh
+                  grid:
+                    - display: block
+                  custom_fields:
+                    products:
+                      - width: 100%
+                custom_fields:
+                  products: |
+                    [[[
+                      try {
+                        // ----- Safe access helpers -----
+                        const safeStr = (v) => (v === null || v === undefined) ? '' : String(v);
+                        const safeNum = (v) => {
+                          const n = Number(v);
+                          return Number.isFinite(n) ? n : 0;
+                        };
+
+                        // Entity may be undefined briefly at load
+                        if (!entity || !entity.attributes) {
+                          return `<div style="text-align:center;padding:30px;color:var(--secondary-text-color);">
+                                    Loading inventory…
+                                  </div>`;
+                        }
+
+                        // products can be an object OR a list depending on how your sensor builds attributes
+                        const rawProducts = entity.attributes.products ?? {};
+                        const list = Array.isArray(rawProducts)
+                          ? rawProducts
+                          : Object.values(rawProducts || {});
+
+                        const catState = states['input_select.ipm_category'];
+                        const subState = states['input_select.ipm_subcategory'];
+                        const searchState = states['input_text.ipm_search'];
+
+                        const category = catState ? catState.state : 'All';
+                        const subcategory = subState ? subState.state : 'All';
+                        const search = searchState ? safeStr(searchState.state).toLowerCase().trim() : '';
+
+                        const catConfig = {
+                          'Chemical':   { icon: 'mdi:flask', color: '#e53935', bg: '#ffebee' },
+                          'Fertiliser': { icon: 'mdi:leaf',  color: '#43a047', bg: '#e8f5e9' },
+                          'Seed':       { icon: 'mdi:seed',  color: '#fb8c00', bg: '#fff3e0' },
+                          'Lubricant':  { icon: 'mdi:oil',   color: '#1e88e5', bg: '#e3f2fd' }
+                        };
+
+                        const filtered = list
+                          .filter((p) => {
+                            if (!p) return false;
+
+                            const pCat  = safeStr(p.category);
+                            const pSub  = safeStr(p.subcategory);
+                            const pName = safeStr(p.name).toLowerCase();
+                            const pId   = safeStr(p.id).toLowerCase();
+
+                            const catMatch = category === 'All' || pCat === category;
+                            const subMatch = subcategory === 'All' || pSub === subcategory;
+
+                            const searchMatch =
+                              !search || pName.includes(search) || pId.includes(search);
+
+                            return catMatch && subMatch && searchMatch;
+                          })
+                          .sort((a, b) => safeStr(a?.name).localeCompare(safeStr(b?.name)));
+
+                        if (filtered.length === 0) {
+                          return `
+                            <div style="text-align:center;padding:40px;color:var(--secondary-text-color);">
+                              <ha-icon icon="mdi:package-variant-remove" style="--mdc-icon-size:48px;margin-bottom:12px;"></ha-icon>
+                              <div style="font-size:16px;">No products match the current filters</div>
+                            </div>`;
+                        }
+
+                        let html = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;padding:4px;">`;
+
+                        for (let i = 0; i < filtered.length; i++) {
+                          const p = filtered[i] || {};
+                          const pCat = safeStr(p.category);
+                          const cat = catConfig[pCat] || { icon: 'mdi:package', color: '#757575', bg: '#f5f5f5' };
+
+                          const unit = safeStr(p.unit);
+
+                          // stock_by_location must be an object; otherwise treat as empty
+                          const sbl = (p.stock_by_location && typeof p.stock_by_location === 'object' && !Array.isArray(p.stock_by_location))
+                            ? p.stock_by_location
+                            : {};
+
+                          const locs = Object.keys(sbl);
+                          let total = 0;
+                          for (let j = 0; j < locs.length; j++) total += safeNum(sbl[locs[j]]);
+
+                          const minStock = safeNum(p.min_stock);
+                          const isLow = minStock > 0 && total < minStock;
+
+                          const pct = (minStock > 0)
+                            ? Math.min(100, (total / minStock) * 100)
+                            : 100;
+
+                          let barColor = '#4caf50';
+                          if (pct < 50) barColor = '#ff9800';
+                          if (pct < 25) barColor = '#f44336';
+
+                          let locHtml = '';
+                          for (let k = 0; k < locs.length; k++) {
+                            const loc = locs[k];
+                            const qty = safeNum(sbl[loc]);
+
+                            if (qty > 0 || locs.length <= 3) {
+                              locHtml += `
+                                <div style="display:flex;justify-content:space-between;padding:2px 0;font-size:13px;color:var(--secondary-text-color);">
+                                  <span>${safeStr(loc)}</span>
+                                  <span style="font-weight:600;">${qty.toFixed(0)} ${unit}</span>
+                                </div>`;
+                            }
+                          }
+
+                          if (!locHtml) {
+                            locHtml = `<div style="font-size:13px;color:var(--secondary-text-color);font-style:italic;">No stock</div>`;
+                          }
+
+                          html += `<div style="background:var(--card-background-color,#fff);border-radius:12px;padding:16px;box-shadow:0 2px 6px rgba(0,0,0,0.1);border-left:4px solid ${cat.color};">`;
+
+                          html += `<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">`;
+                          html += `<div style="width:44px;height:44px;border-radius:50%;background:${cat.bg};display:flex;align-items:center;justify-content:center;">
+                                    <ha-icon icon="${cat.icon}" style="--mdc-icon-size:24px;color:${cat.color};"></ha-icon>
+                                  </div>`;
+                          html += `<div style="flex:1;min-width:0;">`;
+                          html += `<div style="font-size:16px;font-weight:600;color:var(--primary-text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">`;
+                          if (isLow) html += `<ha-icon icon="mdi:alert" style="--mdc-icon-size:16px;color:#f44336;vertical-align:middle;"></ha-icon> `;
+                          html += `${safeStr(p.name) || 'Unknown'}</div>`;
+                          html += `<div style="font-size:12px;color:var(--secondary-text-color);">${pCat}${p.subcategory ? ' / ' + safeStr(p.subcategory) : ''}</div>`;
+                          html += `</div></div>`;
+
+                          html += `<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;">`;
+                          html += `<span style="font-size:28px;font-weight:700;color:var(--primary-text-color);">${safeNum(total).toFixed(0)}</span>`;
+                          html += `<span style="font-size:16px;color:var(--secondary-text-color);">${unit}${minStock > 0 ? ' / min ' + minStock : ''}</span>`;
+                          html += `</div>`;
+
+                          html += `<div style="height:6px;background:var(--divider-color,#e0e0e0);border-radius:3px;margin-bottom:12px;overflow:hidden;">`;
+                          html += `<div style="height:100%;width:${pct}%;background:${barColor};border-radius:3px;"></div></div>`;
+
+                          html += `<div style="border-top:1px solid var(--divider-color,#e0e0e0);padding-top:8px;">${locHtml}</div>`;
+                          html += `</div>`;
+                        }
+
+                        html += `</div>`;
+                        return html;
+
+                      } catch (e) {
+                        console.error('IPM Stock Overview render error:', e);
+                        return `<div style="padding:14px;border-radius:12px;background:rgba(244,67,54,0.12);color:var(--primary-text-color);">
+                                  <div style="font-weight:700;margin-bottom:6px;">Render error in Stock Overview card</div>
+                                  <div style="font-family:monospace;font-size:12px;opacity:.85;">${String(e)}</div>
+                                </div>`;
+                      }
+                    ]]]

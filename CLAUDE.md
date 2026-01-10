@@ -1,85 +1,86 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code when working with this repository.
 
 ## Repository Overview
 
-This is a Home Assistant configuration repository for a farm/agricultural operation. The main custom development is **PaddiSense** - an Integrated Pest Management (IPM) inventory tracking system for managing chemicals, fertilisers, seeds, and lubricants across multiple storage locations.
+This is a Home Assistant configuration repository for a farm/agricultural operation. The system is called **PaddiSense** - a modular farm management platform with multiple packages:
 
-## Architecture
+- **IPM** (Inventory Product Manager) - Track chemicals, fertilisers, seeds, lubricants
+- **WSS** (Work Safety System) - Coming soon
+- **PWM** (Precision Water Management) - Coming soon
+- **ASM** (Asset Manager) - Coming soon
+- **HFM** (Hey Farmer) - Coming soon
 
-### Configuration Loading
+## Directory Structure
 
-Home Assistant loads configuration via `configuration.yaml`:
-- **Packages**: `PaddiSense/YAMLS/*.yaml` are loaded as named packages via `!include_dir_named`
-- **Shell commands**: `PaddiSense/Shell/shell_command.yaml`
-- **Dashboards**: `PaddiSense/Dashboards/registry/*.yaml` registers Lovelace dashboards
+```
+/config/
+├── configuration.yaml          # Main HA config
+├── PaddiSense/                 # All distributable modules
+│   └── ipm/                    # Inventory Product Manager
+│       ├── package.yaml        # All HA config (helpers, templates, scripts, automations)
+│       ├── python/
+│       │   ├── ipm_backend.py  # Write operations (add/edit product, move stock)
+│       │   └── ipm_sensor.py   # Read-only JSON output for HA sensor
+│       └── dashboards/
+│           ├── registry.yaml   # Dashboard registration
+│           └── inventory.yaml  # Dashboard views
+│
+└── local_data/                 # Runtime data - NOT in git
+    └── ipm/
+        └── inventory.json      # Product inventory data
+```
 
-### PaddiSense IPM System
+## Module Design Principles
 
-The inventory system follows a clear separation:
+Each module (ipm, wss, etc.) should be:
+1. **Self-contained** - All files in one folder for easy distribution
+2. **Single package.yaml** - All HA configuration in one file
+3. **Data separation** - Runtime data in `/config/local_data/`, not tracked in git
 
-**Python Backend** (`PaddiSense/Python/`):
-- `ipm_inventory.py` - Write operations: `upsert_product`, `move_stock`, `list` (CLI with argparse)
-- `ipm_read_v2.py` - Read-only: outputs JSON for Home Assistant command_line sensor
-
-**Data Storage**:
-- Runtime data lives in `PaddiSense/data/ipm_inventory.json` (gitignored - each install maintains own inventory)
-- Products stored with `stock_by_location` dict for multi-location tracking
-- Transactions logged for audit trail
-
-**YAML Configuration** (`PaddiSense/YAMLS/`):
-- `ipm_command_line_sensors.yaml` - Sensor that runs `ipm_read_v2.py` every 5 minutes
-- `ipm_templates.yaml` - Template sensors for filtering, selection state, UI helpers
-- `ipm_helpers.yaml` - Input helpers (input_select, input_number, input_text, input_boolean)
-- `ipm_automations.yaml` - Automations for updating dropdowns when filters change
-- `ipm_scripts.yaml` - Scripts for commit, save, load operations calling shell commands
-
-**Shell Commands** (`PaddiSense/Shell/shell_command.yaml`):
-- `ipm_move_stock` - Calls `ipm_inventory.py move_stock`
-- `ipm_upsert_product` - Calls `ipm_inventory.py upsert_product`
-
-**Dashboard** (`PaddiSense/Dashboards/views/ipm-inventory.yaml`):
-- Three views: Movement (stock in/out), Manage Products (add/edit), Stock Overview (read-only)
-- Uses `custom:button-card` templates for UI
-- Product selection uses composite key format: `ID|Location`
+## IPM System Architecture
 
 ### Data Flow
-
-1. `sensor.ipm_inventory_products` runs Python script, exposes JSON as attributes
-2. Template sensors (`sensor.ipm_inventory_catalog`, `sensor.ipm_filtered_products`) process/filter data
-3. Automations update `input_select` options based on filter state
+1. `sensor.ipm_products` runs Python sensor script every 5 minutes
+2. Template sensors filter/transform the data for UI
+3. User interactions trigger scripts
 4. Scripts call shell commands which invoke Python backend
-5. After changes, sensor is refreshed via `homeassistant.update_entity`
+5. Python backend updates `inventory.json`
+6. Sensor refreshes to reflect changes
 
-### ESPHome
+### Key Entities
+- `sensor.ipm_products` - Main data source (JSON attributes)
+- `input_select.ipm_product` - Product selection by NAME (user-friendly)
+- `input_select.ipm_location` - Location selection (for multi-location products)
+- `input_number.ipm_quantity` - Stock change amount
+- `script.ipm_save_movement` - Commit stock changes
+- `script.ipm_add_product` / `script.ipm_save_product` - Product management
 
-Shared ESPHome configuration in `esphome/Includes/`:
-- `.base.yaml` - Common config for ESP32 devices (API, OTA, WiFi, utilities)
-- `.rb_hardware.yaml` - RiceBoard-specific hardware config
-- Individual device YAMLs are gitignored; only shared includes are tracked
+### Category Structure
+```
+Chemical    → Adjuvant, Fungicide, Herbicide, Insecticide, Pesticide, Rodenticide, Seed Treatment
+Fertiliser  → Nitrogen, Phosphorus, Potassium, NPK Blend, Trace Elements, Organic
+Seed        → Wheat, Barley, Canola, Rice, Oats, Pasture, Other
+Lubricant   → Engine Oil, Hydraulic Oil, Grease, Gear Oil, Transmission Fluid, Coolant
+```
+
+### Storage Locations
+Chem Shed, Seed Shed, Oil Shed, Silo 1-13
 
 ## Git Workflow
 
-Sync PaddiSense changes:
+To sync changes:
 ```bash
-git add PaddiSense
-git commit -m "description"
+git add PaddiSense CLAUDE.md configuration.yaml .gitignore
+git commit -m "Description of changes"
 git push
 ```
 
-## Key Entities
+## Important Notes
 
-- `sensor.ipm_inventory_products` - Source of truth, JSON with products/locations
-- `input_select.ipm_product_key` - Selected product in format `PRODUCT_ID|Location`
-- `input_select.ipm_category` / `ipm_subcategory_filter` - Filtering
-- `script.ipm_commit` - Commits stock movement
-- `script.ipm_save_product` - Saves new/edited product
-
-## Important Patterns
-
-- Product IDs are auto-generated slugs from product names (uppercase, alphanumeric + underscores)
-- Categories are normalized (e.g., "fertilizer" → "Fertiliser")
+- Product IDs are auto-generated from names (uppercase, alphanumeric + underscores)
+- Products can exist in multiple locations (e.g., Urea in Silo 1 and Silo 3)
 - Stock cannot go negative (clamped to 0)
-- Template sensors use Jinja2 namespace pattern for list building in loops
-- Input_select options use "please update" as reset placeholder
+- Transactions are logged for audit trail
+- The UI uses two-step selection: Product Name → Location (if multiple)

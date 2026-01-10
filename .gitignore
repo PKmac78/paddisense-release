@@ -9,7 +9,13 @@ home-assistant.log*
 cloud/
 tts/
 
-# PaddiSense runtime data (DO NOT COMMIT)
+########################################
+# PaddiSense local data (DO NOT COMMIT)
+# Each farm maintains their own inventory
+########################################
+local_data/
+
+# Legacy (can be removed after migration)
 PaddiSense/data/
 
 ########################################

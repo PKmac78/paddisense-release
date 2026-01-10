@@ -9,31 +9,31 @@ frontend:
 automation: !include automations.yaml
 script: !include scripts.yaml
 scene: !include scenes.yaml
-shell_command: !include /config/PaddiSense/Shell/shell_command.yaml
 
+##############################################################################
+# PaddiSense Farm Management System
+##############################################################################
+
+# Packages: Each module has its own package.yaml
 homeassistant:
-  packages: !include_dir_named PaddiSense/YAMLS
+  packages:
+    ipm: !include PaddiSense/ipm/package.yaml
 
-############################################
-# Dashboard Loading #
+# Dashboards: Each module registers its own dashboard
 lovelace:
-  dashboards: !include_dir_named PaddiSense/Dashboards/registry
+  mode: storage
+  dashboards:
+    ipm-inventory:
+      mode: yaml
+      title: Inventory Manager
+      icon: mdi:warehouse
+      show_in_sidebar: true
+      filename: PaddiSense/ipm/dashboards/inventory.yaml
 
-
-
-################# EOS ###############################
-
-
-##########################
-# This setting will kepp all data in the database for 1 year then be deleted
+##############################################################################
+# Database Settings
+##############################################################################
 recorder:
   purge_keep_days: 365
   auto_purge: true
   commit_interval: 30
-############################
-
-#################################################
-# Steps to sync with Github
-#     >> git add PaddiSense
-#     >> git commit -m "Add PaddiSense folder"
-#     >> git push
