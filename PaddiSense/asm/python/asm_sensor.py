@@ -65,6 +65,17 @@ def main() -> int:
         service_events, key=lambda e: e.get("timestamp", ""), reverse=True
     )[:20]
 
+    # Build service event labels for dropdown (date - asset - type)
+    event_labels = []
+    event_id_to_label = {}
+    for e in recent_events:
+        ts = e.get("timestamp", "")[:10]  # Just the date portion
+        asset = e.get("asset_name", e.get("asset_id", "Unknown"))
+        stype = e.get("service_type", "Service")
+        label = f"{ts} - {asset} - {stype}"
+        event_labels.append(label)
+        event_id_to_label[e.get("id", "")] = label
+
     # Build categories list
     asset_categories = ["Tractor", "Pump", "Harvester", "Vehicle"]
     part_categories = ["Filter", "Belt", "Oil", "Grease", "Battery", "Tyre", "Hose"]
@@ -89,6 +100,8 @@ def main() -> int:
         "asset_id_to_name": asset_id_to_name,
         "part_id_to_name": part_id_to_name,
         "recent_events": recent_events,
+        "event_labels": event_labels,
+        "event_id_to_label": event_id_to_label,
         "asset_categories": asset_categories,
         "part_categories": part_categories,
         "service_types": service_types,

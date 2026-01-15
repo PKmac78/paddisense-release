@@ -37,6 +37,8 @@ command_line:
         - asset_id_to_name
         - part_id_to_name
         - recent_events
+        - event_labels
+        - event_id_to_label
         - asset_categories
         - part_categories
         - service_types
@@ -130,6 +132,15 @@ input_select:
     name: ASM Editor Mode
     icon: mdi:pencil
     options:
+      - View
+      - Add New
+      - Edit Existing
+
+  asm_part_editor_mode:
+    name: ASM Part Editor Mode
+    icon: mdi:pencil
+    options:
+      - View
       - Add New
       - Edit Existing
 
@@ -248,6 +259,13 @@ input_select:
     icon: mdi:filter
     options:
       - All Assets
+
+  # ----- Service Event Viewer -----
+  asm_service_event:
+    name: ASM Service Event
+    icon: mdi:clipboard-text-clock
+    options:
+      - Select Event
 
 input_number:
   # Part stock
@@ -386,7 +404,107 @@ input_text:
     icon: mdi:text
     max: 50
 
-  # Part attributes (5 slots)
+  asm_attr_6_name:
+    name: ASM Attr 6 Name
+    icon: mdi:tag
+    max: 30
+
+  asm_attr_6_value:
+    name: ASM Attr 6 Value
+    icon: mdi:text
+    max: 50
+
+  asm_attr_7_name:
+    name: ASM Attr 7 Name
+    icon: mdi:tag
+    max: 30
+
+  asm_attr_7_value:
+    name: ASM Attr 7 Value
+    icon: mdi:text
+    max: 50
+
+  asm_attr_8_name:
+    name: ASM Attr 8 Name
+    icon: mdi:tag
+    max: 30
+
+  asm_attr_8_value:
+    name: ASM Attr 8 Value
+    icon: mdi:text
+    max: 50
+
+  asm_attr_9_name:
+    name: ASM Attr 9 Name
+    icon: mdi:tag
+    max: 30
+
+  asm_attr_9_value:
+    name: ASM Attr 9 Value
+    icon: mdi:text
+    max: 50
+
+  asm_attr_10_name:
+    name: ASM Attr 10 Name
+    icon: mdi:tag
+    max: 30
+
+  asm_attr_10_value:
+    name: ASM Attr 10 Value
+    icon: mdi:text
+    max: 50
+
+  asm_attr_11_name:
+    name: ASM Attr 11 Name
+    icon: mdi:tag
+    max: 30
+
+  asm_attr_11_value:
+    name: ASM Attr 11 Value
+    icon: mdi:text
+    max: 50
+
+  asm_attr_12_name:
+    name: ASM Attr 12 Name
+    icon: mdi:tag
+    max: 30
+
+  asm_attr_12_value:
+    name: ASM Attr 12 Value
+    icon: mdi:text
+    max: 50
+
+  asm_attr_13_name:
+    name: ASM Attr 13 Name
+    icon: mdi:tag
+    max: 30
+
+  asm_attr_13_value:
+    name: ASM Attr 13 Value
+    icon: mdi:text
+    max: 50
+
+  asm_attr_14_name:
+    name: ASM Attr 14 Name
+    icon: mdi:tag
+    max: 30
+
+  asm_attr_14_value:
+    name: ASM Attr 14 Value
+    icon: mdi:text
+    max: 50
+
+  asm_attr_15_name:
+    name: ASM Attr 15 Name
+    icon: mdi:tag
+    max: 30
+
+  asm_attr_15_value:
+    name: ASM Attr 15 Value
+    icon: mdi:text
+    max: 50
+
+  # Part attributes (15 slots)
   asm_part_attr_1_name:
     name: ASM Part Attr 1 Name
     icon: mdi:tag
@@ -437,6 +555,106 @@ input_text:
     icon: mdi:text
     max: 50
 
+  asm_part_attr_6_name:
+    name: ASM Part Attr 6 Name
+    icon: mdi:tag
+    max: 30
+
+  asm_part_attr_6_value:
+    name: ASM Part Attr 6 Value
+    icon: mdi:text
+    max: 50
+
+  asm_part_attr_7_name:
+    name: ASM Part Attr 7 Name
+    icon: mdi:tag
+    max: 30
+
+  asm_part_attr_7_value:
+    name: ASM Part Attr 7 Value
+    icon: mdi:text
+    max: 50
+
+  asm_part_attr_8_name:
+    name: ASM Part Attr 8 Name
+    icon: mdi:tag
+    max: 30
+
+  asm_part_attr_8_value:
+    name: ASM Part Attr 8 Value
+    icon: mdi:text
+    max: 50
+
+  asm_part_attr_9_name:
+    name: ASM Part Attr 9 Name
+    icon: mdi:tag
+    max: 30
+
+  asm_part_attr_9_value:
+    name: ASM Part Attr 9 Value
+    icon: mdi:text
+    max: 50
+
+  asm_part_attr_10_name:
+    name: ASM Part Attr 10 Name
+    icon: mdi:tag
+    max: 30
+
+  asm_part_attr_10_value:
+    name: ASM Part Attr 10 Value
+    icon: mdi:text
+    max: 50
+
+  asm_part_attr_11_name:
+    name: ASM Part Attr 11 Name
+    icon: mdi:tag
+    max: 30
+
+  asm_part_attr_11_value:
+    name: ASM Part Attr 11 Value
+    icon: mdi:text
+    max: 50
+
+  asm_part_attr_12_name:
+    name: ASM Part Attr 12 Name
+    icon: mdi:tag
+    max: 30
+
+  asm_part_attr_12_value:
+    name: ASM Part Attr 12 Value
+    icon: mdi:text
+    max: 50
+
+  asm_part_attr_13_name:
+    name: ASM Part Attr 13 Name
+    icon: mdi:tag
+    max: 30
+
+  asm_part_attr_13_value:
+    name: ASM Part Attr 13 Value
+    icon: mdi:text
+    max: 50
+
+  asm_part_attr_14_name:
+    name: ASM Part Attr 14 Name
+    icon: mdi:tag
+    max: 30
+
+  asm_part_attr_14_value:
+    name: ASM Part Attr 14 Value
+    icon: mdi:text
+    max: 50
+
+  asm_part_attr_15_name:
+    name: ASM Part Attr 15 Name
+    icon: mdi:tag
+    max: 30
+
+  asm_part_attr_15_value:
+    name: ASM Part Attr 15 Value
+    icon: mdi:text
+    max: 50
+
   # Service event notes and hours
   asm_service_notes:
     name: ASM Service Notes
@@ -471,6 +689,46 @@ input_boolean:
     name: ASM Show Attr 5
     icon: mdi:plus-circle-outline
 
+  asm_show_attr_6:
+    name: ASM Show Attr 6
+    icon: mdi:plus-circle-outline
+
+  asm_show_attr_7:
+    name: ASM Show Attr 7
+    icon: mdi:plus-circle-outline
+
+  asm_show_attr_8:
+    name: ASM Show Attr 8
+    icon: mdi:plus-circle-outline
+
+  asm_show_attr_9:
+    name: ASM Show Attr 9
+    icon: mdi:plus-circle-outline
+
+  asm_show_attr_10:
+    name: ASM Show Attr 10
+    icon: mdi:plus-circle-outline
+
+  asm_show_attr_11:
+    name: ASM Show Attr 11
+    icon: mdi:plus-circle-outline
+
+  asm_show_attr_12:
+    name: ASM Show Attr 12
+    icon: mdi:plus-circle-outline
+
+  asm_show_attr_13:
+    name: ASM Show Attr 13
+    icon: mdi:plus-circle-outline
+
+  asm_show_attr_14:
+    name: ASM Show Attr 14
+    icon: mdi:plus-circle-outline
+
+  asm_show_attr_15:
+    name: ASM Show Attr 15
+    icon: mdi:plus-circle-outline
+
   # Show additional part attribute slots
   asm_show_part_attr_2:
     name: ASM Show Part Attr 2
@@ -486,6 +744,46 @@ input_boolean:
 
   asm_show_part_attr_5:
     name: ASM Show Part Attr 5
+    icon: mdi:plus-circle-outline
+
+  asm_show_part_attr_6:
+    name: ASM Show Part Attr 6
+    icon: mdi:plus-circle-outline
+
+  asm_show_part_attr_7:
+    name: ASM Show Part Attr 7
+    icon: mdi:plus-circle-outline
+
+  asm_show_part_attr_8:
+    name: ASM Show Part Attr 8
+    icon: mdi:plus-circle-outline
+
+  asm_show_part_attr_9:
+    name: ASM Show Part Attr 9
+    icon: mdi:plus-circle-outline
+
+  asm_show_part_attr_10:
+    name: ASM Show Part Attr 10
+    icon: mdi:plus-circle-outline
+
+  asm_show_part_attr_11:
+    name: ASM Show Part Attr 11
+    icon: mdi:plus-circle-outline
+
+  asm_show_part_attr_12:
+    name: ASM Show Part Attr 12
+    icon: mdi:plus-circle-outline
+
+  asm_show_part_attr_13:
+    name: ASM Show Part Attr 13
+    icon: mdi:plus-circle-outline
+
+  asm_show_part_attr_14:
+    name: ASM Show Part Attr 14
+    icon: mdi:plus-circle-outline
+
+  asm_show_part_attr_15:
+    name: ASM Show Part Attr 15
     icon: mdi:plus-circle-outline
 
   # Show additional consume slots
@@ -660,6 +958,35 @@ template:
         state: >
           {{ state_attr('sensor.asm_data', 'low_stock_count') | default(0) }}
 
+      #-----------------------------------------------------------------------
+      # Selected service event details
+      #-----------------------------------------------------------------------
+      - name: ASM Selected Service Event
+        unique_id: asm_selected_service_event
+        state: >
+          {% set selected_label = states('input_select.asm_service_event') %}
+          {% if selected_label in ['Select Event', 'unknown', 'unavailable', ''] %}
+            none
+          {% else %}
+            {% set events = state_attr('sensor.asm_data', 'recent_events') or [] %}
+            {% set event_id_to_label = state_attr('sensor.asm_data', 'event_id_to_label') or {} %}
+            {% for e in events %}
+              {% if event_id_to_label.get(e.id, '') == selected_label %}
+                {{ e.id }}
+              {% endif %}
+            {% endfor %}
+          {% endif %}
+        attributes:
+          event: >
+            {% set selected_label = states('input_select.asm_service_event') %}
+            {% set events = state_attr('sensor.asm_data', 'recent_events') or [] %}
+            {% set event_id_to_label = state_attr('sensor.asm_data', 'event_id_to_label') or {} %}
+            {% for e in events %}
+              {% if event_id_to_label.get(e.id, '') == selected_label %}
+                {{ e | tojson }}
+              {% endif %}
+            {% endfor %}
+
 #=============================================================================
 # AUTOMATIONS - Keep dropdowns in sync
 #=============================================================================
@@ -702,6 +1029,17 @@ automation:
             - input_select.asm_part_asset_5
         data:
           options: "{{ ['None'] + asset_names }}"
+      # Reset editor modes to View on startup
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.asm_editor_mode
+        data:
+          option: "View"
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.asm_part_editor_mode
+        data:
+          option: "View"
 
   #---------------------------------------------------------------------------
   # Update part dropdown on data change
@@ -735,10 +1073,45 @@ automation:
         data:
           options: "{{ ['None'] + part_names }}"
 
+  #---------------------------------------------------------------------------
+  # Update service event dropdown on data change
+  #---------------------------------------------------------------------------
+  - id: asm_update_service_event_options
+    alias: "ASM: Update Service Event Options"
+    mode: restart
+    trigger:
+      - platform: state
+        entity_id: sensor.asm_data
+      - platform: homeassistant
+        event: start
+    action:
+      - delay: "00:00:01"
+      - variables:
+          event_labels: "{{ state_attr('sensor.asm_data', 'event_labels') or [] }}"
+      - service: input_select.set_options
+        target:
+          entity_id: input_select.asm_service_event
+        data:
+          options: "{{ ['Select Event'] + event_labels }}"
+
 #=============================================================================
 # SCRIPTS - User actions
 #=============================================================================
 script:
+  #---------------------------------------------------------------------------
+  # Start adding a new asset (clears form and sets mode)
+  #---------------------------------------------------------------------------
+  asm_start_add_asset:
+    alias: "ASM: Start Add Asset"
+    mode: single
+    sequence:
+      - service: script.asm_clear_asset_form
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.asm_editor_mode
+        data:
+          option: "Add New"
+
   #---------------------------------------------------------------------------
   # Add new asset
   #---------------------------------------------------------------------------
@@ -749,25 +1122,15 @@ script:
       - variables:
           name: "{{ states('input_text.asm_asset_name') | trim }}"
           category: "{{ states('input_select.asm_asset_category') }}"
-          # Build attributes JSON
+          # Build attributes JSON (15 slots)
           attrs_json: >
-            {% set attrs = {} %}
-            {% set a1n = states('input_text.asm_attr_1_name') | trim %}
-            {% set a1v = states('input_text.asm_attr_1_value') | trim %}
-            {% if a1n %}{% set attrs = dict(attrs, **{a1n: a1v}) %}{% endif %}
-            {% set a2n = states('input_text.asm_attr_2_name') | trim %}
-            {% set a2v = states('input_text.asm_attr_2_value') | trim %}
-            {% if a2n %}{% set attrs = dict(attrs, **{a2n: a2v}) %}{% endif %}
-            {% set a3n = states('input_text.asm_attr_3_name') | trim %}
-            {% set a3v = states('input_text.asm_attr_3_value') | trim %}
-            {% if a3n %}{% set attrs = dict(attrs, **{a3n: a3v}) %}{% endif %}
-            {% set a4n = states('input_text.asm_attr_4_name') | trim %}
-            {% set a4v = states('input_text.asm_attr_4_value') | trim %}
-            {% if a4n %}{% set attrs = dict(attrs, **{a4n: a4v}) %}{% endif %}
-            {% set a5n = states('input_text.asm_attr_5_name') | trim %}
-            {% set a5v = states('input_text.asm_attr_5_value') | trim %}
-            {% if a5n %}{% set attrs = dict(attrs, **{a5n: a5v}) %}{% endif %}
-            {{ attrs | tojson }}
+            {% set ns = namespace(attrs={}) %}
+            {% for i in range(1, 16) %}
+              {% set an = states('input_text.asm_attr_' ~ i ~ '_name') | trim %}
+              {% set av = states('input_text.asm_attr_' ~ i ~ '_value') | trim %}
+              {% if an %}{% set ns.attrs = dict(ns.attrs, **{an: av}) %}{% endif %}
+            {% endfor %}
+            {{ ns.attrs | tojson }}
 
       - choose:
           - conditions:
@@ -806,13 +1169,15 @@ script:
     mode: single
     sequence:
       - variables:
-          asset_id: "{{ states('sensor.asm_selected_asset') }}"
+          asset_id_raw: "{{ states('sensor.asm_selected_asset') }}"
+          asset_id: "{{ (asset_id_raw or '') | string }}"
+          asset_id_lc: "{{ (asset_id_raw or '') | string | lower }}"
           assets: "{{ state_attr('sensor.asm_data', 'assets') or {} }}"
 
       - choose:
           - conditions:
               - condition: template
-                value_template: "{{ asset_id in ['none', 'unknown', 'unavailable', ''] }}"
+                value_template: "{{ asset_id_lc in ['none', 'unknown', 'unavailable', ''] }}"
             sequence:
               - service: persistent_notification.create
                 data:
@@ -820,10 +1185,20 @@ script:
                   message: "Select an asset first."
               - stop: "No asset"
 
+          - conditions:
+              - condition: template
+                value_template: "{{ asset_id not in assets }}"
+            sequence:
+              - service: persistent_notification.create
+                data:
+                  title: "ASM Load Asset"
+                  message: "Selected asset '{{ asset_id }}' was not found."
+              - stop: "Asset not found"
+
       - variables:
-          a: "{{ assets.get(asset_id, {}) }}"
-          attrs: "{{ a.get('attributes', {}) }}"
-          attr_keys: "{{ attrs.keys() | list }}"
+          a: "{{ (state_attr('sensor.asm_data', 'assets') or {}).get(asset_id, {}) }}"
+          attrs: "{{ a.get('attributes', {}) if a.get('attributes') is mapping else {} }}"
+          attr_keys: "{{ (attrs.keys() | list | sort) }}"
 
       - service: input_select.select_option
         target:
@@ -835,80 +1210,317 @@ script:
         target:
           entity_id: input_text.asm_asset_name
         data:
-          value: "{{ a.get('name', '') }}"
+          value: "{{ a.get('name', '') | string }}"
 
+      - variables:
+          cat_options: "{{ state_attr('input_select.asm_asset_category', 'options') or [] }}"
+          desired_cat: "{{ (a.get('category') or 'Tractor') | string }}"
+          safe_cat: >-
+            {% if cat_options | length == 0 %}
+              Tractor
+            {% elif desired_cat in cat_options %}
+              {{ desired_cat }}
+            {% else %}
+              {{ cat_options[0] }}
+            {% endif %}
       - service: input_select.select_option
         target:
           entity_id: input_select.asm_asset_category
         data:
-          option: "{{ a.get('category', 'Tractor') }}"
+          option: "{{ safe_cat | trim }}"
 
-      # Load attributes
+      # Reset all show toggles first
+      - service: input_boolean.turn_off
+        target:
+          entity_id:
+            - input_boolean.asm_show_attr_2
+            - input_boolean.asm_show_attr_3
+            - input_boolean.asm_show_attr_4
+            - input_boolean.asm_show_attr_5
+            - input_boolean.asm_show_attr_6
+            - input_boolean.asm_show_attr_7
+            - input_boolean.asm_show_attr_8
+            - input_boolean.asm_show_attr_9
+            - input_boolean.asm_show_attr_10
+            - input_boolean.asm_show_attr_11
+            - input_boolean.asm_show_attr_12
+            - input_boolean.asm_show_attr_13
+            - input_boolean.asm_show_attr_14
+            - input_boolean.asm_show_attr_15
+
+      # Load attributes (15 slots) - re-fetch to ensure scope
+      - variables:
+          asset_data: "{{ (state_attr('sensor.asm_data', 'assets') or {}).get(asset_id, {}) }}"
+          attr_data: "{{ asset_data.get('attributes', {}) if asset_data.get('attributes') is mapping else {} }}"
+          attr_list: "{{ (attr_data.keys() | list | sort) }}"
+
       - service: input_text.set_value
         target:
           entity_id: input_text.asm_attr_1_name
         data:
-          value: "{{ attr_keys[0] if attr_keys | length > 0 else '' }}"
+          value: "{{ attr_list[0] if attr_list | length > 0 else '' }}"
       - service: input_text.set_value
         target:
           entity_id: input_text.asm_attr_1_value
         data:
-          value: "{{ attrs.get(attr_keys[0], '') if attr_keys | length > 0 else '' }}"
+          value: "{{ attr_data.get(attr_list[0], '') if attr_list | length > 0 else '' }}"
 
       - service: input_text.set_value
         target:
           entity_id: input_text.asm_attr_2_name
         data:
-          value: "{{ attr_keys[1] if attr_keys | length > 1 else '' }}"
+          value: "{{ attr_list[1] if attr_list | length > 1 else '' }}"
       - service: input_text.set_value
         target:
           entity_id: input_text.asm_attr_2_value
         data:
-          value: "{{ attrs.get(attr_keys[1], '') if attr_keys | length > 1 else '' }}"
-      - service: input_boolean.turn_on
-        target:
-          entity_id: input_boolean.asm_show_attr_2
-        condition:
+          value: "{{ attr_data.get(attr_list[1], '') if attr_list | length > 1 else '' }}"
+      - if:
           - condition: template
-            value_template: "{{ attr_keys | length > 1 }}"
+            value_template: "{{ attr_list | length > 1 }}"
+        then:
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.asm_show_attr_2
 
       - service: input_text.set_value
         target:
           entity_id: input_text.asm_attr_3_name
         data:
-          value: "{{ attr_keys[2] if attr_keys | length > 2 else '' }}"
+          value: "{{ attr_list[2] if attr_list | length > 2 else '' }}"
       - service: input_text.set_value
         target:
           entity_id: input_text.asm_attr_3_value
         data:
-          value: "{{ attrs.get(attr_keys[2], '') if attr_keys | length > 2 else '' }}"
+          value: "{{ attr_data.get(attr_list[2], '') if attr_list | length > 2 else '' }}"
+      - if:
+          - condition: template
+            value_template: "{{ attr_list | length > 2 }}"
+        then:
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.asm_show_attr_3
 
       - service: input_text.set_value
         target:
           entity_id: input_text.asm_attr_4_name
         data:
-          value: "{{ attr_keys[3] if attr_keys | length > 3 else '' }}"
+          value: "{{ attr_list[3] if attr_list | length > 3 else '' }}"
       - service: input_text.set_value
         target:
           entity_id: input_text.asm_attr_4_value
         data:
-          value: "{{ attrs.get(attr_keys[3], '') if attr_keys | length > 3 else '' }}"
+          value: "{{ attr_data.get(attr_list[3], '') if attr_list | length > 3 else '' }}"
+      - if:
+          - condition: template
+            value_template: "{{ attr_list | length > 3 }}"
+        then:
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.asm_show_attr_4
 
       - service: input_text.set_value
         target:
           entity_id: input_text.asm_attr_5_name
         data:
-          value: "{{ attr_keys[4] if attr_keys | length > 4 else '' }}"
+          value: "{{ attr_list[4] if attr_list | length > 4 else '' }}"
       - service: input_text.set_value
         target:
           entity_id: input_text.asm_attr_5_value
         data:
-          value: "{{ attrs.get(attr_keys[4], '') if attr_keys | length > 4 else '' }}"
+          value: "{{ attr_data.get(attr_list[4], '') if attr_list | length > 4 else '' }}"
+      - if:
+          - condition: template
+            value_template: "{{ attr_list | length > 4 }}"
+        then:
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.asm_show_attr_5
+
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_attr_6_name
+        data:
+          value: "{{ attr_list[5] if attr_list | length > 5 else '' }}"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_attr_6_value
+        data:
+          value: "{{ attr_data.get(attr_list[5], '') if attr_list | length > 5 else '' }}"
+      - if:
+          - condition: template
+            value_template: "{{ attr_list | length > 5 }}"
+        then:
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.asm_show_attr_6
+
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_attr_7_name
+        data:
+          value: "{{ attr_list[6] if attr_list | length > 6 else '' }}"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_attr_7_value
+        data:
+          value: "{{ attr_data.get(attr_list[6], '') if attr_list | length > 6 else '' }}"
+      - if:
+          - condition: template
+            value_template: "{{ attr_list | length > 6 }}"
+        then:
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.asm_show_attr_7
+
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_attr_8_name
+        data:
+          value: "{{ attr_list[7] if attr_list | length > 7 else '' }}"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_attr_8_value
+        data:
+          value: "{{ attr_data.get(attr_list[7], '') if attr_list | length > 7 else '' }}"
+      - if:
+          - condition: template
+            value_template: "{{ attr_list | length > 7 }}"
+        then:
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.asm_show_attr_8
+
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_attr_9_name
+        data:
+          value: "{{ attr_list[8] if attr_list | length > 8 else '' }}"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_attr_9_value
+        data:
+          value: "{{ attr_data.get(attr_list[8], '') if attr_list | length > 8 else '' }}"
+      - if:
+          - condition: template
+            value_template: "{{ attr_list | length > 8 }}"
+        then:
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.asm_show_attr_9
+
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_attr_10_name
+        data:
+          value: "{{ attr_list[9] if attr_list | length > 9 else '' }}"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_attr_10_value
+        data:
+          value: "{{ attr_data.get(attr_list[9], '') if attr_list | length > 9 else '' }}"
+      - if:
+          - condition: template
+            value_template: "{{ attr_list | length > 9 }}"
+        then:
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.asm_show_attr_10
+
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_attr_11_name
+        data:
+          value: "{{ attr_list[10] if attr_list | length > 10 else '' }}"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_attr_11_value
+        data:
+          value: "{{ attr_data.get(attr_list[10], '') if attr_list | length > 10 else '' }}"
+      - if:
+          - condition: template
+            value_template: "{{ attr_list | length > 10 }}"
+        then:
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.asm_show_attr_11
+
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_attr_12_name
+        data:
+          value: "{{ attr_list[11] if attr_list | length > 11 else '' }}"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_attr_12_value
+        data:
+          value: "{{ attr_data.get(attr_list[11], '') if attr_list | length > 11 else '' }}"
+      - if:
+          - condition: template
+            value_template: "{{ attr_list | length > 11 }}"
+        then:
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.asm_show_attr_12
+
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_attr_13_name
+        data:
+          value: "{{ attr_list[12] if attr_list | length > 12 else '' }}"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_attr_13_value
+        data:
+          value: "{{ attr_data.get(attr_list[12], '') if attr_list | length > 12 else '' }}"
+      - if:
+          - condition: template
+            value_template: "{{ attr_list | length > 12 }}"
+        then:
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.asm_show_attr_13
+
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_attr_14_name
+        data:
+          value: "{{ attr_list[13] if attr_list | length > 13 else '' }}"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_attr_14_value
+        data:
+          value: "{{ attr_data.get(attr_list[13], '') if attr_list | length > 13 else '' }}"
+      - if:
+          - condition: template
+            value_template: "{{ attr_list | length > 13 }}"
+        then:
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.asm_show_attr_14
+
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_attr_15_name
+        data:
+          value: "{{ attr_list[14] if attr_list | length > 14 else '' }}"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_attr_15_value
+        data:
+          value: "{{ attr_data.get(attr_list[14], '') if attr_list | length > 14 else '' }}"
+      - if:
+          - condition: template
+            value_template: "{{ attr_list | length > 14 }}"
+        then:
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.asm_show_attr_15
 
       - service: persistent_notification.create
         data:
           title: "ASM Load Asset"
-          message: "Loaded '{{ a.get('name', asset_id) }}'."
+          message: "Loaded '{{ asset_data.get('name', asset_id) }}'."
 
   #---------------------------------------------------------------------------
   # Save asset (edit existing)
@@ -922,24 +1534,15 @@ script:
           asset_id: "{{ states('sensor.asm_selected_asset') }}"
           name: "{{ states('input_text.asm_asset_name') | trim }}"
           category: "{{ states('input_select.asm_asset_category') }}"
+          # Build attributes JSON (15 slots)
           attrs_json: >
-            {% set attrs = {} %}
-            {% set a1n = states('input_text.asm_attr_1_name') | trim %}
-            {% set a1v = states('input_text.asm_attr_1_value') | trim %}
-            {% if a1n %}{% set attrs = dict(attrs, **{a1n: a1v}) %}{% endif %}
-            {% set a2n = states('input_text.asm_attr_2_name') | trim %}
-            {% set a2v = states('input_text.asm_attr_2_value') | trim %}
-            {% if a2n %}{% set attrs = dict(attrs, **{a2n: a2v}) %}{% endif %}
-            {% set a3n = states('input_text.asm_attr_3_name') | trim %}
-            {% set a3v = states('input_text.asm_attr_3_value') | trim %}
-            {% if a3n %}{% set attrs = dict(attrs, **{a3n: a3v}) %}{% endif %}
-            {% set a4n = states('input_text.asm_attr_4_name') | trim %}
-            {% set a4v = states('input_text.asm_attr_4_value') | trim %}
-            {% if a4n %}{% set attrs = dict(attrs, **{a4n: a4v}) %}{% endif %}
-            {% set a5n = states('input_text.asm_attr_5_name') | trim %}
-            {% set a5v = states('input_text.asm_attr_5_value') | trim %}
-            {% if a5n %}{% set attrs = dict(attrs, **{a5n: a5v}) %}{% endif %}
-            {{ attrs | tojson }}
+            {% set ns = namespace(attrs={}) %}
+            {% for i in range(1, 16) %}
+              {% set an = states('input_text.asm_attr_' ~ i ~ '_name') | trim %}
+              {% set av = states('input_text.asm_attr_' ~ i ~ '_value') | trim %}
+              {% if an %}{% set ns.attrs = dict(ns.attrs, **{an: av}) %}{% endif %}
+            {% endfor %}
+            {{ ns.attrs | tojson }}
 
       - choose:
           - conditions:
@@ -1000,6 +1603,26 @@ script:
             - input_text.asm_attr_4_value
             - input_text.asm_attr_5_name
             - input_text.asm_attr_5_value
+            - input_text.asm_attr_6_name
+            - input_text.asm_attr_6_value
+            - input_text.asm_attr_7_name
+            - input_text.asm_attr_7_value
+            - input_text.asm_attr_8_name
+            - input_text.asm_attr_8_value
+            - input_text.asm_attr_9_name
+            - input_text.asm_attr_9_value
+            - input_text.asm_attr_10_name
+            - input_text.asm_attr_10_value
+            - input_text.asm_attr_11_name
+            - input_text.asm_attr_11_value
+            - input_text.asm_attr_12_name
+            - input_text.asm_attr_12_value
+            - input_text.asm_attr_13_name
+            - input_text.asm_attr_13_value
+            - input_text.asm_attr_14_name
+            - input_text.asm_attr_14_value
+            - input_text.asm_attr_15_name
+            - input_text.asm_attr_15_value
         data:
           value: ""
       - service: input_select.select_option
@@ -1014,6 +1637,117 @@ script:
             - input_boolean.asm_show_attr_3
             - input_boolean.asm_show_attr_4
             - input_boolean.asm_show_attr_5
+            - input_boolean.asm_show_attr_6
+            - input_boolean.asm_show_attr_7
+            - input_boolean.asm_show_attr_8
+            - input_boolean.asm_show_attr_9
+            - input_boolean.asm_show_attr_10
+            - input_boolean.asm_show_attr_11
+            - input_boolean.asm_show_attr_12
+            - input_boolean.asm_show_attr_13
+            - input_boolean.asm_show_attr_14
+            - input_boolean.asm_show_attr_15
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.asm_editor_mode
+        data:
+          option: "View"
+
+  #---------------------------------------------------------------------------
+  # Delete asset
+  #---------------------------------------------------------------------------
+  asm_delete_asset:
+    alias: "ASM: Delete Asset"
+    mode: single
+    sequence:
+      - variables:
+          asset_id: "{{ states('sensor.asm_selected_asset') }}"
+          assets: "{{ state_attr('sensor.asm_data', 'assets') or {} }}"
+
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ asset_id in ['none', 'unknown', 'unavailable', ''] }}"
+            sequence:
+              - service: persistent_notification.create
+                data:
+                  title: "ASM Delete Asset"
+                  message: "Select an asset first."
+              - stop: "No asset"
+
+      - variables:
+          asset_name: "{{ assets.get(asset_id, {}).get('name', asset_id) }}"
+
+      - service: shell_command.asm_delete_asset
+        data:
+          asset_id: "{{ asset_id }}"
+
+      - service: script.asm_clear_asset_form
+
+      - delay: "00:00:01"
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.asm_data
+
+      - service: persistent_notification.create
+        data:
+          title: "ASM Delete Asset"
+          message: "Asset '{{ asset_name }}' deleted."
+
+  #---------------------------------------------------------------------------
+  # Delete part
+  #---------------------------------------------------------------------------
+  asm_delete_part:
+    alias: "ASM: Delete Part"
+    mode: single
+    sequence:
+      - variables:
+          part_id: "{{ states('sensor.asm_selected_part') }}"
+          parts: "{{ state_attr('sensor.asm_data', 'parts') or {} }}"
+
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ part_id in ['none', 'unknown', 'unavailable', ''] }}"
+            sequence:
+              - service: persistent_notification.create
+                data:
+                  title: "ASM Delete Part"
+                  message: "Select a part first."
+              - stop: "No part"
+
+      - variables:
+          part_name: "{{ parts.get(part_id, {}).get('name', part_id) }}"
+
+      - service: shell_command.asm_delete_part
+        data:
+          part_id: "{{ part_id }}"
+
+      - service: script.asm_clear_part_form
+
+      - delay: "00:00:01"
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.asm_data
+
+      - service: persistent_notification.create
+        data:
+          title: "ASM Delete Part"
+          message: "Part '{{ part_name }}' deleted."
+
+  #---------------------------------------------------------------------------
+  # Start adding a new part (clears form and sets mode)
+  #---------------------------------------------------------------------------
+  asm_start_add_part:
+    alias: "ASM: Start Add Part"
+    mode: single
+    sequence:
+      - service: script.asm_clear_part_form
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.asm_part_editor_mode
+        data:
+          option: "Add New"
 
   #---------------------------------------------------------------------------
   # Add new part
@@ -1065,25 +1799,15 @@ script:
               {% endfor %}
             {% endif %}
             {{ arr | tojson }}
-          # Build part attributes
+          # Build part attributes (15 slots)
           attrs_json: >
-            {% set attrs = {} %}
-            {% set a1n = states('input_text.asm_part_attr_1_name') | trim %}
-            {% set a1v = states('input_text.asm_part_attr_1_value') | trim %}
-            {% if a1n %}{% set attrs = dict(attrs, **{a1n: a1v}) %}{% endif %}
-            {% set a2n = states('input_text.asm_part_attr_2_name') | trim %}
-            {% set a2v = states('input_text.asm_part_attr_2_value') | trim %}
-            {% if a2n %}{% set attrs = dict(attrs, **{a2n: a2v}) %}{% endif %}
-            {% set a3n = states('input_text.asm_part_attr_3_name') | trim %}
-            {% set a3v = states('input_text.asm_part_attr_3_value') | trim %}
-            {% if a3n %}{% set attrs = dict(attrs, **{a3n: a3v}) %}{% endif %}
-            {% set a4n = states('input_text.asm_part_attr_4_name') | trim %}
-            {% set a4v = states('input_text.asm_part_attr_4_value') | trim %}
-            {% if a4n %}{% set attrs = dict(attrs, **{a4n: a4v}) %}{% endif %}
-            {% set a5n = states('input_text.asm_part_attr_5_name') | trim %}
-            {% set a5v = states('input_text.asm_part_attr_5_value') | trim %}
-            {% if a5n %}{% set attrs = dict(attrs, **{a5n: a5v}) %}{% endif %}
-            {{ attrs | tojson }}
+            {% set ns = namespace(attrs={}) %}
+            {% for i in range(1, 16) %}
+              {% set an = states('input_text.asm_part_attr_' ~ i ~ '_name') | trim %}
+              {% set av = states('input_text.asm_part_attr_' ~ i ~ '_value') | trim %}
+              {% if an %}{% set ns.attrs = dict(ns.attrs, **{an: av}) %}{% endif %}
+            {% endfor %}
+            {{ ns.attrs | tojson }}
 
       - choose:
           - conditions:
@@ -1121,6 +1845,123 @@ script:
           message: "Part '{{ name }}' added."
 
   #---------------------------------------------------------------------------
+  # Save part (edit existing or add new based on mode)
+  #---------------------------------------------------------------------------
+  asm_save_part:
+    alias: "ASM: Save Part"
+    mode: single
+    sequence:
+      - variables:
+          mode: "{{ states('input_select.asm_part_editor_mode') }}"
+          part_id: "{{ states('sensor.asm_selected_part') }}"
+          name: "{{ states('input_text.asm_part_name') | trim }}"
+          part_number: "{{ states('input_text.asm_part_number') | trim }}"
+          category: "{{ states('input_select.asm_part_category') }}"
+          unit: "{{ states('input_select.asm_part_unit') }}"
+          min_stock: "{{ states('input_number.asm_part_min_stock') | float(0) }}"
+          universal: "{{ is_state('input_boolean.asm_universal_part', 'on') }}"
+          assets: "{{ state_attr('sensor.asm_data', 'assets') or {} }}"
+          # Build assets array from selections
+          assets_json: >
+            {% set arr = [] %}
+            {% set a1 = states('input_select.asm_part_asset_1') %}
+            {% if a1 != 'None' %}
+              {% for aid, a in assets.items() if a.name == a1 %}
+                {% set arr = arr + [aid] %}
+              {% endfor %}
+            {% endif %}
+            {% set a2 = states('input_select.asm_part_asset_2') %}
+            {% if a2 != 'None' %}
+              {% for aid, a in assets.items() if a.name == a2 %}
+                {% set arr = arr + [aid] %}
+              {% endfor %}
+            {% endif %}
+            {% set a3 = states('input_select.asm_part_asset_3') %}
+            {% if a3 != 'None' %}
+              {% for aid, a in assets.items() if a.name == a3 %}
+                {% set arr = arr + [aid] %}
+              {% endfor %}
+            {% endif %}
+            {% set a4 = states('input_select.asm_part_asset_4') %}
+            {% if a4 != 'None' %}
+              {% for aid, a in assets.items() if a.name == a4 %}
+                {% set arr = arr + [aid] %}
+              {% endfor %}
+            {% endif %}
+            {% set a5 = states('input_select.asm_part_asset_5') %}
+            {% if a5 != 'None' %}
+              {% for aid, a in assets.items() if a.name == a5 %}
+                {% set arr = arr + [aid] %}
+              {% endfor %}
+            {% endif %}
+            {{ arr | tojson }}
+          # Build part attributes (15 slots)
+          attrs_json: >
+            {% set ns = namespace(attrs={}) %}
+            {% for i in range(1, 16) %}
+              {% set an = states('input_text.asm_part_attr_' ~ i ~ '_name') | trim %}
+              {% set av = states('input_text.asm_part_attr_' ~ i ~ '_value') | trim %}
+              {% if an %}{% set ns.attrs = dict(ns.attrs, **{an: av}) %}{% endif %}
+            {% endfor %}
+            {{ ns.attrs | tojson }}
+
+      - choose:
+          # If in Add mode, delegate to add script
+          - conditions:
+              - condition: template
+                value_template: "{{ 'Add' in mode }}"
+            sequence:
+              - service: script.asm_add_part
+              - stop: "Delegated to add"
+
+      # Edit mode - validate
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ part_id in ['none', 'unknown', 'unavailable', ''] }}"
+            sequence:
+              - service: persistent_notification.create
+                data:
+                  title: "ASM Save Part"
+                  message: "No part loaded. Use Load first."
+              - stop: "No part"
+
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ name == '' }}"
+            sequence:
+              - service: persistent_notification.create
+                data:
+                  title: "ASM Save Part"
+                  message: "Part name is required."
+              - stop: "No name"
+
+      - service: shell_command.asm_edit_part
+        data:
+          part_id: "{{ part_id }}"
+          name: "{{ name }}"
+          part_number: "{{ part_number }}"
+          category: "{{ category }}"
+          unit: "{{ unit }}"
+          min_stock: "{{ min_stock }}"
+          assets: "{{ assets_json }}"
+          universal: "{{ 'true' if universal else 'false' }}"
+          attributes: "{{ attrs_json }}"
+
+      - service: script.asm_clear_part_form
+
+      - delay: "00:00:01"
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.asm_data
+
+      - service: persistent_notification.create
+        data:
+          title: "ASM Save Part"
+          message: "Part '{{ name }}' updated."
+
+  #---------------------------------------------------------------------------
   # Clear part form
   #---------------------------------------------------------------------------
   asm_clear_part_form:
@@ -1142,6 +1983,26 @@ script:
             - input_text.asm_part_attr_4_value
             - input_text.asm_part_attr_5_name
             - input_text.asm_part_attr_5_value
+            - input_text.asm_part_attr_6_name
+            - input_text.asm_part_attr_6_value
+            - input_text.asm_part_attr_7_name
+            - input_text.asm_part_attr_7_value
+            - input_text.asm_part_attr_8_name
+            - input_text.asm_part_attr_8_value
+            - input_text.asm_part_attr_9_name
+            - input_text.asm_part_attr_9_value
+            - input_text.asm_part_attr_10_name
+            - input_text.asm_part_attr_10_value
+            - input_text.asm_part_attr_11_name
+            - input_text.asm_part_attr_11_value
+            - input_text.asm_part_attr_12_name
+            - input_text.asm_part_attr_12_value
+            - input_text.asm_part_attr_13_name
+            - input_text.asm_part_attr_13_value
+            - input_text.asm_part_attr_14_name
+            - input_text.asm_part_attr_14_value
+            - input_text.asm_part_attr_15_name
+            - input_text.asm_part_attr_15_value
         data:
           value: ""
       - service: input_number.set_value
@@ -1169,10 +2030,572 @@ script:
             - input_boolean.asm_show_part_attr_3
             - input_boolean.asm_show_part_attr_4
             - input_boolean.asm_show_part_attr_5
+            - input_boolean.asm_show_part_attr_6
+            - input_boolean.asm_show_part_attr_7
+            - input_boolean.asm_show_part_attr_8
+            - input_boolean.asm_show_part_attr_9
+            - input_boolean.asm_show_part_attr_10
+            - input_boolean.asm_show_part_attr_11
+            - input_boolean.asm_show_part_attr_12
+            - input_boolean.asm_show_part_attr_13
+            - input_boolean.asm_show_part_attr_14
+            - input_boolean.asm_show_part_attr_15
             - input_boolean.asm_show_asset_2
             - input_boolean.asm_show_asset_3
             - input_boolean.asm_show_asset_4
             - input_boolean.asm_show_asset_5
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.asm_part_editor_mode
+        data:
+          option: "View"
+
+#---------------------------------------------------------------------------
+# Load part into editor
+#---------------------------------------------------------------------------
+  asm_load_part:
+    alias: "ASM: Load Part"
+    mode: single
+    sequence:
+      - variables:
+          part_id_raw: "{{ states('sensor.asm_selected_part') }}"
+          part_id: "{{ (part_id_raw or '') | string }}"
+          part_id_lc: "{{ (part_id_raw or '') | string | lower }}"
+          parts: "{{ state_attr('sensor.asm_data', 'parts') or {} }}"
+          assets: "{{ state_attr('sensor.asm_data', 'assets') or {} }}"
+
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ part_id_lc in ['none', 'unknown', 'unavailable', ''] }}"
+            sequence:
+              - service: persistent_notification.create
+                data:
+                  title: "ASM Load Part"
+                  message: "Select a part first."
+              - stop: "No part selected"
+
+          - conditions:
+              - condition: template
+                value_template: "{{ part_id not in parts }}"
+            sequence:
+              - service: persistent_notification.create
+                data:
+                  title: "ASM Load Part"
+                  message: "Selected part '{{ part_id }}' was not found in asm_data.parts."
+              - stop: "Part not found"
+
+      - variables:
+          p: "{{ parts.get(part_id, {}) }}"
+          attrs: "{{ p.get('attributes', {}) if p.get('attributes', {}) is mapping else {} }}"
+          attr_keys: "{{ (attrs.keys() | list | sort) }}"
+          applicable: "{{ p.get('applicable_assets', []) or [] }}"
+
+      # Reset toggles
+      - service: input_boolean.turn_off
+        target:
+          entity_id:
+            - input_boolean.asm_show_asset_2
+            - input_boolean.asm_show_asset_3
+            - input_boolean.asm_show_asset_4
+            - input_boolean.asm_show_asset_5
+            - input_boolean.asm_show_part_attr_2
+            - input_boolean.asm_show_part_attr_3
+            - input_boolean.asm_show_part_attr_4
+            - input_boolean.asm_show_part_attr_5
+            - input_boolean.asm_show_part_attr_6
+            - input_boolean.asm_show_part_attr_7
+            - input_boolean.asm_show_part_attr_8
+            - input_boolean.asm_show_part_attr_9
+            - input_boolean.asm_show_part_attr_10
+            - input_boolean.asm_show_part_attr_11
+            - input_boolean.asm_show_part_attr_12
+            - input_boolean.asm_show_part_attr_13
+            - input_boolean.asm_show_part_attr_14
+            - input_boolean.asm_show_part_attr_15
+
+      # Basic fields
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_part_name
+        data:
+          value: "{{ (p.get('name') or '') | string }}"
+
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_part_number
+        data:
+          value: "{{ (p.get('part_number') or '') | string }}"
+
+      # Category
+      - variables:
+          cat_options: "{{ state_attr('input_select.asm_part_category', 'options') or [] }}"
+          desired_cat: "{{ (p.get('category') or 'Filter') | string }}"
+          safe_cat: >-
+            {% if cat_options | length == 0 %}
+              ''
+            {% elif desired_cat in cat_options %}
+              {{ desired_cat }}
+            {% else %}
+              {{ cat_options[0] }}
+            {% endif %}
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ cat_options | length > 0 and (safe_cat | string) | length > 0 }}"
+            sequence:
+              - service: input_select.select_option
+                target:
+                  entity_id: input_select.asm_part_category
+                data:
+                  option: "{{ safe_cat | string }}"
+
+      # Unit
+      - variables:
+          unit_options: "{{ state_attr('input_select.asm_part_unit', 'options') or [] }}"
+          desired_unit: "{{ (p.get('unit') or 'ea') | string }}"
+          safe_unit: >-
+            {% if unit_options | length == 0 %}
+              ''
+            {% elif desired_unit in unit_options %}
+              {{ desired_unit }}
+            {% else %}
+              {{ unit_options[0] }}
+            {% endif %}
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ unit_options | length > 0 and (safe_unit | string) | length > 0 }}"
+            sequence:
+              - service: input_select.select_option
+                target:
+                  entity_id: input_select.asm_part_unit
+                data:
+                  option: "{{ safe_unit | string }}"
+
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.asm_part_min_stock
+        data:
+          value: "{{ p.get('min_stock', 0) | float(0) }}"
+
+      - service: "input_boolean.turn_{{ 'on' if (p.get('universal', false) | bool) else 'off' }}"
+        target:
+          entity_id: input_boolean.asm_universal_part
+
+      # Set editor mode to Edit Existing
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.asm_part_editor_mode
+        data:
+          option: "Edit Existing"
+
+      # -----------------------------------------------------------------------
+      # Assets - restore applicable assets from part data
+      # -----------------------------------------------------------------------
+      - variables:
+          asset_id_to_name: "{{ state_attr('sensor.asm_data', 'asset_id_to_name') or {} }}"
+          # Build list of asset names from IDs
+          asset_name_1: >
+            {% if applicable | length > 0 %}
+              {{ asset_id_to_name.get(applicable[0], '') }}
+            {% else %}
+              None
+            {% endif %}
+          asset_name_2: >
+            {% if applicable | length > 1 %}
+              {{ asset_id_to_name.get(applicable[1], '') }}
+            {% else %}
+              None
+            {% endif %}
+          asset_name_3: >
+            {% if applicable | length > 2 %}
+              {{ asset_id_to_name.get(applicable[2], '') }}
+            {% else %}
+              None
+            {% endif %}
+          asset_name_4: >
+            {% if applicable | length > 3 %}
+              {{ asset_id_to_name.get(applicable[3], '') }}
+            {% else %}
+              None
+            {% endif %}
+          asset_name_5: >
+            {% if applicable | length > 4 %}
+              {{ asset_id_to_name.get(applicable[4], '') }}
+            {% else %}
+              None
+            {% endif %}
+
+      # Reset all to None first
+      - service: input_select.select_option
+        target:
+          entity_id:
+            - input_select.asm_part_asset_1
+            - input_select.asm_part_asset_2
+            - input_select.asm_part_asset_3
+            - input_select.asm_part_asset_4
+            - input_select.asm_part_asset_5
+        data:
+          option: "None"
+
+      # Set Asset 1 if applicable
+      - if:
+          - condition: template
+            value_template: "{{ asset_name_1 | trim not in ['', 'None'] }}"
+        then:
+          - service: input_select.select_option
+            target:
+              entity_id: input_select.asm_part_asset_1
+            data:
+              option: "{{ asset_name_1 | trim }}"
+
+      # Set Asset 2 if applicable
+      - if:
+          - condition: template
+            value_template: "{{ asset_name_2 | trim not in ['', 'None'] }}"
+        then:
+          - service: input_select.select_option
+            target:
+              entity_id: input_select.asm_part_asset_2
+            data:
+              option: "{{ asset_name_2 | trim }}"
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.asm_show_asset_2
+
+      # Set Asset 3 if applicable
+      - if:
+          - condition: template
+            value_template: "{{ asset_name_3 | trim not in ['', 'None'] }}"
+        then:
+          - service: input_select.select_option
+            target:
+              entity_id: input_select.asm_part_asset_3
+            data:
+              option: "{{ asset_name_3 | trim }}"
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.asm_show_asset_2
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.asm_show_asset_3
+
+      # Set Asset 4 if applicable
+      - if:
+          - condition: template
+            value_template: "{{ asset_name_4 | trim not in ['', 'None'] }}"
+        then:
+          - service: input_select.select_option
+            target:
+              entity_id: input_select.asm_part_asset_4
+            data:
+              option: "{{ asset_name_4 | trim }}"
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.asm_show_asset_2
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.asm_show_asset_3
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.asm_show_asset_4
+
+      # Set Asset 5 if applicable
+      - if:
+          - condition: template
+            value_template: "{{ asset_name_5 | trim not in ['', 'None'] }}"
+        then:
+          - service: input_select.select_option
+            target:
+              entity_id: input_select.asm_part_asset_5
+            data:
+              option: "{{ asset_name_5 | trim }}"
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.asm_show_asset_2
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.asm_show_asset_3
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.asm_show_asset_4
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.asm_show_asset_5
+
+      # -----------------------------------------------------------------------
+      # Attributes
+      # -----------------------------------------------------------------------
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_part_attr_1_name
+        data:
+          value: "{{ attr_keys[0] if attr_keys | length > 0 else '' }}"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_part_attr_1_value
+        data:
+          value: "{{ attrs.get(attr_keys[0], '') if attr_keys | length > 0 else '' }}"
+
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_part_attr_2_name
+        data:
+          value: "{{ attr_keys[1] if attr_keys | length > 1 else '' }}"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_part_attr_2_value
+        data:
+          value: "{{ attrs.get(attr_keys[1], '') if attr_keys | length > 1 else '' }}"
+      - if:
+          - condition: template
+            value_template: "{{ attr_keys | length > 1 }}"
+        then:
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.asm_show_part_attr_2
+
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_part_attr_3_name
+        data:
+          value: "{{ attr_keys[2] if attr_keys | length > 2 else '' }}"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_part_attr_3_value
+        data:
+          value: "{{ attrs.get(attr_keys[2], '') if attr_keys | length > 2 else '' }}"
+      - if:
+          - condition: template
+            value_template: "{{ attr_keys | length > 2 }}"
+        then:
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.asm_show_part_attr_3
+
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_part_attr_4_name
+        data:
+          value: "{{ attr_keys[3] if attr_keys | length > 3 else '' }}"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_part_attr_4_value
+        data:
+          value: "{{ attrs.get(attr_keys[3], '') if attr_keys | length > 3 else '' }}"
+      - if:
+          - condition: template
+            value_template: "{{ attr_keys | length > 3 }}"
+        then:
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.asm_show_part_attr_4
+
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_part_attr_5_name
+        data:
+          value: "{{ attr_keys[4] if attr_keys | length > 4 else '' }}"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_part_attr_5_value
+        data:
+          value: "{{ attrs.get(attr_keys[4], '') if attr_keys | length > 4 else '' }}"
+      - if:
+          - condition: template
+            value_template: "{{ attr_keys | length > 4 }}"
+        then:
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.asm_show_part_attr_5
+
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_part_attr_6_name
+        data:
+          value: "{{ attr_keys[5] if attr_keys | length > 5 else '' }}"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_part_attr_6_value
+        data:
+          value: "{{ attrs.get(attr_keys[5], '') if attr_keys | length > 5 else '' }}"
+      - if:
+          - condition: template
+            value_template: "{{ attr_keys | length > 5 }}"
+        then:
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.asm_show_part_attr_6
+
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_part_attr_7_name
+        data:
+          value: "{{ attr_keys[6] if attr_keys | length > 6 else '' }}"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_part_attr_7_value
+        data:
+          value: "{{ attrs.get(attr_keys[6], '') if attr_keys | length > 6 else '' }}"
+      - if:
+          - condition: template
+            value_template: "{{ attr_keys | length > 6 }}"
+        then:
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.asm_show_part_attr_7
+
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_part_attr_8_name
+        data:
+          value: "{{ attr_keys[7] if attr_keys | length > 7 else '' }}"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_part_attr_8_value
+        data:
+          value: "{{ attrs.get(attr_keys[7], '') if attr_keys | length > 7 else '' }}"
+      - if:
+          - condition: template
+            value_template: "{{ attr_keys | length > 7 }}"
+        then:
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.asm_show_part_attr_8
+
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_part_attr_9_name
+        data:
+          value: "{{ attr_keys[8] if attr_keys | length > 8 else '' }}"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_part_attr_9_value
+        data:
+          value: "{{ attrs.get(attr_keys[8], '') if attr_keys | length > 8 else '' }}"
+      - if:
+          - condition: template
+            value_template: "{{ attr_keys | length > 8 }}"
+        then:
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.asm_show_part_attr_9
+
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_part_attr_10_name
+        data:
+          value: "{{ attr_keys[9] if attr_keys | length > 9 else '' }}"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_part_attr_10_value
+        data:
+          value: "{{ attrs.get(attr_keys[9], '') if attr_keys | length > 9 else '' }}"
+      - if:
+          - condition: template
+            value_template: "{{ attr_keys | length > 9 }}"
+        then:
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.asm_show_part_attr_10
+
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_part_attr_11_name
+        data:
+          value: "{{ attr_keys[10] if attr_keys | length > 10 else '' }}"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_part_attr_11_value
+        data:
+          value: "{{ attrs.get(attr_keys[10], '') if attr_keys | length > 10 else '' }}"
+      - if:
+          - condition: template
+            value_template: "{{ attr_keys | length > 10 }}"
+        then:
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.asm_show_part_attr_11
+
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_part_attr_12_name
+        data:
+          value: "{{ attr_keys[11] if attr_keys | length > 11 else '' }}"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_part_attr_12_value
+        data:
+          value: "{{ attrs.get(attr_keys[11], '') if attr_keys | length > 11 else '' }}"
+      - if:
+          - condition: template
+            value_template: "{{ attr_keys | length > 11 }}"
+        then:
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.asm_show_part_attr_12
+
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_part_attr_13_name
+        data:
+          value: "{{ attr_keys[12] if attr_keys | length > 12 else '' }}"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_part_attr_13_value
+        data:
+          value: "{{ attrs.get(attr_keys[12], '') if attr_keys | length > 12 else '' }}"
+      - if:
+          - condition: template
+            value_template: "{{ attr_keys | length > 12 }}"
+        then:
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.asm_show_part_attr_13
+
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_part_attr_14_name
+        data:
+          value: "{{ attr_keys[13] if attr_keys | length > 13 else '' }}"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_part_attr_14_value
+        data:
+          value: "{{ attrs.get(attr_keys[13], '') if attr_keys | length > 13 else '' }}"
+      - if:
+          - condition: template
+            value_template: "{{ attr_keys | length > 13 }}"
+        then:
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.asm_show_part_attr_14
+
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_part_attr_15_name
+        data:
+          value: "{{ attr_keys[14] if attr_keys | length > 14 else '' }}"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.asm_part_attr_15_value
+        data:
+          value: "{{ attrs.get(attr_keys[14], '') if attr_keys | length > 14 else '' }}"
+      - if:
+          - condition: template
+            value_template: "{{ attr_keys | length > 14 }}"
+        then:
+          - service: input_boolean.turn_on
+            target:
+              entity_id: input_boolean.asm_show_part_attr_15
+
+      - service: persistent_notification.create
+        data:
+          title: "ASM Load Part"
+          message: "Loaded '{{ p.get('name', part_id) }}'."
+
+
 
   #---------------------------------------------------------------------------
   # Adjust stock
