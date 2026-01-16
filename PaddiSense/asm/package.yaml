@@ -108,6 +108,11 @@ shell_command:
     --notes "{{ notes }}"
     --hours "{{ hours }}"
 
+  # Delete service event command
+  asm_delete_service: >-
+    python3 /config/PaddiSense/asm/python/asm_backend.py delete_service
+    --id "{{ event_id }}"
+
 #=============================================================================
 # INPUT HELPERS - User interface controls
 #=============================================================================
@@ -969,20 +974,35 @@ template:
             none
           {% else %}
             {% set events = state_attr('sensor.asm_data', 'recent_events') or [] %}
-            {% set event_id_to_label = state_attr('sensor.asm_data', 'event_id_to_label') or {} %}
             {% for e in events %}
-              {% if event_id_to_label.get(e.id, '') == selected_label %}
+              {% set ts_full = e.timestamp | default('') %}
+              {% set ts = (ts_full[:16] | replace('T', ' ')) if ts_full | length >= 16 else ts_full[:10] %}
+              {% set label = ts ~ ' - ' ~ (e.asset_name | default(e.asset_id | default('Unknown'))) ~ ' - ' ~ (e.service_type | default('Service')) %}
+              {% if label == selected_label %}
                 {{ e.id }}
               {% endif %}
             {% endfor %}
           {% endif %}
         attributes:
+          id: >
+            {% set selected_label = states('input_select.asm_service_event') %}
+            {% set events = state_attr('sensor.asm_data', 'recent_events') or [] %}
+            {% for e in events %}
+              {% set ts_full = e.timestamp | default('') %}
+              {% set ts = (ts_full[:16] | replace('T', ' ')) if ts_full | length >= 16 else ts_full[:10] %}
+              {% set label = ts ~ ' - ' ~ (e.asset_name | default(e.asset_id | default('Unknown'))) ~ ' - ' ~ (e.service_type | default('Service')) %}
+              {% if label == selected_label %}
+                {{ e.id }}
+              {% endif %}
+            {% endfor %}
           event: >
             {% set selected_label = states('input_select.asm_service_event') %}
             {% set events = state_attr('sensor.asm_data', 'recent_events') or [] %}
-            {% set event_id_to_label = state_attr('sensor.asm_data', 'event_id_to_label') or {} %}
             {% for e in events %}
-              {% if event_id_to_label.get(e.id, '') == selected_label %}
+              {% set ts_full = e.timestamp | default('') %}
+              {% set ts = (ts_full[:16] | replace('T', ' ')) if ts_full | length >= 16 else ts_full[:10] %}
+              {% set label = ts ~ ' - ' ~ (e.asset_name | default(e.asset_id | default('Unknown'))) ~ ' - ' ~ (e.service_type | default('Service')) %}
+              {% if label == selected_label %}
                 {{ e | tojson }}
               {% endif %}
             {% endfor %}
@@ -1082,9 +1102,14 @@ automation:
     trigger:
       - platform: state
         entity_id: sensor.asm_data
+        attribute: event_labels
       - platform: homeassistant
         event: start
     action:
+      # Wait for sensor to be available with data (up to 60 seconds on startup)
+      - wait_template: "{{ state_attr('sensor.asm_data', 'event_labels') is not none }}"
+        timeout: "00:01:00"
+        continue_on_timeout: true
       - delay: "00:00:01"
       - variables:
           event_labels: "{{ state_attr('sensor.asm_data', 'event_labels') or [] }}"
@@ -2792,3 +2817,45 @@ script:
             - input_boolean.asm_show_consume_3
             - input_boolean.asm_show_consume_4
             - input_boolean.asm_show_consume_5
+
+  #---------------------------------------------------------------------------
+  # Delete service event
+  #---------------------------------------------------------------------------
+  asm_delete_service:
+    alias: "ASM: Delete Service Event"
+    mode: single
+    sequence:
+      - variables:
+          event_id_raw: "{{ states('sensor.asm_selected_service_event') }}"
+          event_id: "{{ (event_id_raw or '') | string | trim }}"
+
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ event_id in ['none', 'unknown', 'unavailable', ''] }}"
+            sequence:
+              - service: persistent_notification.create
+                data:
+                  title: "ASM Delete Service"
+                  message: "Select a service event first."
+              - stop: "No event"
+
+      - service: shell_command.asm_delete_service
+        data:
+          event_id: "{{ event_id }}"
+
+      - delay: "00:00:01"
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.asm_data
+
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.asm_service_event
+        data:
+          option: "Select Event"
+
+      - service: persistent_notification.create
+        data:
+          title: "ASM Delete Service"
+          message: "Service event deleted."

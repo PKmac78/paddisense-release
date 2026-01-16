@@ -1545,6 +1545,28 @@ views:
                         }
                       ]]]
 
+              #----------------------------------------------------------------
+              # DELETE SERVICE EVENT BUTTON (shows when event is selected)
+              #----------------------------------------------------------------
+              - type: conditional
+                conditions:
+                  - entity: sensor.asm_selected_service_event
+                    state_not: "none"
+                card:
+                  type: custom:button-card
+                  template: asm_action
+                  name: DELETE SERVICE EVENT
+                  icon: mdi:delete
+                  tap_action:
+                    action: call-service
+                    service: script.asm_delete_service
+                    confirmation:
+                      text: "Delete this service event? This cannot be undone."
+                  styles:
+                    card:
+                      - height: 60px
+                      - background: "#c62828"
+
               # History table (summary view)
               - type: markdown
                 content: |

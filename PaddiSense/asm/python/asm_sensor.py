@@ -65,11 +65,13 @@ def main() -> int:
         service_events, key=lambda e: e.get("timestamp", ""), reverse=True
     )[:20]
 
-    # Build service event labels for dropdown (date - asset - type)
+    # Build service event labels for dropdown (date time - asset - type)
     event_labels = []
     event_id_to_label = {}
     for e in recent_events:
-        ts = e.get("timestamp", "")[:10]  # Just the date portion
+        ts_full = e.get("timestamp", "")
+        # Include date and time (HH:MM) to avoid duplicates
+        ts = ts_full[:16].replace("T", " ") if len(ts_full) >= 16 else ts_full[:10]
         asset = e.get("asset_name", e.get("asset_id", "Unknown"))
         stype = e.get("service_type", "Service")
         label = f"{ts} - {asset} - {stype}"

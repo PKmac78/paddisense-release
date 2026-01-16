@@ -26,8 +26,8 @@ This is a Home Assistant configuration repository for a farm/agricultural operat
 - **Total Assets:** 2 (Case Magnum 280, Case Puma 140)
 - **Total Parts:** 3 (Tyre 8960, little tyre, Big tyre rear)
 - **Low Stock Alerts:** 1 (little tyre at 0 stock)
-- **Service Events:** 3 recorded
-- **Transactions logged:** 19
+- **Service Events:** 6 recorded
+- **Transactions logged:** 25
 
 ### Weather Station
 - **Data Source:** Ecowitt Gateway (ecowittgateway_1)
@@ -141,14 +141,17 @@ Available groups: None, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 22, M (mu
 7. Sensor refreshes to reflect changes
 
 ### Key Entities
-- `sensor.asm_data` - Main data source (JSON attributes: assets, parts, events)
+- `sensor.asm_data` - Main data source (JSON attributes: assets, parts, events, event_labels)
 - `input_select.asm_asset` - Asset selection by NAME
 - `input_select.asm_part` - Part selection
 - `input_select.asm_service_asset` - Asset for service recording
 - `input_select.asm_service_type` - Service type selection
+- `input_select.asm_service_event` - Service history viewer (labels include datetime)
+- `sensor.asm_selected_service_event` - Selected event details for display
 - `script.asm_add_asset` / `script.asm_save_asset` - Asset management
 - `script.asm_add_part` - Part management
 - `script.asm_record_service` - Record service with auto-deduct
+- `script.asm_delete_service` - Delete a service event
 
 ### Asset Categories
 Tractor, Pump, Harvester, Vehicle
@@ -162,7 +165,7 @@ Filter, Belt, Oil, Grease, Battery, Tyre, Hose
 ### Dashboard Views (views.yaml)
 1. **Assets** - View/add/edit assets with custom attributes
 2. **Parts** - View/add/edit parts, assign to assets or mark universal
-3. **Service** - Record service events with parts consumption
+3. **Service** - Record service events with parts consumption, view/delete history
 4. **Report** - Service history and parts usage reports
 
 ### Key Features
@@ -170,6 +173,7 @@ Filter, Belt, Oil, Grease, Battery, Tyre, Hose
 - Flexible custom attributes (15 slots) for both assets and parts
 - Single stock count per part (simpler than IPM's multi-location)
 - Service events consume parts and auto-deduct from stock
+- Service history dropdown uses datetime labels (e.g., "2026-01-16 15:11 - Asset - Type")
 - Transaction logging for audit trail
 
 ## Weather System Architecture
