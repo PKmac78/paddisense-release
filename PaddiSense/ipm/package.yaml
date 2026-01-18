@@ -35,6 +35,18 @@ command_line:
         - categories
         - category_subcategories
         - locations
+        - active_names
+        - system_status
+        - config_exists
+        - database_exists
+        - locations_with_stock
+        - custom_actives_count
+        - all_actives_list
+        - active_products_map
+        - backup_count
+        - last_backup
+        - backup_filenames
+        - version
 
 #=============================================================================
 # SHELL COMMANDS - Python backend calls
@@ -48,7 +60,6 @@ shell_command:
     --unit "{{ unit }}"
     --container_size "{{ container_size }}"
     --min_stock "{{ min_stock }}"
-    --chemical_group "{{ chemical_group }}"
     --application_unit "{{ application_unit }}"
     --location "{{ location }}"
     --initial_stock "{{ initial_stock }}"
@@ -63,7 +74,6 @@ shell_command:
     --unit "{{ unit }}"
     --container_size "{{ container_size }}"
     --min_stock "{{ min_stock }}"
-    --chemical_group "{{ chemical_group }}"
     --application_unit "{{ application_unit }}"
     --actives '{{ actives }}'
 
@@ -77,6 +87,49 @@ shell_command:
   ipm_delete_product: >-
     python3 /config/PaddiSense/ipm/python/ipm_backend.py delete_product
     --id "{{ product_id }}"
+
+  # ----- Settings Commands -----
+  ipm_init: >-
+    python3 /config/PaddiSense/ipm/python/ipm_backend.py init
+
+  ipm_status: >-
+    python3 /config/PaddiSense/ipm/python/ipm_backend.py status
+
+  ipm_add_location: >-
+    python3 /config/PaddiSense/ipm/python/ipm_backend.py add_location
+    --name "{{ name }}"
+
+  ipm_remove_location: >-
+    python3 /config/PaddiSense/ipm/python/ipm_backend.py remove_location
+    --name "{{ name }}"
+
+  # ----- Active Constituents Commands -----
+  ipm_list_actives: >-
+    python3 /config/PaddiSense/ipm/python/ipm_backend.py list_actives
+
+  ipm_add_active: >-
+    python3 /config/PaddiSense/ipm/python/ipm_backend.py add_active
+    --name "{{ name }}"
+    --groups "{{ groups }}"
+
+  ipm_remove_active: >-
+    python3 /config/PaddiSense/ipm/python/ipm_backend.py remove_active
+    --name "{{ name }}"
+
+  # ----- Data Management Commands (Phase 3) -----
+  ipm_export: >-
+    python3 /config/PaddiSense/ipm/python/ipm_backend.py export
+
+  ipm_import_backup: >-
+    python3 /config/PaddiSense/ipm/python/ipm_backend.py import_backup
+    --filename "{{ filename }}"
+
+  ipm_reset: >-
+    python3 /config/PaddiSense/ipm/python/ipm_backend.py reset
+    --token "{{ token }}"
+
+  ipm_backup_list: >-
+    python3 /config/PaddiSense/ipm/python/ipm_backend.py backup_list
 
 #=============================================================================
 # INPUT HELPERS - User interface controls
@@ -96,6 +149,12 @@ input_select:
   ipm_subcategory:
     name: IPM Subcategory Filter
     icon: mdi:shape-outline
+    options:
+      - All
+
+  ipm_active_filter:
+    name: IPM Active Filter
+    icon: mdi:flask-outline
     options:
       - All
 
@@ -194,28 +253,6 @@ input_select:
       - Silo 12
       - Silo 13
 
-  ipm_edit_chem_group:
-    name: IPM Edit Chemical Group
-    icon: mdi:flask
-    options:
-      - None
-      - "1"
-      - "2"
-      - "3"
-      - "4"
-      - "5"
-      - "6"
-      - "7"
-      - "8"
-      - "9"
-      - "11"
-      - "12"
-      - "13"
-      - "14"
-      - "15"
-      - "22"
-      - "M"
-
   ipm_edit_app_unit:
     name: IPM Edit Application Unit
     icon: mdi:ruler
@@ -282,6 +319,946 @@ input_select:
       - g/kg
       - ml/L
       - "%"
+
+  # Chemical group per active constituent
+  ipm_active_1_group:
+    name: IPM Active 1 Group
+    icon: mdi:flask
+    options:
+      - None
+      - "1"
+      - "2"
+      - "3"
+      - "4"
+      - "5"
+      - "6"
+      - "7"
+      - "8"
+      - "9"
+      - "11"
+      - "12"
+      - "13"
+      - "14"
+      - "15"
+      - "22"
+      - "M"
+
+  ipm_active_2_group:
+    name: IPM Active 2 Group
+    icon: mdi:flask
+    options:
+      - None
+      - "1"
+      - "2"
+      - "3"
+      - "4"
+      - "5"
+      - "6"
+      - "7"
+      - "8"
+      - "9"
+      - "11"
+      - "12"
+      - "13"
+      - "14"
+      - "15"
+      - "22"
+      - "M"
+
+  ipm_active_3_group:
+    name: IPM Active 3 Group
+    icon: mdi:flask
+    options:
+      - None
+      - "1"
+      - "2"
+      - "3"
+      - "4"
+      - "5"
+      - "6"
+      - "7"
+      - "8"
+      - "9"
+      - "11"
+      - "12"
+      - "13"
+      - "14"
+      - "15"
+      - "22"
+      - "M"
+
+  ipm_active_4_group:
+    name: IPM Active 4 Group
+    icon: mdi:flask
+    options:
+      - None
+      - "1"
+      - "2"
+      - "3"
+      - "4"
+      - "5"
+      - "6"
+      - "7"
+      - "8"
+      - "9"
+      - "11"
+      - "12"
+      - "13"
+      - "14"
+      - "15"
+      - "22"
+      - "M"
+
+  ipm_active_5_group:
+    name: IPM Active 5 Group
+    icon: mdi:flask
+    options:
+      - None
+      - "1"
+      - "2"
+      - "3"
+      - "4"
+      - "5"
+      - "6"
+      - "7"
+      - "8"
+      - "9"
+      - "11"
+      - "12"
+      - "13"
+      - "14"
+      - "15"
+      - "22"
+      - "M"
+
+  ipm_active_6_group:
+    name: IPM Active 6 Group
+    icon: mdi:flask
+    options:
+      - None
+      - "1"
+      - "2"
+      - "3"
+      - "4"
+      - "5"
+      - "6"
+      - "7"
+      - "8"
+      - "9"
+      - "11"
+      - "12"
+      - "13"
+      - "14"
+      - "15"
+      - "22"
+      - "M"
+
+  # Active constituent names (dropdown selection)
+  ipm_active_1_name:
+    name: IPM Active 1 Name
+    icon: mdi:flask
+    options:
+      - Select Active
+      # Herbicides
+      - 2,4-D
+      - Atrazine
+      - Bromoxynil
+      - Carfentrazone-ethyl
+      - Clethodim
+      - Clodinafop-propargyl
+      - Clopyralid
+      - Dicamba
+      - Diflufenican
+      - Diquat
+      - Fenoxaprop-P-ethyl
+      - Florasulam
+      - Fluazifop-P-butyl
+      - Flumetsulam
+      - Fluroxypyr
+      - Glufosinate-ammonium
+      - Glyphosate
+      - Haloxyfop
+      - Imazamox
+      - Imazapic
+      - Imazapyr
+      - Imazethapyr
+      - MCPA
+      - Mesotrione
+      - Metolachlor
+      - Metsulfuron-methyl
+      - Paraquat
+      - Pendimethalin
+      - Picloram
+      - Pinoxaden
+      - Propaquizafop
+      - Prosulfocarb
+      - Pyroxasulfone
+      - Pyroxsulam
+      - Quizalofop-P-ethyl
+      - Sethoxydim
+      - Simazine
+      - Sulfometuron-methyl
+      - Sulfosulfuron
+      - Terbuthylazine
+      - Triallate
+      - Tribenuron-methyl
+      - Triclopyr
+      - Trifluralin
+      - Trifloxysulfuron
+      # Fungicides
+      - Azoxystrobin
+      - Bixafen
+      - Boscalid
+      - Carbendazim
+      - Chlorothalonil
+      - Cyproconazole
+      - Difenoconazole
+      - Epoxiconazole
+      - Fludioxonil
+      - Fluopyram
+      - Flutriafol
+      - Fluxapyroxad
+      - Iprodione
+      - Isopyrazam
+      - Mancozeb
+      - Metalaxyl
+      - Propiconazole
+      - Prothioconazole
+      - Pyraclostrobin
+      - Tebuconazole
+      - Thiram
+      - Triadimefon
+      - Triadimenol
+      - Trifloxystrobin
+      # Insecticides
+      - Abamectin
+      - Acetamiprid
+      - Alpha-cypermethrin
+      - Bifenthrin
+      - Chlorantraniliprole
+      - Chlorpyrifos
+      - Clothianidin
+      - Cyantraniliprole
+      - Cypermethrin
+      - Deltamethrin
+      - Dimethoate
+      - Emamectin benzoate
+      - Esfenvalerate
+      - Fipronil
+      - Imidacloprid
+      - Indoxacarb
+      - Lambda-cyhalothrin
+      - Malathion
+      - Methomyl
+      - Omethoate
+      - Pirimicarb
+      - Spinetoram
+      - Spinosad
+      - Sulfoxaflor
+      - Thiacloprid
+      - Thiamethoxam
+      # Seed Treatments
+      - Fludioxonil
+      - Ipconazole
+      - Metalaxyl-M
+      - Sedaxane
+      - Thiamethoxam
+      - Triticonazole
+      # Fertiliser Elements
+      - Boron
+      - Calcium
+      - Copper
+      - Iron
+      - Magnesium
+      - Manganese
+      - Molybdenum
+      - Nitrogen
+      - Phosphorus
+      - Potassium
+      - Sulfur
+      - Zinc
+      # Adjuvants
+      - Alcohol ethoxylate
+      - Ammonium sulfate
+      - Methylated seed oil
+      - Organosilicone
+      - Paraffin oil
+      - Petroleum oil
+
+  ipm_active_2_name:
+    name: IPM Active 2 Name
+    icon: mdi:flask
+    options:
+      - Select Active
+      # Herbicides
+      - 2,4-D
+      - Atrazine
+      - Bromoxynil
+      - Carfentrazone-ethyl
+      - Clethodim
+      - Clodinafop-propargyl
+      - Clopyralid
+      - Dicamba
+      - Diflufenican
+      - Diquat
+      - Fenoxaprop-P-ethyl
+      - Florasulam
+      - Fluazifop-P-butyl
+      - Flumetsulam
+      - Fluroxypyr
+      - Glufosinate-ammonium
+      - Glyphosate
+      - Haloxyfop
+      - Imazamox
+      - Imazapic
+      - Imazapyr
+      - Imazethapyr
+      - MCPA
+      - Mesotrione
+      - Metolachlor
+      - Metsulfuron-methyl
+      - Paraquat
+      - Pendimethalin
+      - Picloram
+      - Pinoxaden
+      - Propaquizafop
+      - Prosulfocarb
+      - Pyroxasulfone
+      - Pyroxsulam
+      - Quizalofop-P-ethyl
+      - Sethoxydim
+      - Simazine
+      - Sulfometuron-methyl
+      - Sulfosulfuron
+      - Terbuthylazine
+      - Triallate
+      - Tribenuron-methyl
+      - Triclopyr
+      - Trifluralin
+      - Trifloxysulfuron
+      # Fungicides
+      - Azoxystrobin
+      - Bixafen
+      - Boscalid
+      - Carbendazim
+      - Chlorothalonil
+      - Cyproconazole
+      - Difenoconazole
+      - Epoxiconazole
+      - Fludioxonil
+      - Fluopyram
+      - Flutriafol
+      - Fluxapyroxad
+      - Iprodione
+      - Isopyrazam
+      - Mancozeb
+      - Metalaxyl
+      - Propiconazole
+      - Prothioconazole
+      - Pyraclostrobin
+      - Tebuconazole
+      - Thiram
+      - Triadimefon
+      - Triadimenol
+      - Trifloxystrobin
+      # Insecticides
+      - Abamectin
+      - Acetamiprid
+      - Alpha-cypermethrin
+      - Bifenthrin
+      - Chlorantraniliprole
+      - Chlorpyrifos
+      - Clothianidin
+      - Cyantraniliprole
+      - Cypermethrin
+      - Deltamethrin
+      - Dimethoate
+      - Emamectin benzoate
+      - Esfenvalerate
+      - Fipronil
+      - Imidacloprid
+      - Indoxacarb
+      - Lambda-cyhalothrin
+      - Malathion
+      - Methomyl
+      - Omethoate
+      - Pirimicarb
+      - Spinetoram
+      - Spinosad
+      - Sulfoxaflor
+      - Thiacloprid
+      - Thiamethoxam
+      # Seed Treatments
+      - Fludioxonil
+      - Ipconazole
+      - Metalaxyl-M
+      - Sedaxane
+      - Thiamethoxam
+      - Triticonazole
+      # Fertiliser Elements
+      - Boron
+      - Calcium
+      - Copper
+      - Iron
+      - Magnesium
+      - Manganese
+      - Molybdenum
+      - Nitrogen
+      - Phosphorus
+      - Potassium
+      - Sulfur
+      - Zinc
+      # Adjuvants
+      - Alcohol ethoxylate
+      - Ammonium sulfate
+      - Methylated seed oil
+      - Organosilicone
+      - Paraffin oil
+      - Petroleum oil
+
+  ipm_active_3_name:
+    name: IPM Active 3 Name
+    icon: mdi:flask
+    options:
+      - Select Active
+      # Herbicides
+      - 2,4-D
+      - Atrazine
+      - Bromoxynil
+      - Carfentrazone-ethyl
+      - Clethodim
+      - Clodinafop-propargyl
+      - Clopyralid
+      - Dicamba
+      - Diflufenican
+      - Diquat
+      - Fenoxaprop-P-ethyl
+      - Florasulam
+      - Fluazifop-P-butyl
+      - Flumetsulam
+      - Fluroxypyr
+      - Glufosinate-ammonium
+      - Glyphosate
+      - Haloxyfop
+      - Imazamox
+      - Imazapic
+      - Imazapyr
+      - Imazethapyr
+      - MCPA
+      - Mesotrione
+      - Metolachlor
+      - Metsulfuron-methyl
+      - Paraquat
+      - Pendimethalin
+      - Picloram
+      - Pinoxaden
+      - Propaquizafop
+      - Prosulfocarb
+      - Pyroxasulfone
+      - Pyroxsulam
+      - Quizalofop-P-ethyl
+      - Sethoxydim
+      - Simazine
+      - Sulfometuron-methyl
+      - Sulfosulfuron
+      - Terbuthylazine
+      - Triallate
+      - Tribenuron-methyl
+      - Triclopyr
+      - Trifluralin
+      - Trifloxysulfuron
+      # Fungicides
+      - Azoxystrobin
+      - Bixafen
+      - Boscalid
+      - Carbendazim
+      - Chlorothalonil
+      - Cyproconazole
+      - Difenoconazole
+      - Epoxiconazole
+      - Fludioxonil
+      - Fluopyram
+      - Flutriafol
+      - Fluxapyroxad
+      - Iprodione
+      - Isopyrazam
+      - Mancozeb
+      - Metalaxyl
+      - Propiconazole
+      - Prothioconazole
+      - Pyraclostrobin
+      - Tebuconazole
+      - Thiram
+      - Triadimefon
+      - Triadimenol
+      - Trifloxystrobin
+      # Insecticides
+      - Abamectin
+      - Acetamiprid
+      - Alpha-cypermethrin
+      - Bifenthrin
+      - Chlorantraniliprole
+      - Chlorpyrifos
+      - Clothianidin
+      - Cyantraniliprole
+      - Cypermethrin
+      - Deltamethrin
+      - Dimethoate
+      - Emamectin benzoate
+      - Esfenvalerate
+      - Fipronil
+      - Imidacloprid
+      - Indoxacarb
+      - Lambda-cyhalothrin
+      - Malathion
+      - Methomyl
+      - Omethoate
+      - Pirimicarb
+      - Spinetoram
+      - Spinosad
+      - Sulfoxaflor
+      - Thiacloprid
+      - Thiamethoxam
+      # Seed Treatments
+      - Fludioxonil
+      - Ipconazole
+      - Metalaxyl-M
+      - Sedaxane
+      - Thiamethoxam
+      - Triticonazole
+      # Fertiliser Elements
+      - Boron
+      - Calcium
+      - Copper
+      - Iron
+      - Magnesium
+      - Manganese
+      - Molybdenum
+      - Nitrogen
+      - Phosphorus
+      - Potassium
+      - Sulfur
+      - Zinc
+      # Adjuvants
+      - Alcohol ethoxylate
+      - Ammonium sulfate
+      - Methylated seed oil
+      - Organosilicone
+      - Paraffin oil
+      - Petroleum oil
+
+  ipm_active_4_name:
+    name: IPM Active 4 Name
+    icon: mdi:flask
+    options:
+      - Select Active
+      # Herbicides
+      - 2,4-D
+      - Atrazine
+      - Bromoxynil
+      - Carfentrazone-ethyl
+      - Clethodim
+      - Clodinafop-propargyl
+      - Clopyralid
+      - Dicamba
+      - Diflufenican
+      - Diquat
+      - Fenoxaprop-P-ethyl
+      - Florasulam
+      - Fluazifop-P-butyl
+      - Flumetsulam
+      - Fluroxypyr
+      - Glufosinate-ammonium
+      - Glyphosate
+      - Haloxyfop
+      - Imazamox
+      - Imazapic
+      - Imazapyr
+      - Imazethapyr
+      - MCPA
+      - Mesotrione
+      - Metolachlor
+      - Metsulfuron-methyl
+      - Paraquat
+      - Pendimethalin
+      - Picloram
+      - Pinoxaden
+      - Propaquizafop
+      - Prosulfocarb
+      - Pyroxasulfone
+      - Pyroxsulam
+      - Quizalofop-P-ethyl
+      - Sethoxydim
+      - Simazine
+      - Sulfometuron-methyl
+      - Sulfosulfuron
+      - Terbuthylazine
+      - Triallate
+      - Tribenuron-methyl
+      - Triclopyr
+      - Trifluralin
+      - Trifloxysulfuron
+      # Fungicides
+      - Azoxystrobin
+      - Bixafen
+      - Boscalid
+      - Carbendazim
+      - Chlorothalonil
+      - Cyproconazole
+      - Difenoconazole
+      - Epoxiconazole
+      - Fludioxonil
+      - Fluopyram
+      - Flutriafol
+      - Fluxapyroxad
+      - Iprodione
+      - Isopyrazam
+      - Mancozeb
+      - Metalaxyl
+      - Propiconazole
+      - Prothioconazole
+      - Pyraclostrobin
+      - Tebuconazole
+      - Thiram
+      - Triadimefon
+      - Triadimenol
+      - Trifloxystrobin
+      # Insecticides
+      - Abamectin
+      - Acetamiprid
+      - Alpha-cypermethrin
+      - Bifenthrin
+      - Chlorantraniliprole
+      - Chlorpyrifos
+      - Clothianidin
+      - Cyantraniliprole
+      - Cypermethrin
+      - Deltamethrin
+      - Dimethoate
+      - Emamectin benzoate
+      - Esfenvalerate
+      - Fipronil
+      - Imidacloprid
+      - Indoxacarb
+      - Lambda-cyhalothrin
+      - Malathion
+      - Methomyl
+      - Omethoate
+      - Pirimicarb
+      - Spinetoram
+      - Spinosad
+      - Sulfoxaflor
+      - Thiacloprid
+      - Thiamethoxam
+      # Seed Treatments
+      - Fludioxonil
+      - Ipconazole
+      - Metalaxyl-M
+      - Sedaxane
+      - Thiamethoxam
+      - Triticonazole
+      # Fertiliser Elements
+      - Boron
+      - Calcium
+      - Copper
+      - Iron
+      - Magnesium
+      - Manganese
+      - Molybdenum
+      - Nitrogen
+      - Phosphorus
+      - Potassium
+      - Sulfur
+      - Zinc
+      # Adjuvants
+      - Alcohol ethoxylate
+      - Ammonium sulfate
+      - Methylated seed oil
+      - Organosilicone
+      - Paraffin oil
+      - Petroleum oil
+
+  ipm_active_5_name:
+    name: IPM Active 5 Name
+    icon: mdi:flask
+    options:
+      - Select Active
+      # Herbicides
+      - 2,4-D
+      - Atrazine
+      - Bromoxynil
+      - Carfentrazone-ethyl
+      - Clethodim
+      - Clodinafop-propargyl
+      - Clopyralid
+      - Dicamba
+      - Diflufenican
+      - Diquat
+      - Fenoxaprop-P-ethyl
+      - Florasulam
+      - Fluazifop-P-butyl
+      - Flumetsulam
+      - Fluroxypyr
+      - Glufosinate-ammonium
+      - Glyphosate
+      - Haloxyfop
+      - Imazamox
+      - Imazapic
+      - Imazapyr
+      - Imazethapyr
+      - MCPA
+      - Mesotrione
+      - Metolachlor
+      - Metsulfuron-methyl
+      - Paraquat
+      - Pendimethalin
+      - Picloram
+      - Pinoxaden
+      - Propaquizafop
+      - Prosulfocarb
+      - Pyroxasulfone
+      - Pyroxsulam
+      - Quizalofop-P-ethyl
+      - Sethoxydim
+      - Simazine
+      - Sulfometuron-methyl
+      - Sulfosulfuron
+      - Terbuthylazine
+      - Triallate
+      - Tribenuron-methyl
+      - Triclopyr
+      - Trifluralin
+      - Trifloxysulfuron
+      # Fungicides
+      - Azoxystrobin
+      - Bixafen
+      - Boscalid
+      - Carbendazim
+      - Chlorothalonil
+      - Cyproconazole
+      - Difenoconazole
+      - Epoxiconazole
+      - Fludioxonil
+      - Fluopyram
+      - Flutriafol
+      - Fluxapyroxad
+      - Iprodione
+      - Isopyrazam
+      - Mancozeb
+      - Metalaxyl
+      - Propiconazole
+      - Prothioconazole
+      - Pyraclostrobin
+      - Tebuconazole
+      - Thiram
+      - Triadimefon
+      - Triadimenol
+      - Trifloxystrobin
+      # Insecticides
+      - Abamectin
+      - Acetamiprid
+      - Alpha-cypermethrin
+      - Bifenthrin
+      - Chlorantraniliprole
+      - Chlorpyrifos
+      - Clothianidin
+      - Cyantraniliprole
+      - Cypermethrin
+      - Deltamethrin
+      - Dimethoate
+      - Emamectin benzoate
+      - Esfenvalerate
+      - Fipronil
+      - Imidacloprid
+      - Indoxacarb
+      - Lambda-cyhalothrin
+      - Malathion
+      - Methomyl
+      - Omethoate
+      - Pirimicarb
+      - Spinetoram
+      - Spinosad
+      - Sulfoxaflor
+      - Thiacloprid
+      - Thiamethoxam
+      # Seed Treatments
+      - Fludioxonil
+      - Ipconazole
+      - Metalaxyl-M
+      - Sedaxane
+      - Thiamethoxam
+      - Triticonazole
+      # Fertiliser Elements
+      - Boron
+      - Calcium
+      - Copper
+      - Iron
+      - Magnesium
+      - Manganese
+      - Molybdenum
+      - Nitrogen
+      - Phosphorus
+      - Potassium
+      - Sulfur
+      - Zinc
+      # Adjuvants
+      - Alcohol ethoxylate
+      - Ammonium sulfate
+      - Methylated seed oil
+      - Organosilicone
+      - Paraffin oil
+      - Petroleum oil
+
+  ipm_active_6_name:
+    name: IPM Active 6 Name
+    icon: mdi:flask
+    options:
+      - Select Active
+      # Herbicides
+      - 2,4-D
+      - Atrazine
+      - Bromoxynil
+      - Carfentrazone-ethyl
+      - Clethodim
+      - Clodinafop-propargyl
+      - Clopyralid
+      - Dicamba
+      - Diflufenican
+      - Diquat
+      - Fenoxaprop-P-ethyl
+      - Florasulam
+      - Fluazifop-P-butyl
+      - Flumetsulam
+      - Fluroxypyr
+      - Glufosinate-ammonium
+      - Glyphosate
+      - Haloxyfop
+      - Imazamox
+      - Imazapic
+      - Imazapyr
+      - Imazethapyr
+      - MCPA
+      - Mesotrione
+      - Metolachlor
+      - Metsulfuron-methyl
+      - Paraquat
+      - Pendimethalin
+      - Picloram
+      - Pinoxaden
+      - Propaquizafop
+      - Prosulfocarb
+      - Pyroxasulfone
+      - Pyroxsulam
+      - Quizalofop-P-ethyl
+      - Sethoxydim
+      - Simazine
+      - Sulfometuron-methyl
+      - Sulfosulfuron
+      - Terbuthylazine
+      - Triallate
+      - Tribenuron-methyl
+      - Triclopyr
+      - Trifluralin
+      - Trifloxysulfuron
+      # Fungicides
+      - Azoxystrobin
+      - Bixafen
+      - Boscalid
+      - Carbendazim
+      - Chlorothalonil
+      - Cyproconazole
+      - Difenoconazole
+      - Epoxiconazole
+      - Fludioxonil
+      - Fluopyram
+      - Flutriafol
+      - Fluxapyroxad
+      - Iprodione
+      - Isopyrazam
+      - Mancozeb
+      - Metalaxyl
+      - Propiconazole
+      - Prothioconazole
+      - Pyraclostrobin
+      - Tebuconazole
+      - Thiram
+      - Triadimefon
+      - Triadimenol
+      - Trifloxystrobin
+      # Insecticides
+      - Abamectin
+      - Acetamiprid
+      - Alpha-cypermethrin
+      - Bifenthrin
+      - Chlorantraniliprole
+      - Chlorpyrifos
+      - Clothianidin
+      - Cyantraniliprole
+      - Cypermethrin
+      - Deltamethrin
+      - Dimethoate
+      - Emamectin benzoate
+      - Esfenvalerate
+      - Fipronil
+      - Imidacloprid
+      - Indoxacarb
+      - Lambda-cyhalothrin
+      - Malathion
+      - Methomyl
+      - Omethoate
+      - Pirimicarb
+      - Spinetoram
+      - Spinosad
+      - Sulfoxaflor
+      - Thiacloprid
+      - Thiamethoxam
+      # Seed Treatments
+      - Fludioxonil
+      - Ipconazole
+      - Metalaxyl-M
+      - Sedaxane
+      - Thiamethoxam
+      - Triticonazole
+      # Fertiliser Elements
+      - Boron
+      - Calcium
+      - Copper
+      - Iron
+      - Magnesium
+      - Manganese
+      - Molybdenum
+      - Nitrogen
+      - Phosphorus
+      - Potassium
+      - Sulfur
+      - Zinc
+      # Adjuvants
+      - Alcohol ethoxylate
+      - Ammonium sulfate
+      - Methylated seed oil
+      - Organosilicone
+      - Paraffin oil
+      - Petroleum oil
+
+  # ----- Settings View -----
+  ipm_manage_location:
+    name: IPM Manage Location
+    icon: mdi:map-marker-remove
+    options:
+      - Select Location
+
+  ipm_manage_active:
+    name: IPM Manage Active
+    icon: mdi:flask-remove
+    options:
+      - Select Active
+
+  # ----- Data Management (Phase 3) -----
+  ipm_import_backup:
+    name: IPM Import Backup
+    icon: mdi:backup-restore
+    options:
+      - Select Backup
 
 input_number:
   # Stock movement quantity
@@ -372,38 +1349,30 @@ input_text:
     icon: mdi:rename
     max: 80
 
-  # Active constituent names (for Chemicals and Fertilisers)
-  ipm_active_1_name:
-    name: IPM Active 1 Name
-    icon: mdi:flask
+  # Settings - new location name
+  ipm_new_location:
+    name: IPM New Location
+    icon: mdi:map-marker-plus
     max: 50
 
-  ipm_active_2_name:
-    name: IPM Active 2 Name
-    icon: mdi:flask
-    max: 50
+  # Settings - new active constituent name
+  ipm_new_active:
+    name: IPM New Active
+    icon: mdi:flask-plus
+    max: 80
 
-  ipm_active_3_name:
-    name: IPM Active 3 Name
-    icon: mdi:flask
-    max: 50
-
-  ipm_active_4_name:
-    name: IPM Active 4 Name
-    icon: mdi:flask
-    max: 50
-
-  ipm_active_5_name:
-    name: IPM Active 5 Name
-    icon: mdi:flask
-    max: 50
-
-  ipm_active_6_name:
-    name: IPM Active 6 Name
-    icon: mdi:flask
+  # Settings - new active constituent groups (comma-separated)
+  ipm_new_active_groups:
+    name: IPM New Active Groups
+    icon: mdi:flask-outline
     max: 50
 
 input_boolean:
+  # ----- Data Management (Phase 3) -----
+  ipm_confirm_reset:
+    name: IPM Confirm Reset
+    icon: mdi:alert-octagon
+
   # Toggle to show additional active constituent fields
   ipm_show_active_2:
     name: IPM Show Active 2
@@ -430,6 +1399,12 @@ input_boolean:
     name: IPM Show Form
     icon: mdi:form-select
     initial: true
+
+  # Flag to prevent automation reset during product load
+  ipm_loading_product:
+    name: IPM Loading Product
+    icon: mdi:loading
+    initial: false
 
 #=============================================================================
 # TEMPLATE SENSORS - Computed values for UI
@@ -713,7 +1688,33 @@ automation:
           option: "All"
 
   #---------------------------------------------------------------------------
-  # Auto-select location when product changes (if single location)
+  # Update active filter dropdown when sensor updates
+  #---------------------------------------------------------------------------
+  - id: ipm_update_active_filter_options
+    alias: "IPM: Update Active Filter Options"
+    mode: restart
+    trigger:
+      - platform: state
+        entity_id: sensor.ipm_products
+      - platform: homeassistant
+        event: start
+    action:
+      - delay: "00:00:01"
+      - service: input_select.set_options
+        target:
+          entity_id: input_select.ipm_active_filter
+        data:
+          options: >
+            {% set active_names = state_attr('sensor.ipm_products', 'active_names') or [] %}
+            {{ ['All'] + active_names }}
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.ipm_active_filter
+        data:
+          option: "All"
+
+  #---------------------------------------------------------------------------
+  # Update location dropdown when product changes (filter to product's locations)
   #---------------------------------------------------------------------------
   - id: ipm_update_location_options
     alias: "IPM: Update Location on Product Change"
@@ -724,20 +1725,79 @@ automation:
     action:
       - delay: "00:00:00.5"
       - variables:
+          selected_product: "{{ states('input_select.ipm_product') }}"
           locations: "{{ state_attr('sensor.ipm_product_locations', 'locations') or [] }}"
       - choose:
-          # If product has only one location, auto-select it
+          # If no product selected, show all locations
+          - conditions:
+              - condition: template
+                value_template: "{{ selected_product in ['Select Product', 'unknown', 'unavailable', ''] }}"
+            sequence:
+              - service: input_select.set_options
+                target:
+                  entity_id: input_select.ipm_location
+                data:
+                  options:
+                    - Select Location
+                    - Chem Shed
+                    - Seed Shed
+                    - Oil Shed
+                    - Silo 1
+                    - Silo 2
+                    - Silo 3
+                    - Silo 4
+                    - Silo 5
+                    - Silo 6
+                    - Silo 7
+                    - Silo 8
+                    - Silo 9
+                    - Silo 10
+                    - Silo 11
+                    - Silo 12
+                    - Silo 13
+              - service: input_select.select_option
+                target:
+                  entity_id: input_select.ipm_location
+                data:
+                  option: "Select Location"
+          # If product has only one location, set options and auto-select it
           - conditions:
               - condition: template
                 value_template: "{{ locations | length == 1 }}"
             sequence:
+              - service: input_select.set_options
+                target:
+                  entity_id: input_select.ipm_location
+                data:
+                  options: "{{ locations }}"
               - service: input_select.select_option
                 target:
                   entity_id: input_select.ipm_location
                 data:
                   option: "{{ locations[0] }}"
+          # If product has multiple locations, show only those locations
+          - conditions:
+              - condition: template
+                value_template: "{{ locations | length > 1 }}"
+            sequence:
+              - service: input_select.set_options
+                target:
+                  entity_id: input_select.ipm_location
+                data:
+                  options: "{{ ['Select Location'] + locations }}"
+              - service: input_select.select_option
+                target:
+                  entity_id: input_select.ipm_location
+                data:
+                  option: "Select Location"
         default:
-          # Otherwise reset to Select Location
+          # Product has no locations (shouldn't happen normally)
+          - service: input_select.set_options
+            target:
+              entity_id: input_select.ipm_location
+            data:
+              options:
+                - Select Location
           - service: input_select.select_option
             target:
               entity_id: input_select.ipm_location
@@ -753,6 +1813,11 @@ automation:
     trigger:
       - platform: state
         entity_id: input_select.ipm_edit_category
+    condition:
+      # Don't run during product load (script handles subcategory)
+      - condition: state
+        entity_id: input_boolean.ipm_loading_product
+        state: "off"
     action:
       - service: input_select.set_options
         target:
@@ -899,35 +1964,40 @@ script:
           min_stock: "{{ states('input_number.ipm_edit_min_stock') | float(0) }}"
           initial_stock: "{{ states('input_number.ipm_edit_initial_stock') | float(0) }}"
           location: "{{ states('input_select.ipm_edit_location') }}"
-          chem_group: "{{ states('input_select.ipm_edit_chem_group') }}"
           app_unit: "{{ states('input_select.ipm_edit_app_unit') }}"
-          # Collect active constituents (name + concentration number + unit)
+          # Collect active constituents (name + concentration + unit + group)
           actives_json: >
             {% set actives = [] %}
-            {% set a1_name = states('input_text.ipm_active_1_name') | trim %}
+            {% set a1_name = states('input_select.ipm_active_1_name') %}
             {% set a1_conc = states('input_number.ipm_active_1_conc') | float(0) %}
             {% set a1_unit = states('input_select.ipm_active_1_unit') %}
-            {% if a1_name %}{% set actives = actives + [{"name": a1_name, "concentration": a1_conc, "unit": a1_unit}] %}{% endif %}
-            {% set a2_name = states('input_text.ipm_active_2_name') | trim %}
+            {% set a1_group = states('input_select.ipm_active_1_group') %}
+            {% if a1_name not in ['Select Active', '', 'unknown', 'unavailable'] %}{% set actives = actives + [{"name": a1_name, "concentration": a1_conc, "unit": a1_unit, "group": a1_group if a1_group != 'None' else ''}] %}{% endif %}
+            {% set a2_name = states('input_select.ipm_active_2_name') %}
             {% set a2_conc = states('input_number.ipm_active_2_conc') | float(0) %}
             {% set a2_unit = states('input_select.ipm_active_2_unit') %}
-            {% if a2_name %}{% set actives = actives + [{"name": a2_name, "concentration": a2_conc, "unit": a2_unit}] %}{% endif %}
-            {% set a3_name = states('input_text.ipm_active_3_name') | trim %}
+            {% set a2_group = states('input_select.ipm_active_2_group') %}
+            {% if a2_name not in ['Select Active', '', 'unknown', 'unavailable'] %}{% set actives = actives + [{"name": a2_name, "concentration": a2_conc, "unit": a2_unit, "group": a2_group if a2_group != 'None' else ''}] %}{% endif %}
+            {% set a3_name = states('input_select.ipm_active_3_name') %}
             {% set a3_conc = states('input_number.ipm_active_3_conc') | float(0) %}
             {% set a3_unit = states('input_select.ipm_active_3_unit') %}
-            {% if a3_name %}{% set actives = actives + [{"name": a3_name, "concentration": a3_conc, "unit": a3_unit}] %}{% endif %}
-            {% set a4_name = states('input_text.ipm_active_4_name') | trim %}
+            {% set a3_group = states('input_select.ipm_active_3_group') %}
+            {% if a3_name not in ['Select Active', '', 'unknown', 'unavailable'] %}{% set actives = actives + [{"name": a3_name, "concentration": a3_conc, "unit": a3_unit, "group": a3_group if a3_group != 'None' else ''}] %}{% endif %}
+            {% set a4_name = states('input_select.ipm_active_4_name') %}
             {% set a4_conc = states('input_number.ipm_active_4_conc') | float(0) %}
             {% set a4_unit = states('input_select.ipm_active_4_unit') %}
-            {% if a4_name %}{% set actives = actives + [{"name": a4_name, "concentration": a4_conc, "unit": a4_unit}] %}{% endif %}
-            {% set a5_name = states('input_text.ipm_active_5_name') | trim %}
+            {% set a4_group = states('input_select.ipm_active_4_group') %}
+            {% if a4_name not in ['Select Active', '', 'unknown', 'unavailable'] %}{% set actives = actives + [{"name": a4_name, "concentration": a4_conc, "unit": a4_unit, "group": a4_group if a4_group != 'None' else ''}] %}{% endif %}
+            {% set a5_name = states('input_select.ipm_active_5_name') %}
             {% set a5_conc = states('input_number.ipm_active_5_conc') | float(0) %}
             {% set a5_unit = states('input_select.ipm_active_5_unit') %}
-            {% if a5_name %}{% set actives = actives + [{"name": a5_name, "concentration": a5_conc, "unit": a5_unit}] %}{% endif %}
-            {% set a6_name = states('input_text.ipm_active_6_name') | trim %}
+            {% set a5_group = states('input_select.ipm_active_5_group') %}
+            {% if a5_name not in ['Select Active', '', 'unknown', 'unavailable'] %}{% set actives = actives + [{"name": a5_name, "concentration": a5_conc, "unit": a5_unit, "group": a5_group if a5_group != 'None' else ''}] %}{% endif %}
+            {% set a6_name = states('input_select.ipm_active_6_name') %}
             {% set a6_conc = states('input_number.ipm_active_6_conc') | float(0) %}
             {% set a6_unit = states('input_select.ipm_active_6_unit') %}
-            {% if a6_name %}{% set actives = actives + [{"name": a6_name, "concentration": a6_conc, "unit": a6_unit}] %}{% endif %}
+            {% set a6_group = states('input_select.ipm_active_6_group') %}
+            {% if a6_name not in ['Select Active', '', 'unknown', 'unavailable'] %}{% set actives = actives + [{"name": a6_name, "concentration": a6_conc, "unit": a6_unit, "group": a6_group if a6_group != 'None' else ''}] %}{% endif %}
             {{ actives | tojson }}
 
       # Validate name
@@ -963,7 +2033,6 @@ script:
           unit: "{{ unit }}"
           container_size: "{{ container_size }}"
           min_stock: "{{ min_stock }}"
-          chemical_group: "{{ chem_group if chem_group != 'None' else '' }}"
           application_unit: "{{ app_unit }}"
           location: "{{ location }}"
           initial_stock: "{{ initial_stock }}"
@@ -991,6 +2060,11 @@ script:
     alias: "IPM: Load Product into Editor"
     mode: single
     sequence:
+      # Set loading flag to prevent automation interference
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.ipm_loading_product
+
       - variables:
           product_id: "{{ states('sensor.ipm_selected_product') }}"
           products: "{{ state_attr('sensor.ipm_products', 'products') | default({}, true) }}"
@@ -1009,6 +2083,9 @@ script:
               - condition: template
                 value_template: "{{ product_id in ['none', 'unknown', 'unavailable', ''] }}"
             sequence:
+              - service: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.ipm_loading_product
               - service: persistent_notification.create
                 data:
                   title: "IPM Load Product"
@@ -1129,19 +2206,6 @@ script:
         data:
           value: "{{ p_min_stock | float(0) }}"
 
-      # Set chemical group (string-safe)
-      - service: input_select.select_option
-        target:
-          entity_id: input_select.ipm_edit_chem_group
-        data:
-          option: >-
-            {% set opts = state_attr('input_select.ipm_edit_chem_group', 'options') | default([], true) %}
-            {% set raw = products.get(product_id, {}).get('chemical_group') %}
-            {% set val = (raw | default('', true) | string | trim) %}
-            {% set chosen = val if val != '' else 'None' %}
-            {{ chosen if (opts | count == 0) or (chosen in opts) else 'None' }}
-
-
       # Set application unit (string-safe)
       - service: input_select.select_option
         target:
@@ -1160,17 +2224,17 @@ script:
           a6: "{{ actives[5] if actives | length > 5 else {} }}"
 
       # Clear existing active name fields
-      - service: input_text.set_value
+      - service: input_select.select_option
         target:
           entity_id:
-            - input_text.ipm_active_1_name
-            - input_text.ipm_active_2_name
-            - input_text.ipm_active_3_name
-            - input_text.ipm_active_4_name
-            - input_text.ipm_active_5_name
-            - input_text.ipm_active_6_name
+            - input_select.ipm_active_1_name
+            - input_select.ipm_active_2_name
+            - input_select.ipm_active_3_name
+            - input_select.ipm_active_4_name
+            - input_select.ipm_active_5_name
+            - input_select.ipm_active_6_name
         data:
-          value: ""
+          option: "Select Active"
 
       # Clear existing active concentration fields
       - service: input_number.set_value
@@ -1198,6 +2262,19 @@ script:
         data:
           option: "g/L"
 
+      # Reset active group dropdowns to default
+      - service: input_select.select_option
+        target:
+          entity_id:
+            - input_select.ipm_active_1_group
+            - input_select.ipm_active_2_group
+            - input_select.ipm_active_3_group
+            - input_select.ipm_active_4_group
+            - input_select.ipm_active_5_group
+            - input_select.ipm_active_6_group
+        data:
+          option: "None"
+
       # Hide all additional active toggles first
       - service: input_boolean.turn_off
         target:
@@ -1214,11 +2291,11 @@ script:
               - condition: template
                 value_template: "{{ actives | length > 0 and a1.get('name', '') | trim != '' }}"
             sequence:
-              - service: input_text.set_value
+              - service: input_select.select_option
                 target:
-                  entity_id: input_text.ipm_active_1_name
+                  entity_id: input_select.ipm_active_1_name
                 data:
-                  value: "{{ a1.get('name', '') | default('', true) }}"
+                  option: "{{ a1.get('name', 'Select Active') | default('Select Active', true) }}"
               - service: input_number.set_value
                 target:
                   entity_id: input_number.ipm_active_1_conc
@@ -1229,6 +2306,11 @@ script:
                   entity_id: input_select.ipm_active_1_unit
                 data:
                   option: "{{ a1.get('unit', 'g/L') | default('g/L', true) }}"
+              - service: input_select.select_option
+                target:
+                  entity_id: input_select.ipm_active_1_group
+                data:
+                  option: "{{ a1.get('group', '') | default('', true) if a1.get('group', '') | default('', true) != '' else 'None' }}"
 
       # Set active 2 if exists
       - choose:
@@ -1239,11 +2321,11 @@ script:
               - service: input_boolean.turn_on
                 target:
                   entity_id: input_boolean.ipm_show_active_2
-              - service: input_text.set_value
+              - service: input_select.select_option
                 target:
-                  entity_id: input_text.ipm_active_2_name
+                  entity_id: input_select.ipm_active_2_name
                 data:
-                  value: "{{ a2.get('name', '') | default('', true) }}"
+                  option: "{{ a2.get('name', 'Select Active') | default('Select Active', true) }}"
               - service: input_number.set_value
                 target:
                   entity_id: input_number.ipm_active_2_conc
@@ -1254,6 +2336,11 @@ script:
                   entity_id: input_select.ipm_active_2_unit
                 data:
                   option: "{{ a2.get('unit', 'g/L') | default('g/L', true) }}"
+              - service: input_select.select_option
+                target:
+                  entity_id: input_select.ipm_active_2_group
+                data:
+                  option: "{{ a2.get('group', '') | default('', true) if a2.get('group', '') | default('', true) != '' else 'None' }}"
 
       # Set active 3 if exists
       - choose:
@@ -1264,11 +2351,11 @@ script:
               - service: input_boolean.turn_on
                 target:
                   entity_id: input_boolean.ipm_show_active_3
-              - service: input_text.set_value
+              - service: input_select.select_option
                 target:
-                  entity_id: input_text.ipm_active_3_name
+                  entity_id: input_select.ipm_active_3_name
                 data:
-                  value: "{{ a3.get('name', '') | default('', true) }}"
+                  option: "{{ a3.get('name', 'Select Active') | default('Select Active', true) }}"
               - service: input_number.set_value
                 target:
                   entity_id: input_number.ipm_active_3_conc
@@ -1279,6 +2366,11 @@ script:
                   entity_id: input_select.ipm_active_3_unit
                 data:
                   option: "{{ a3.get('unit', 'g/L') | default('g/L', true) }}"
+              - service: input_select.select_option
+                target:
+                  entity_id: input_select.ipm_active_3_group
+                data:
+                  option: "{{ a3.get('group', '') | default('', true) if a3.get('group', '') | default('', true) != '' else 'None' }}"
 
       # Set active 4 if exists
       - choose:
@@ -1289,11 +2381,11 @@ script:
               - service: input_boolean.turn_on
                 target:
                   entity_id: input_boolean.ipm_show_active_4
-              - service: input_text.set_value
+              - service: input_select.select_option
                 target:
-                  entity_id: input_text.ipm_active_4_name
+                  entity_id: input_select.ipm_active_4_name
                 data:
-                  value: "{{ a4.get('name', '') | default('', true) }}"
+                  option: "{{ a4.get('name', 'Select Active') | default('Select Active', true) }}"
               - service: input_number.set_value
                 target:
                   entity_id: input_number.ipm_active_4_conc
@@ -1304,6 +2396,11 @@ script:
                   entity_id: input_select.ipm_active_4_unit
                 data:
                   option: "{{ a4.get('unit', 'g/L') | default('g/L', true) }}"
+              - service: input_select.select_option
+                target:
+                  entity_id: input_select.ipm_active_4_group
+                data:
+                  option: "{{ a4.get('group', '') | default('', true) if a4.get('group', '') | default('', true) != '' else 'None' }}"
 
       # Set active 5 if exists
       - choose:
@@ -1314,11 +2411,11 @@ script:
               - service: input_boolean.turn_on
                 target:
                   entity_id: input_boolean.ipm_show_active_5
-              - service: input_text.set_value
+              - service: input_select.select_option
                 target:
-                  entity_id: input_text.ipm_active_5_name
+                  entity_id: input_select.ipm_active_5_name
                 data:
-                  value: "{{ a5.get('name', '') | default('', true) }}"
+                  option: "{{ a5.get('name', 'Select Active') | default('Select Active', true) }}"
               - service: input_number.set_value
                 target:
                   entity_id: input_number.ipm_active_5_conc
@@ -1329,6 +2426,11 @@ script:
                   entity_id: input_select.ipm_active_5_unit
                 data:
                   option: "{{ a5.get('unit', 'g/L') | default('g/L', true) }}"
+              - service: input_select.select_option
+                target:
+                  entity_id: input_select.ipm_active_5_group
+                data:
+                  option: "{{ a5.get('group', '') | default('', true) if a5.get('group', '') | default('', true) != '' else 'None' }}"
 
       # Set active 6 if exists
       - choose:
@@ -1339,11 +2441,11 @@ script:
               - service: input_boolean.turn_on
                 target:
                   entity_id: input_boolean.ipm_show_active_6
-              - service: input_text.set_value
+              - service: input_select.select_option
                 target:
-                  entity_id: input_text.ipm_active_6_name
+                  entity_id: input_select.ipm_active_6_name
                 data:
-                  value: "{{ a6.get('name', '') | default('', true) }}"
+                  option: "{{ a6.get('name', 'Select Active') | default('Select Active', true) }}"
               - service: input_number.set_value
                 target:
                   entity_id: input_number.ipm_active_6_conc
@@ -1354,6 +2456,16 @@ script:
                   entity_id: input_select.ipm_active_6_unit
                 data:
                   option: "{{ a6.get('unit', 'g/L') | default('g/L', true) }}"
+              - service: input_select.select_option
+                target:
+                  entity_id: input_select.ipm_active_6_group
+                data:
+                  option: "{{ a6.get('group', '') | default('', true) if a6.get('group', '') | default('', true) != '' else 'None' }}"
+
+      # Clear loading flag
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.ipm_loading_product
 
       - service: persistent_notification.create
         data:
@@ -1377,35 +2489,40 @@ script:
           unit: "{{ states('input_select.ipm_edit_unit') }}"
           container_size: "{{ states('input_select.ipm_edit_container') }}"
           min_stock: "{{ states('input_number.ipm_edit_min_stock') | float(0) }}"
-          chem_group: "{{ states('input_select.ipm_edit_chem_group') }}"
           app_unit: "{{ states('input_select.ipm_edit_app_unit') }}"
-          # Collect active constituents (name + concentration number + unit)
+          # Collect active constituents (name + concentration + unit + group)
           actives_json: >
             {% set actives = [] %}
-            {% set a1_name = states('input_text.ipm_active_1_name') | trim %}
+            {% set a1_name = states('input_select.ipm_active_1_name') %}
             {% set a1_conc = states('input_number.ipm_active_1_conc') | float(0) %}
             {% set a1_unit = states('input_select.ipm_active_1_unit') %}
-            {% if a1_name %}{% set actives = actives + [{"name": a1_name, "concentration": a1_conc, "unit": a1_unit}] %}{% endif %}
-            {% set a2_name = states('input_text.ipm_active_2_name') | trim %}
+            {% set a1_group = states('input_select.ipm_active_1_group') %}
+            {% if a1_name not in ['Select Active', '', 'unknown', 'unavailable'] %}{% set actives = actives + [{"name": a1_name, "concentration": a1_conc, "unit": a1_unit, "group": a1_group if a1_group != 'None' else ''}] %}{% endif %}
+            {% set a2_name = states('input_select.ipm_active_2_name') %}
             {% set a2_conc = states('input_number.ipm_active_2_conc') | float(0) %}
             {% set a2_unit = states('input_select.ipm_active_2_unit') %}
-            {% if a2_name %}{% set actives = actives + [{"name": a2_name, "concentration": a2_conc, "unit": a2_unit}] %}{% endif %}
-            {% set a3_name = states('input_text.ipm_active_3_name') | trim %}
+            {% set a2_group = states('input_select.ipm_active_2_group') %}
+            {% if a2_name not in ['Select Active', '', 'unknown', 'unavailable'] %}{% set actives = actives + [{"name": a2_name, "concentration": a2_conc, "unit": a2_unit, "group": a2_group if a2_group != 'None' else ''}] %}{% endif %}
+            {% set a3_name = states('input_select.ipm_active_3_name') %}
             {% set a3_conc = states('input_number.ipm_active_3_conc') | float(0) %}
             {% set a3_unit = states('input_select.ipm_active_3_unit') %}
-            {% if a3_name %}{% set actives = actives + [{"name": a3_name, "concentration": a3_conc, "unit": a3_unit}] %}{% endif %}
-            {% set a4_name = states('input_text.ipm_active_4_name') | trim %}
+            {% set a3_group = states('input_select.ipm_active_3_group') %}
+            {% if a3_name not in ['Select Active', '', 'unknown', 'unavailable'] %}{% set actives = actives + [{"name": a3_name, "concentration": a3_conc, "unit": a3_unit, "group": a3_group if a3_group != 'None' else ''}] %}{% endif %}
+            {% set a4_name = states('input_select.ipm_active_4_name') %}
             {% set a4_conc = states('input_number.ipm_active_4_conc') | float(0) %}
             {% set a4_unit = states('input_select.ipm_active_4_unit') %}
-            {% if a4_name %}{% set actives = actives + [{"name": a4_name, "concentration": a4_conc, "unit": a4_unit}] %}{% endif %}
-            {% set a5_name = states('input_text.ipm_active_5_name') | trim %}
+            {% set a4_group = states('input_select.ipm_active_4_group') %}
+            {% if a4_name not in ['Select Active', '', 'unknown', 'unavailable'] %}{% set actives = actives + [{"name": a4_name, "concentration": a4_conc, "unit": a4_unit, "group": a4_group if a4_group != 'None' else ''}] %}{% endif %}
+            {% set a5_name = states('input_select.ipm_active_5_name') %}
             {% set a5_conc = states('input_number.ipm_active_5_conc') | float(0) %}
             {% set a5_unit = states('input_select.ipm_active_5_unit') %}
-            {% if a5_name %}{% set actives = actives + [{"name": a5_name, "concentration": a5_conc, "unit": a5_unit}] %}{% endif %}
-            {% set a6_name = states('input_text.ipm_active_6_name') | trim %}
+            {% set a5_group = states('input_select.ipm_active_5_group') %}
+            {% if a5_name not in ['Select Active', '', 'unknown', 'unavailable'] %}{% set actives = actives + [{"name": a5_name, "concentration": a5_conc, "unit": a5_unit, "group": a5_group if a5_group != 'None' else ''}] %}{% endif %}
+            {% set a6_name = states('input_select.ipm_active_6_name') %}
             {% set a6_conc = states('input_number.ipm_active_6_conc') | float(0) %}
             {% set a6_unit = states('input_select.ipm_active_6_unit') %}
-            {% if a6_name %}{% set actives = actives + [{"name": a6_name, "concentration": a6_conc, "unit": a6_unit}] %}{% endif %}
+            {% set a6_group = states('input_select.ipm_active_6_group') %}
+            {% if a6_name not in ['Select Active', '', 'unknown', 'unavailable'] %}{% set actives = actives + [{"name": a6_name, "concentration": a6_conc, "unit": a6_unit, "group": a6_group if a6_group != 'None' else ''}] %}{% endif %}
             {{ actives | tojson }}
 
       # If adding new, use the add script
@@ -1439,7 +2556,6 @@ script:
           unit: "{{ unit }}"
           container_size: "{{ container_size }}"
           min_stock: "{{ min_stock }}"
-          chemical_group: "{{ chem_group if chem_group != 'None' else '' }}"
           application_unit: "{{ app_unit }}"
           actives: "{{ actives_json }}"
 
@@ -1491,17 +2607,17 @@ script:
         data:
           option: "Select Subcategory"
       # Clear all active constituent name fields
-      - service: input_text.set_value
+      - service: input_select.select_option
         target:
           entity_id:
-            - input_text.ipm_active_1_name
-            - input_text.ipm_active_2_name
-            - input_text.ipm_active_3_name
-            - input_text.ipm_active_4_name
-            - input_text.ipm_active_5_name
-            - input_text.ipm_active_6_name
+            - input_select.ipm_active_1_name
+            - input_select.ipm_active_2_name
+            - input_select.ipm_active_3_name
+            - input_select.ipm_active_4_name
+            - input_select.ipm_active_5_name
+            - input_select.ipm_active_6_name
         data:
-          value: ""
+          option: "Select Active"
       # Clear all active concentration fields
       - service: input_number.set_value
         target:
@@ -1526,6 +2642,18 @@ script:
             - input_select.ipm_active_6_unit
         data:
           option: "g/L"
+      # Reset all active group fields to default
+      - service: input_select.select_option
+        target:
+          entity_id:
+            - input_select.ipm_active_1_group
+            - input_select.ipm_active_2_group
+            - input_select.ipm_active_3_group
+            - input_select.ipm_active_4_group
+            - input_select.ipm_active_5_group
+            - input_select.ipm_active_6_group
+        data:
+          option: "None"
       # Hide additional active toggles
       - service: input_boolean.turn_off
         target:
@@ -1543,11 +2671,11 @@ script:
     alias: "IPM: Clear Active 1"
     mode: single
     sequence:
-      - service: input_text.set_value
+      - service: input_select.select_option
         target:
-          entity_id: input_text.ipm_active_1_name
+          entity_id: input_select.ipm_active_1_name
         data:
-          value: ""
+          option: "Select Active"
       - service: input_number.set_value
         target:
           entity_id: input_number.ipm_active_1_conc
@@ -1558,16 +2686,21 @@ script:
           entity_id: input_select.ipm_active_1_unit
         data:
           option: "g/L"
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.ipm_active_1_group
+        data:
+          option: "None"
 
   ipm_clear_active_2:
     alias: "IPM: Clear Active 2"
     mode: single
     sequence:
-      - service: input_text.set_value
+      - service: input_select.select_option
         target:
-          entity_id: input_text.ipm_active_2_name
+          entity_id: input_select.ipm_active_2_name
         data:
-          value: ""
+          option: "Select Active"
       - service: input_number.set_value
         target:
           entity_id: input_number.ipm_active_2_conc
@@ -1578,6 +2711,11 @@ script:
           entity_id: input_select.ipm_active_2_unit
         data:
           option: "g/L"
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.ipm_active_2_group
+        data:
+          option: "None"
       - service: input_boolean.turn_off
         target:
           entity_id: input_boolean.ipm_show_active_2
@@ -1586,11 +2724,11 @@ script:
     alias: "IPM: Clear Active 3"
     mode: single
     sequence:
-      - service: input_text.set_value
+      - service: input_select.select_option
         target:
-          entity_id: input_text.ipm_active_3_name
+          entity_id: input_select.ipm_active_3_name
         data:
-          value: ""
+          option: "Select Active"
       - service: input_number.set_value
         target:
           entity_id: input_number.ipm_active_3_conc
@@ -1601,6 +2739,11 @@ script:
           entity_id: input_select.ipm_active_3_unit
         data:
           option: "g/L"
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.ipm_active_3_group
+        data:
+          option: "None"
       - service: input_boolean.turn_off
         target:
           entity_id: input_boolean.ipm_show_active_3
@@ -1609,11 +2752,11 @@ script:
     alias: "IPM: Clear Active 4"
     mode: single
     sequence:
-      - service: input_text.set_value
+      - service: input_select.select_option
         target:
-          entity_id: input_text.ipm_active_4_name
+          entity_id: input_select.ipm_active_4_name
         data:
-          value: ""
+          option: "Select Active"
       - service: input_number.set_value
         target:
           entity_id: input_number.ipm_active_4_conc
@@ -1624,6 +2767,11 @@ script:
           entity_id: input_select.ipm_active_4_unit
         data:
           option: "g/L"
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.ipm_active_4_group
+        data:
+          option: "None"
       - service: input_boolean.turn_off
         target:
           entity_id: input_boolean.ipm_show_active_4
@@ -1632,11 +2780,11 @@ script:
     alias: "IPM: Clear Active 5"
     mode: single
     sequence:
-      - service: input_text.set_value
+      - service: input_select.select_option
         target:
-          entity_id: input_text.ipm_active_5_name
+          entity_id: input_select.ipm_active_5_name
         data:
-          value: ""
+          option: "Select Active"
       - service: input_number.set_value
         target:
           entity_id: input_number.ipm_active_5_conc
@@ -1647,6 +2795,11 @@ script:
           entity_id: input_select.ipm_active_5_unit
         data:
           option: "g/L"
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.ipm_active_5_group
+        data:
+          option: "None"
       - service: input_boolean.turn_off
         target:
           entity_id: input_boolean.ipm_show_active_5
@@ -1655,11 +2808,11 @@ script:
     alias: "IPM: Clear Active 6"
     mode: single
     sequence:
-      - service: input_text.set_value
+      - service: input_select.select_option
         target:
-          entity_id: input_text.ipm_active_6_name
+          entity_id: input_select.ipm_active_6_name
         data:
-          value: ""
+          option: "Select Active"
       - service: input_number.set_value
         target:
           entity_id: input_number.ipm_active_6_conc
@@ -1670,6 +2823,508 @@ script:
           entity_id: input_select.ipm_active_6_unit
         data:
           option: "g/L"
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.ipm_active_6_group
+        data:
+          option: "None"
       - service: input_boolean.turn_off
         target:
           entity_id: input_boolean.ipm_show_active_6
+
+  #---------------------------------------------------------------------------
+  # Settings: Initialize System
+  #---------------------------------------------------------------------------
+  ipm_initialize_system:
+    alias: "IPM: Initialize System"
+    mode: single
+    sequence:
+      - service: shell_command.ipm_init
+      - delay: "00:00:01"
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.ipm_products
+      - service: persistent_notification.create
+        data:
+          title: "IPM Settings"
+          message: "System initialized successfully. Database and configuration files created."
+
+  #---------------------------------------------------------------------------
+  # Settings: Add Location
+  #---------------------------------------------------------------------------
+  ipm_add_new_location:
+    alias: "IPM: Add New Location"
+    mode: single
+    sequence:
+      - variables:
+          new_location: "{{ states('input_text.ipm_new_location') | trim }}"
+
+      # Validate not empty
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ new_location == '' }}"
+            sequence:
+              - service: persistent_notification.create
+                data:
+                  title: "IPM Settings"
+                  message: "Please enter a location name."
+              - stop: "No location name"
+
+      # Add location
+      - service: shell_command.ipm_add_location
+        data:
+          name: "{{ new_location }}"
+
+      # Clear input
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.ipm_new_location
+        data:
+          value: ""
+
+      # Refresh data
+      - delay: "00:00:01"
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.ipm_products
+
+      # Update location dropdowns
+      - service: input_select.set_options
+        target:
+          entity_id: input_select.ipm_location
+        data:
+          options: >-
+            {% set locs = state_attr('sensor.ipm_products', 'locations') or [] %}
+            {{ ['Select Location'] + locs }}
+
+      - service: input_select.set_options
+        target:
+          entity_id: input_select.ipm_edit_location
+        data:
+          options: >-
+            {% set locs = state_attr('sensor.ipm_products', 'locations') or [] %}
+            {{ locs if locs else ['Chem Shed'] }}
+
+      - service: input_select.set_options
+        target:
+          entity_id: input_select.ipm_manage_location
+        data:
+          options: >-
+            {% set locs = state_attr('sensor.ipm_products', 'locations') or [] %}
+            {{ ['Select Location'] + locs }}
+
+      - service: persistent_notification.create
+        data:
+          title: "IPM Settings"
+          message: "Location '{{ new_location }}' added successfully."
+
+  #---------------------------------------------------------------------------
+  # Settings: Remove Location
+  #---------------------------------------------------------------------------
+  ipm_remove_selected_location:
+    alias: "IPM: Remove Selected Location"
+    mode: single
+    sequence:
+      - variables:
+          location: "{{ states('input_select.ipm_manage_location') }}"
+          locations_with_stock: "{{ state_attr('sensor.ipm_products', 'locations_with_stock') or [] }}"
+
+      # Validate selection
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ location in ['Select Location', 'unknown', 'unavailable', ''] }}"
+            sequence:
+              - service: persistent_notification.create
+                data:
+                  title: "IPM Settings"
+                  message: "Please select a location to remove."
+              - stop: "No location selected"
+
+      # Check if location has stock
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ location in locations_with_stock }}"
+            sequence:
+              - service: persistent_notification.create
+                data:
+                  title: "IPM Settings"
+                  message: "Cannot remove '{{ location }}' - it has stock. Move or deplete stock first."
+              - stop: "Location has stock"
+
+      # Remove location
+      - service: shell_command.ipm_remove_location
+        data:
+          name: "{{ location }}"
+
+      # Refresh data
+      - delay: "00:00:01"
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.ipm_products
+
+      # Update location dropdowns
+      - service: input_select.set_options
+        target:
+          entity_id: input_select.ipm_location
+        data:
+          options: >-
+            {% set locs = state_attr('sensor.ipm_products', 'locations') or [] %}
+            {{ ['Select Location'] + locs }}
+
+      - service: input_select.set_options
+        target:
+          entity_id: input_select.ipm_edit_location
+        data:
+          options: >-
+            {% set locs = state_attr('sensor.ipm_products', 'locations') or [] %}
+            {{ locs if locs else ['Chem Shed'] }}
+
+      - service: input_select.set_options
+        target:
+          entity_id: input_select.ipm_manage_location
+        data:
+          options: >-
+            {% set locs = state_attr('sensor.ipm_products', 'locations') or [] %}
+            {{ ['Select Location'] + locs }}
+
+      - service: persistent_notification.create
+        data:
+          title: "IPM Settings"
+          message: "Location '{{ location }}' removed successfully."
+
+  #---------------------------------------------------------------------------
+  # Settings: Refresh Locations (update all dropdowns from config)
+  #---------------------------------------------------------------------------
+  ipm_refresh_locations:
+    alias: "IPM: Refresh Locations"
+    mode: single
+    sequence:
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.ipm_products
+
+      - delay: "00:00:01"
+
+      - service: input_select.set_options
+        target:
+          entity_id: input_select.ipm_location
+        data:
+          options: >-
+            {% set locs = state_attr('sensor.ipm_products', 'locations') or [] %}
+            {{ ['Select Location'] + locs }}
+
+      - service: input_select.set_options
+        target:
+          entity_id: input_select.ipm_edit_location
+        data:
+          options: >-
+            {% set locs = state_attr('sensor.ipm_products', 'locations') or [] %}
+            {{ locs if locs else ['Chem Shed'] }}
+
+      - service: input_select.set_options
+        target:
+          entity_id: input_select.ipm_manage_location
+        data:
+          options: >-
+            {% set locs = state_attr('sensor.ipm_products', 'locations') or [] %}
+            {{ ['Select Location'] + locs }}
+
+  #---------------------------------------------------------------------------
+  # Settings: Add Custom Active Constituent
+  #---------------------------------------------------------------------------
+  ipm_add_new_active:
+    alias: "IPM: Add New Active Constituent"
+    mode: single
+    sequence:
+      - variables:
+          new_active: "{{ states('input_text.ipm_new_active') | trim }}"
+          new_groups: "{{ states('input_text.ipm_new_active_groups') | trim }}"
+
+      # Validate not empty
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ new_active == '' }}"
+            sequence:
+              - service: persistent_notification.create
+                data:
+                  title: "IPM Settings"
+                  message: "Please enter an active constituent name."
+              - stop: "No active name"
+
+      # Add active
+      - service: shell_command.ipm_add_active
+        data:
+          name: "{{ new_active }}"
+          groups: "{{ new_groups }}"
+
+      # Clear inputs
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.ipm_new_active
+        data:
+          value: ""
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.ipm_new_active_groups
+        data:
+          value: ""
+
+      # Refresh data
+      - delay: "00:00:01"
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.ipm_products
+
+      # Update manage active dropdown with custom actives only
+      - service: input_select.set_options
+        target:
+          entity_id: input_select.ipm_manage_active
+        data:
+          options: >-
+            {% set all_actives = state_attr('sensor.ipm_products', 'all_actives_list') or [] %}
+            {% set custom = all_actives | selectattr('type', 'eq', 'custom') | map(attribute='name') | list %}
+            {{ ['Select Active'] + custom }}
+
+      - service: persistent_notification.create
+        data:
+          title: "IPM Settings"
+          message: "Active constituent '{{ new_active }}' added successfully."
+
+  #---------------------------------------------------------------------------
+  # Settings: Remove Custom Active Constituent
+  #---------------------------------------------------------------------------
+  ipm_remove_selected_active:
+    alias: "IPM: Remove Selected Active Constituent"
+    mode: single
+    sequence:
+      - variables:
+          active_name: "{{ states('input_select.ipm_manage_active') }}"
+          active_products_map: "{{ state_attr('sensor.ipm_products', 'active_products_map') or {} }}"
+
+      # Validate selection
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ active_name in ['Select Active', 'unknown', 'unavailable', ''] }}"
+            sequence:
+              - service: persistent_notification.create
+                data:
+                  title: "IPM Settings"
+                  message: "Please select an active constituent to remove."
+              - stop: "No active selected"
+
+      # Check if active is in use
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ active_name in active_products_map and active_products_map[active_name] | length > 0 }}"
+            sequence:
+              - service: persistent_notification.create
+                data:
+                  title: "IPM Settings"
+                  message: >
+                    Cannot remove '{{ active_name }}' - it is used by:
+                    {{ (active_products_map[active_name] | list)[:3] | join(', ') }}
+                    {% if active_products_map[active_name] | length > 3 %}...{% endif %}
+              - stop: "Active in use"
+
+      # Remove active
+      - service: shell_command.ipm_remove_active
+        data:
+          name: "{{ active_name }}"
+
+      # Refresh data
+      - delay: "00:00:01"
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.ipm_products
+
+      # Update manage active dropdown
+      - service: input_select.set_options
+        target:
+          entity_id: input_select.ipm_manage_active
+        data:
+          options: >-
+            {% set all_actives = state_attr('sensor.ipm_products', 'all_actives_list') or [] %}
+            {% set custom = all_actives | selectattr('type', 'eq', 'custom') | map(attribute='name') | list %}
+            {{ ['Select Active'] + custom }}
+
+      - service: persistent_notification.create
+        data:
+          title: "IPM Settings"
+          message: "Active constituent '{{ active_name }}' removed successfully."
+
+  #---------------------------------------------------------------------------
+  # Settings: Refresh Actives dropdown
+  #---------------------------------------------------------------------------
+  ipm_refresh_actives:
+    alias: "IPM: Refresh Actives"
+    mode: single
+    sequence:
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.ipm_products
+
+      - delay: "00:00:01"
+
+      # Update manage active dropdown with custom actives only
+      - service: input_select.set_options
+        target:
+          entity_id: input_select.ipm_manage_active
+        data:
+          options: >-
+            {% set all_actives = state_attr('sensor.ipm_products', 'all_actives_list') or [] %}
+            {% set custom = all_actives | selectattr('type', 'eq', 'custom') | map(attribute='name') | list %}
+            {{ ['Select Active'] + custom }}
+
+  #---------------------------------------------------------------------------
+  # Data Management: Export Backup
+  #---------------------------------------------------------------------------
+  ipm_export_backup:
+    alias: "IPM: Export Backup"
+    mode: single
+    sequence:
+      - service: shell_command.ipm_export
+
+      - delay: "00:00:01"
+
+      # Refresh sensor to update backup list
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.ipm_products
+
+      - delay: "00:00:01"
+
+      # Refresh import dropdown
+      - service: script.ipm_refresh_backups
+
+      - service: persistent_notification.create
+        data:
+          title: "IPM Backup"
+          message: >
+            Backup created successfully.
+            {% set last = state_attr('sensor.ipm_products', 'last_backup') %}
+            {% if last %}File: {{ last.filename }}{% endif %}
+
+  #---------------------------------------------------------------------------
+  # Data Management: Refresh Backups dropdown
+  #---------------------------------------------------------------------------
+  ipm_refresh_backups:
+    alias: "IPM: Refresh Backups"
+    mode: single
+    sequence:
+      - service: input_select.set_options
+        target:
+          entity_id: input_select.ipm_import_backup
+        data:
+          options: >-
+            {% set filenames = state_attr('sensor.ipm_products', 'backup_filenames') or [] %}
+            {{ ['Select Backup'] + filenames }}
+
+  #---------------------------------------------------------------------------
+  # Data Management: Import Backup
+  #---------------------------------------------------------------------------
+  ipm_import_selected_backup:
+    alias: "IPM: Import Selected Backup"
+    mode: single
+    sequence:
+      - variables:
+          backup_file: "{{ states('input_select.ipm_import_backup') }}"
+
+      # Validate selection
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ backup_file == 'Select Backup' or not backup_file }}"
+            sequence:
+              - service: persistent_notification.create
+                data:
+                  title: "IPM Import"
+                  message: "Please select a backup file to import."
+              - stop: "No backup selected"
+
+      # Import the backup
+      - service: shell_command.ipm_import_backup
+        data:
+          filename: "{{ backup_file }}"
+
+      - delay: "00:00:01"
+
+      # Refresh sensor
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.ipm_products
+
+      - delay: "00:00:01"
+
+      # Refresh all dropdowns
+      - service: script.ipm_refresh_locations
+      - service: script.ipm_refresh_actives
+      - service: script.ipm_refresh_backups
+
+      - service: persistent_notification.create
+        data:
+          title: "IPM Import"
+          message: "Backup '{{ backup_file }}' imported successfully. A pre-import backup was created automatically."
+
+      # Reset selection
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.ipm_import_backup
+        data:
+          option: "Select Backup"
+
+  #---------------------------------------------------------------------------
+  # Data Management: Reset System
+  #---------------------------------------------------------------------------
+  ipm_reset_system:
+    alias: "IPM: Reset System"
+    mode: single
+    sequence:
+      - variables:
+          confirmed: "{{ states('input_boolean.ipm_confirm_reset') }}"
+
+      # Validate confirmation
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ confirmed != 'on' }}"
+            sequence:
+              - service: persistent_notification.create
+                data:
+                  title: "IPM Reset"
+                  message: "You must check the confirmation box to reset all IPM data."
+              - stop: "Reset not confirmed"
+
+      # Reset the system
+      - service: shell_command.ipm_reset
+        data:
+          token: "CONFIRM_RESET"
+
+      - delay: "00:00:01"
+
+      # Turn off confirmation toggle
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.ipm_confirm_reset
+
+      # Refresh sensor
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.ipm_products
+
+      - delay: "00:00:01"
+
+      # Refresh all dropdowns
+      - service: script.ipm_refresh_locations
+      - service: script.ipm_refresh_actives
+      - service: script.ipm_refresh_backups
+
+      - service: persistent_notification.create
+        data:
+          title: "IPM Reset"
+          message: "All IPM data has been reset. A pre-reset backup was created automatically."

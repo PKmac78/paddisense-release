@@ -13,14 +13,47 @@ Output includes:
   - part_names: List of part names for dropdowns
   - recent_events: Last 20 service events
   - low_stock_count: Number of parts below min_stock
+  - initialized: System initialization status
+  - config_ok / database_ok: File status
 """
 
 import json
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-DATA_FILE = Path("/config/local_data/asm/data.json")
+DATA_DIR = Path("/config/local_data/asm")
+DATA_FILE = DATA_DIR / "data.json"
+CONFIG_FILE = DATA_DIR / "config.json"
+BACKUP_DIR = DATA_DIR / "backups"
+
+# Version file location (in module directory)
+VERSION_FILE = Path("/config/PaddiSense/asm/VERSION")
+
+
+def get_version() -> str:
+    """Read module version from VERSION file."""
+    try:
+        if VERSION_FILE.exists():
+            return VERSION_FILE.read_text(encoding="utf-8").strip()
+    except IOError:
+        pass
+    return "unknown"
+
+# Default categories
+DEFAULT_ASSET_CATEGORIES = ["Tractor", "Pump", "Harvester", "Vehicle"]
+DEFAULT_PART_CATEGORIES = ["Filter", "Belt", "Oil", "Grease", "Battery", "Tyre", "Hose"]
+DEFAULT_SERVICE_TYPES = [
+    "250 Hr Service",
+    "500 Hr Service",
+    "1000 Hr Service",
+    "Annual Service",
+    "Repair",
+    "Inspection",
+    "Other",
+]
+DEFAULT_PART_UNITS = ["ea", "L", "kg", "m"]
 
 
 def load_data() -> dict[str, Any]:
@@ -33,8 +66,34 @@ def load_data() -> dict[str, Any]:
         return {"assets": {}, "parts": {}, "service_events": [], "transactions": []}
 
 
+def load_config() -> dict[str, Any]:
+    """Load config from JSON file."""
+    if not CONFIG_FILE.exists():
+        return {
+            "asset_categories": DEFAULT_ASSET_CATEGORIES.copy(),
+            "part_categories": DEFAULT_PART_CATEGORIES.copy(),
+            "service_types": DEFAULT_SERVICE_TYPES.copy(),
+            "part_units": DEFAULT_PART_UNITS.copy(),
+        }
+    try:
+        return json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, IOError):
+        return {
+            "asset_categories": DEFAULT_ASSET_CATEGORIES.copy(),
+            "part_categories": DEFAULT_PART_CATEGORIES.copy(),
+            "service_types": DEFAULT_SERVICE_TYPES.copy(),
+            "part_units": DEFAULT_PART_UNITS.copy(),
+        }
+
+
 def main() -> int:
     data = load_data()
+    config = load_config()
+
+    # System status
+    initialized = CONFIG_FILE.exists() or DATA_FILE.exists()
+    config_ok = CONFIG_FILE.exists()
+    database_ok = DATA_FILE.exists()
 
     assets = data.get("assets", {})
     parts = data.get("parts", {})
@@ -78,23 +137,35 @@ def main() -> int:
         event_labels.append(label)
         event_id_to_label[e.get("id", "")] = label
 
-    # Build categories list
-    asset_categories = ["Tractor", "Pump", "Harvester", "Vehicle"]
-    part_categories = ["Filter", "Belt", "Oil", "Grease", "Battery", "Tyre", "Hose"]
-    service_types = [
-        "250 Hr Service",
-        "500 Hr Service",
-        "1000 Hr Service",
-        "Annual Service",
-        "Repair",
-        "Inspection",
-        "Other",
-    ]
+    # Build categories list (from config or defaults)
+    asset_categories = config.get("asset_categories", DEFAULT_ASSET_CATEGORIES)
+    part_categories = config.get("part_categories", DEFAULT_PART_CATEGORIES)
+    service_types = config.get("service_types", DEFAULT_SERVICE_TYPES)
+    part_units = config.get("part_units", DEFAULT_PART_UNITS)
+
+    # Count backups
+    backup_count = 0
+    if BACKUP_DIR.exists():
+        backup_count = len(list(BACKUP_DIR.glob("*.json")))
+
+    # Get version
+    version = get_version()
 
     output = {
+        # System status
+        "initialized": initialized,
+        "config_ok": config_ok,
+        "database_ok": database_ok,
+        "status": "ready" if initialized else "not_initialized",
+        "version": version,
+        # Counts
         "total_assets": len(assets),
         "total_parts": len(parts),
+        "total_services": len(service_events),
         "low_stock_count": low_stock_count,
+        "transaction_count": len(data.get("transactions", [])),
+        "backup_count": backup_count,
+        # Data
         "assets": assets,
         "parts": parts,
         "asset_names": asset_names,
@@ -104,9 +175,11 @@ def main() -> int:
         "recent_events": recent_events,
         "event_labels": event_labels,
         "event_id_to_label": event_id_to_label,
+        # Categories (from config)
         "asset_categories": asset_categories,
         "part_categories": part_categories,
         "service_types": service_types,
+        "part_units": part_units,
     }
 
     print(json.dumps(output, ensure_ascii=False))

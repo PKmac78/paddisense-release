@@ -27,9 +27,20 @@ command_line:
       scan_interval: 300
       value_template: '{{ value_json.total_parts | default(0) }}'
       json_attributes:
+        # System status
+        - initialized
+        - config_ok
+        - database_ok
+        - status
+        - version
+        # Counts
         - total_assets
         - total_parts
+        - total_services
         - low_stock_count
+        - transaction_count
+        - backup_count
+        # Data
         - assets
         - parts
         - asset_names
@@ -39,14 +50,37 @@ command_line:
         - recent_events
         - event_labels
         - event_id_to_label
+        # Categories
         - asset_categories
         - part_categories
         - service_types
+        - part_units
 
 #=============================================================================
 # SHELL COMMANDS - Python backend calls
 #=============================================================================
 shell_command:
+  # System management commands
+  asm_init: >-
+    python3 /config/PaddiSense/asm/python/asm_backend.py init
+
+  asm_status: >-
+    python3 /config/PaddiSense/asm/python/asm_backend.py status
+
+  asm_export: >-
+    python3 /config/PaddiSense/asm/python/asm_backend.py export
+
+  asm_import_backup: >-
+    python3 /config/PaddiSense/asm/python/asm_backend.py import_backup
+    --filename "{{ filename }}"
+
+  asm_reset: >-
+    python3 /config/PaddiSense/asm/python/asm_backend.py reset
+    --token "{{ token }}"
+
+  asm_backup_list: >-
+    python3 /config/PaddiSense/asm/python/asm_backend.py backup_list
+
   # Asset commands
   asm_add_asset: >-
     python3 /config/PaddiSense/asm/python/asm_backend.py add_asset
@@ -2859,3 +2893,46 @@ script:
         data:
           title: "ASM Delete Service"
           message: "Service event deleted."
+
+  #---------------------------------------------------------------------------
+  # System Management Scripts (Settings page)
+  #---------------------------------------------------------------------------
+  asm_init_system:
+    alias: "ASM: Initialize System"
+    mode: single
+    sequence:
+      - service: shell_command.asm_init
+      - delay: "00:00:01"
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.asm_data
+      - service: persistent_notification.create
+        data:
+          title: "ASM Initialize"
+          message: "System initialized successfully."
+
+  asm_export_data:
+    alias: "ASM: Export Data"
+    mode: single
+    sequence:
+      - service: shell_command.asm_export
+      - delay: "00:00:01"
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.asm_data
+      - service: persistent_notification.create
+        data:
+          title: "ASM Export"
+          message: "Data exported to backup file."
+
+  asm_refresh_data:
+    alias: "ASM: Refresh Data"
+    mode: single
+    sequence:
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.asm_data
+      - service: persistent_notification.create
+        data:
+          title: "ASM Refresh"
+          message: "Data refreshed."

@@ -7,15 +7,22 @@ This script handles all write operations for the asset service system:
   - add_asset / edit_asset / delete_asset: Asset management
   - add_part / edit_part / delete_part: Part management
   - adjust_stock: Manual stock adjustments
-  - record_service: Record service events (auto-deducts parts)
+  - record_service / delete_service: Record/delete service events
+  - init / status: System initialization and status
+  - export / import_backup / reset / backup_list: Data management
 
 Data is stored in: /config/local_data/asm/data.json
-This file is NOT tracked in git - each farm maintains their own data.
+Config is stored in: /config/local_data/asm/config.json
+Backups are stored in: /config/local_data/asm/backups/
 
 Usage:
+  python3 asm_backend.py init
+  python3 asm_backend.py status
   python3 asm_backend.py add_asset --name "Tractor 1" --category "Tractor" --attributes '{"tyre_size": "18.4-38"}'
   python3 asm_backend.py add_part --name "Oil Filter" --category "Filter" --stock 5 --assets '["TRACTOR_1"]'
   python3 asm_backend.py record_service --asset "TRACTOR_1" --type "250 Hr Service" --parts '[{"part_id": "OIL_FILTER", "quantity": 1}]'
+  python3 asm_backend.py export
+  python3 asm_backend.py import_backup --filename "backup_2026-01-17_120000.json"
 """
 
 import argparse
@@ -26,13 +33,16 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-# Data file location (outside of git-tracked folders)
-DATA_FILE = Path("/config/local_data/asm/data.json")
+# File locations (outside of git-tracked folders)
+DATA_DIR = Path("/config/local_data/asm")
+DATA_FILE = DATA_DIR / "data.json"
+CONFIG_FILE = DATA_DIR / "config.json"
+BACKUP_DIR = DATA_DIR / "backups"
 
-# Valid categories
-ASSET_CATEGORIES = ["Tractor", "Pump", "Harvester", "Vehicle"]
-PART_CATEGORIES = ["Filter", "Belt", "Oil", "Grease", "Battery", "Tyre", "Hose"]
-SERVICE_TYPES = [
+# Default categories
+DEFAULT_ASSET_CATEGORIES = ["Tractor", "Pump", "Harvester", "Vehicle"]
+DEFAULT_PART_CATEGORIES = ["Filter", "Belt", "Oil", "Grease", "Battery", "Tyre", "Hose"]
+DEFAULT_SERVICE_TYPES = [
     "250 Hr Service",
     "500 Hr Service",
     "1000 Hr Service",
@@ -41,7 +51,13 @@ SERVICE_TYPES = [
     "Inspection",
     "Other",
 ]
-PART_UNITS = ["ea", "L", "kg", "m"]
+DEFAULT_PART_UNITS = ["ea", "L", "kg", "m"]
+
+# Valid categories (will be loaded from config if available)
+ASSET_CATEGORIES = DEFAULT_ASSET_CATEGORIES.copy()
+PART_CATEGORIES = DEFAULT_PART_CATEGORIES.copy()
+SERVICE_TYPES = DEFAULT_SERVICE_TYPES.copy()
+PART_UNITS = DEFAULT_PART_UNITS.copy()
 
 
 def generate_id(name: str) -> str:
@@ -66,6 +82,37 @@ def save_data(data: dict[str, Any]) -> None:
     DATA_FILE.parent.mkdir(parents=True, exist_ok=True)
     DATA_FILE.write_text(
         json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+
+
+def load_config() -> dict[str, Any]:
+    """Load config from JSON file, or return default structure."""
+    if not CONFIG_FILE.exists():
+        return {
+            "asset_categories": DEFAULT_ASSET_CATEGORIES.copy(),
+            "part_categories": DEFAULT_PART_CATEGORIES.copy(),
+            "service_types": DEFAULT_SERVICE_TYPES.copy(),
+            "part_units": DEFAULT_PART_UNITS.copy(),
+            "created": datetime.now().isoformat(timespec="seconds"),
+        }
+    try:
+        return json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, IOError):
+        return {
+            "asset_categories": DEFAULT_ASSET_CATEGORIES.copy(),
+            "part_categories": DEFAULT_PART_CATEGORIES.copy(),
+            "service_types": DEFAULT_SERVICE_TYPES.copy(),
+            "part_units": DEFAULT_PART_UNITS.copy(),
+            "created": datetime.now().isoformat(timespec="seconds"),
+        }
+
+
+def save_config(config: dict[str, Any]) -> None:
+    """Save config to JSON file."""
+    config["modified"] = datetime.now().isoformat(timespec="seconds")
+    CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    CONFIG_FILE.write_text(
+        json.dumps(config, indent=2, ensure_ascii=False), encoding="utf-8"
     )
 
 
@@ -477,6 +524,322 @@ def cmd_record_service(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_delete_service(args: argparse.Namespace) -> int:
+    """Delete a service event."""
+    data = load_data()
+    service_events = data.get("service_events", [])
+
+    event_id = args.id.strip()
+    if not event_id:
+        print("ERROR: Event ID is required", file=sys.stderr)
+        return 1
+
+    # Find the event
+    found_idx = None
+    event_info = ""
+    for idx, event in enumerate(service_events):
+        if event.get("id") == event_id:
+            found_idx = idx
+            event_info = f"{event.get('service_type', 'Service')} on {event.get('asset_name', event.get('asset_id', 'Unknown'))}"
+            break
+
+    if found_idx is None:
+        print(f"ERROR: Service event '{event_id}' not found", file=sys.stderr)
+        return 1
+
+    # Remove the event
+    del service_events[found_idx]
+
+    log_transaction(data, "delete_service", "service", event_id, event_info)
+    save_data(data)
+
+    print("OK:deleted")
+    return 0
+
+
+# =============================================================================
+# SYSTEM MANAGEMENT COMMANDS
+# =============================================================================
+
+
+def cmd_status(args: argparse.Namespace) -> int:
+    """Get system status (for Settings page)."""
+    status = {
+        "initialized": False,
+        "config_ok": False,
+        "database_ok": False,
+        "asset_count": 0,
+        "part_count": 0,
+        "service_count": 0,
+        "transaction_count": 0,
+        "low_stock_count": 0,
+        "status": "not_initialized",
+    }
+
+    # Check config
+    if CONFIG_FILE.exists():
+        try:
+            config = load_config()
+            status["config_ok"] = True
+            status["asset_categories"] = config.get("asset_categories", DEFAULT_ASSET_CATEGORIES)
+            status["part_categories"] = config.get("part_categories", DEFAULT_PART_CATEGORIES)
+            status["service_types"] = config.get("service_types", DEFAULT_SERVICE_TYPES)
+        except Exception:
+            status["status"] = "error"
+            status["error"] = "Config file corrupted"
+            print(json.dumps(status))
+            return 0
+
+    # Check database
+    if DATA_FILE.exists():
+        try:
+            data = load_data()
+            assets = data.get("assets", {})
+            parts = data.get("parts", {})
+            events = data.get("service_events", [])
+
+            status["database_ok"] = True
+            status["asset_count"] = len(assets)
+            status["part_count"] = len(parts)
+            status["service_count"] = len(events)
+            status["transaction_count"] = len(data.get("transactions", []))
+
+            # Count low stock parts
+            low_stock = 0
+            for part in parts.values():
+                stock = float(part.get("stock", 0))
+                min_stock = float(part.get("min_stock", 0))
+                if min_stock > 0 and stock < min_stock:
+                    low_stock += 1
+            status["low_stock_count"] = low_stock
+
+            status["initialized"] = True
+            status["status"] = "ready"
+        except Exception as e:
+            status["status"] = "error"
+            status["error"] = f"Database file corrupted: {e}"
+    elif CONFIG_FILE.exists():
+        # Config exists but no database - still considered initialized
+        status["initialized"] = True
+        status["status"] = "ready"
+
+    print(json.dumps(status))
+    return 0
+
+
+def cmd_init(args: argparse.Namespace) -> int:
+    """Initialize the ASM system - create config and database files."""
+    created = []
+
+    # Create directory
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Create config if missing
+    if not CONFIG_FILE.exists():
+        config = {
+            "asset_categories": DEFAULT_ASSET_CATEGORIES.copy(),
+            "part_categories": DEFAULT_PART_CATEGORIES.copy(),
+            "service_types": DEFAULT_SERVICE_TYPES.copy(),
+            "part_units": DEFAULT_PART_UNITS.copy(),
+            "created": datetime.now().isoformat(timespec="seconds"),
+        }
+        save_config(config)
+        created.append("config")
+
+    # Create empty database if missing
+    if not DATA_FILE.exists():
+        data = {"assets": {}, "parts": {}, "service_events": [], "transactions": []}
+        save_data(data)
+        created.append("database")
+
+    if created:
+        print(f"OK:created:{','.join(created)}")
+    else:
+        print("OK:already_initialized")
+    return 0
+
+
+def cmd_export(args: argparse.Namespace) -> int:
+    """Export data and config to a timestamped backup file."""
+    # Create backup directory if needed
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Generate timestamp for filename
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    backup_file = BACKUP_DIR / f"asm_backup_{timestamp}.json"
+
+    # Load current data
+    data = load_data()
+    config = load_config()
+
+    # Create backup structure
+    backup_data = {
+        "version": "1.0",
+        "created": datetime.now().isoformat(timespec="seconds"),
+        "type": "asm_backup",
+        "data": data,
+        "config": config,
+    }
+
+    # Write backup file
+    backup_file.write_text(
+        json.dumps(backup_data, indent=2, ensure_ascii=False),
+        encoding="utf-8"
+    )
+
+    print(f"OK:{backup_file.name}")
+    return 0
+
+
+def cmd_import(args: argparse.Namespace) -> int:
+    """Import data and config from a backup file."""
+    filename = args.filename.strip()
+    if not filename:
+        print("ERROR: Filename cannot be empty", file=sys.stderr)
+        return 1
+
+    # Construct full path
+    backup_file = BACKUP_DIR / filename
+    if not backup_file.exists():
+        print(f"ERROR: Backup file '{filename}' not found", file=sys.stderr)
+        return 1
+
+    # Load and validate backup
+    try:
+        backup_data = json.loads(backup_file.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        print(f"ERROR: Invalid JSON in backup file: {e}", file=sys.stderr)
+        return 1
+
+    # Validate backup structure
+    if backup_data.get("type") != "asm_backup":
+        print("ERROR: File is not a valid ASM backup", file=sys.stderr)
+        return 1
+
+    data = backup_data.get("data")
+    config = backup_data.get("config")
+
+    if not isinstance(data, dict):
+        print("ERROR: Backup contains invalid data", file=sys.stderr)
+        return 1
+
+    # Create a backup of current data before importing
+    current_data = load_data()
+    current_config = load_config()
+
+    pre_import_backup = {
+        "version": "1.0",
+        "created": datetime.now().isoformat(timespec="seconds"),
+        "type": "asm_backup",
+        "note": "Pre-import automatic backup",
+        "data": current_data,
+        "config": current_config,
+    }
+
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    pre_import_file = BACKUP_DIR / f"pre_import_{datetime.now().strftime('%Y-%m-%d_%H%M%S')}.json"
+    pre_import_file.write_text(
+        json.dumps(pre_import_backup, indent=2, ensure_ascii=False),
+        encoding="utf-8"
+    )
+
+    # Import the data
+    save_data(data)
+    if config and isinstance(config, dict):
+        save_config(config)
+
+    asset_count = len(data.get("assets", {}))
+    part_count = len(data.get("parts", {}))
+    print(f"OK:imported:{asset_count}:{part_count}:{pre_import_file.name}")
+    return 0
+
+
+def cmd_reset(args: argparse.Namespace) -> int:
+    """Reset all ASM data (requires confirmation token)."""
+    token = args.token.strip() if args.token else ""
+
+    # Token must be "CONFIRM_RESET" to proceed
+    if token != "CONFIRM_RESET":
+        print("ERROR: Invalid confirmation token. Use --token CONFIRM_RESET", file=sys.stderr)
+        return 1
+
+    # Create backup before reset
+    current_data = load_data()
+    current_config = load_config()
+
+    if current_data.get("assets") or current_data.get("parts") or current_data.get("service_events"):
+        pre_reset_backup = {
+            "version": "1.0",
+            "created": datetime.now().isoformat(timespec="seconds"),
+            "type": "asm_backup",
+            "note": "Pre-reset automatic backup",
+            "data": current_data,
+            "config": current_config,
+        }
+
+        BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+        pre_reset_file = BACKUP_DIR / f"pre_reset_{datetime.now().strftime('%Y-%m-%d_%H%M%S')}.json"
+        pre_reset_file.write_text(
+            json.dumps(pre_reset_backup, indent=2, ensure_ascii=False),
+            encoding="utf-8"
+        )
+
+    # Reset to empty state
+    empty_data = {"assets": {}, "parts": {}, "service_events": [], "transactions": []}
+    save_data(empty_data)
+
+    # Reset config to defaults
+    reset_config = {
+        "asset_categories": DEFAULT_ASSET_CATEGORIES.copy(),
+        "part_categories": DEFAULT_PART_CATEGORIES.copy(),
+        "service_types": DEFAULT_SERVICE_TYPES.copy(),
+        "part_units": DEFAULT_PART_UNITS.copy(),
+        "created": datetime.now().isoformat(timespec="seconds"),
+    }
+    save_config(reset_config)
+
+    print("OK:reset")
+    return 0
+
+
+def cmd_backup_list(args: argparse.Namespace) -> int:
+    """List available backup files with metadata."""
+    backups = []
+
+    if BACKUP_DIR.exists():
+        for backup_file in sorted(BACKUP_DIR.glob("*.json"), reverse=True):
+            try:
+                backup_data = json.loads(backup_file.read_text(encoding="utf-8"))
+                asset_count = len(backup_data.get("data", {}).get("assets", {}))
+                part_count = len(backup_data.get("data", {}).get("parts", {}))
+                backups.append({
+                    "filename": backup_file.name,
+                    "created": backup_data.get("created", ""),
+                    "note": backup_data.get("note", ""),
+                    "asset_count": asset_count,
+                    "part_count": part_count,
+                    "size_kb": round(backup_file.stat().st_size / 1024, 1),
+                })
+            except (json.JSONDecodeError, IOError):
+                # Include file even if we can't read it
+                backups.append({
+                    "filename": backup_file.name,
+                    "created": "",
+                    "note": "Unable to read",
+                    "asset_count": 0,
+                    "part_count": 0,
+                    "size_kb": round(backup_file.stat().st_size / 1024, 1),
+                })
+
+    result = {
+        "total": len(backups),
+        "backups": backups,
+    }
+
+    print(json.dumps(result))
+    return 0
+
+
 # =============================================================================
 # ARGUMENT PARSER
 # =============================================================================
@@ -554,6 +917,38 @@ def build_parser() -> argparse.ArgumentParser:
     rec_svc.add_argument("--notes", default="", help="Service notes")
     rec_svc.add_argument("--hours", default="", help="Engine hours at service")
     rec_svc.set_defaults(func=cmd_record_service)
+
+    # delete_service
+    del_svc = subparsers.add_parser("delete_service", help="Delete a service event")
+    del_svc.add_argument("--id", required=True, help="Service event ID")
+    del_svc.set_defaults(func=cmd_delete_service)
+
+    # ----- System Management Commands -----
+    # status command
+    status_p = subparsers.add_parser("status", help="Get system status")
+    status_p.set_defaults(func=cmd_status)
+
+    # init command
+    init_p = subparsers.add_parser("init", help="Initialize ASM system")
+    init_p.set_defaults(func=cmd_init)
+
+    # export command
+    export_p = subparsers.add_parser("export", help="Export data to backup file")
+    export_p.set_defaults(func=cmd_export)
+
+    # import command
+    import_p = subparsers.add_parser("import_backup", help="Import data from backup file")
+    import_p.add_argument("--filename", required=True, help="Backup filename to import")
+    import_p.set_defaults(func=cmd_import)
+
+    # reset command
+    reset_p = subparsers.add_parser("reset", help="Reset all data (requires confirmation)")
+    reset_p.add_argument("--token", required=True, help="Confirmation token (CONFIRM_RESET)")
+    reset_p.set_defaults(func=cmd_reset)
+
+    # backup_list command
+    backup_list_p = subparsers.add_parser("backup_list", help="List available backups")
+    backup_list_p.set_defaults(func=cmd_backup_list)
 
     return parser
 

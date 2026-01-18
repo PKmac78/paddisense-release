@@ -1,0 +1,547 @@
+##############################################################################
+# PWM Dashboard - Precision Water Management
+# PaddiSense Farm Management System
+# Version: 1.0.0
+#
+# Views:
+#   1. Overview - All paddocks with status cards
+#   2. Paddock - Bay details for selected paddock
+#   3. Settings - System status, add paddock, configuration
+##############################################################################
+
+title: PWM - Water Management
+
+button_card_templates:
+  #---------------------------------------------------------------------------
+  # Section title bar (dark blue)
+  #---------------------------------------------------------------------------
+  pwm_title:
+    color_type: label-card
+    color: rgb(21, 101, 192)
+    show_icon: false
+    show_state: false
+    styles:
+      card:
+        - height: 50px
+        - border-radius: 12px
+        - padding: 8px
+      name:
+        - font-size: 18px
+        - font-weight: 700
+        - text-align: center
+        - color: white
+
+  #---------------------------------------------------------------------------
+  # Info display block (blue-grey)
+  #---------------------------------------------------------------------------
+  pwm_info_block:
+    color_type: label-card
+    color: rgb(55, 71, 79)
+    show_icon: false
+    show_state: true
+    tap_action:
+      action: none
+    styles:
+      card:
+        - height: 80px
+        - border-radius: 12px
+        - padding: 10px
+      state:
+        - font-size: 28px
+        - font-weight: 800
+        - text-align: center
+        - color: white
+      name:
+        - font-size: 14px
+        - font-weight: 600
+        - text-align: center
+        - color: white
+
+  #---------------------------------------------------------------------------
+  # Primary action button (blue)
+  #---------------------------------------------------------------------------
+  pwm_action:
+    show_icon: true
+    show_name: true
+    show_state: false
+    styles:
+      card:
+        - height: 70px
+        - border-radius: 12px
+        - background: "#1565c0"
+      name:
+        - font-size: 16px
+        - font-weight: 700
+        - color: white
+      icon:
+        - color: white
+        - width: 28px
+
+  #---------------------------------------------------------------------------
+  # Secondary button (grey)
+  #---------------------------------------------------------------------------
+  pwm_secondary:
+    show_icon: true
+    show_name: true
+    show_state: false
+    styles:
+      card:
+        - height: 70px
+        - border-radius: 12px
+        - background: "#555555"
+      name:
+        - font-size: 14px
+        - font-weight: 600
+        - color: white
+      icon:
+        - color: white
+        - width: 24px
+
+  #---------------------------------------------------------------------------
+  # Stat chip
+  #---------------------------------------------------------------------------
+  pwm_stat_chip:
+    color_type: label-card
+    show_icon: true
+    show_name: true
+    show_state: true
+    tap_action:
+      action: none
+    styles:
+      card:
+        - height: 60px
+        - border-radius: 10px
+        - padding: 8px
+      grid:
+        - grid-template-areas: '"i s" "i n"'
+        - grid-template-columns: 40px 1fr
+        - grid-template-rows: 1fr 1fr
+      icon:
+        - width: 30px
+        - color: white
+      state:
+        - font-size: 20px
+        - font-weight: 700
+        - justify-self: start
+        - color: white
+      name:
+        - font-size: 12px
+        - justify-self: start
+        - color: rgba(255,255,255,0.8)
+
+  #---------------------------------------------------------------------------
+  # Paddock card
+  #---------------------------------------------------------------------------
+  pwm_paddock_card:
+    show_icon: true
+    show_name: true
+    show_state: true
+    icon: mdi:waves
+    tap_action:
+      action: navigate
+      navigation_path: /pwm/paddock
+    styles:
+      card:
+        - height: 100px
+        - border-radius: 12px
+        - padding: 12px
+      grid:
+        - grid-template-areas: '"i n" "i s"'
+        - grid-template-columns: 50px 1fr
+        - grid-template-rows: 1fr 1fr
+      icon:
+        - width: 40px
+      name:
+        - font-size: 18px
+        - font-weight: 700
+        - justify-self: start
+      state:
+        - font-size: 14px
+        - justify-self: start
+        - color: rgba(255,255,255,0.8)
+
+views:
+  #############################################################################
+  # VIEW 1: OVERVIEW
+  #############################################################################
+  - title: Overview
+    path: overview
+    icon: mdi:view-dashboard
+    type: custom:masonry-layout
+    cards:
+      # Title
+      - type: custom:button-card
+        template: pwm_title
+        name: "Paddock Overview"
+
+      # Stats row
+      - type: horizontal-stack
+        cards:
+          - type: custom:button-card
+            template: pwm_stat_chip
+            name: "Paddocks"
+            icon: mdi:view-grid
+            color: rgb(46, 125, 50)
+            entity: sensor.pwm_data
+            state_display: |
+              [[[
+                return states['sensor.pwm_data'].attributes.enabled_paddock_count || 0;
+              ]]]
+
+          - type: custom:button-card
+            template: pwm_stat_chip
+            name: "Bays"
+            icon: mdi:format-list-numbered
+            color: rgb(21, 101, 192)
+            entity: sensor.pwm_data
+            state_display: |
+              [[[
+                return states['sensor.pwm_data'].attributes.total_bays || 0;
+              ]]]
+
+          - type: custom:button-card
+            template: pwm_stat_chip
+            name: "Devices"
+            icon: mdi:access-point
+            color: rgb(156, 39, 176)
+            entity: sensor.pwm_data
+            state_display: |
+              [[[
+                return states['sensor.pwm_data'].attributes.device_count || 0;
+              ]]]
+
+      # Paddock selector
+      - type: entities
+        entities:
+          - entity: input_select.pwm_selected_paddock
+            name: "Select Paddock"
+
+      # Paddock cards (auto-entities to show all paddocks)
+      - type: custom:auto-entities
+        filter:
+          template: |
+            {% set summary = state_attr('sensor.pwm_data', 'paddock_summary') or [] %}
+            {% for p in summary %}
+            {{ {
+              'type': 'custom:button-card',
+              'template': 'pwm_paddock_card',
+              'name': p.name,
+              'state_display': (p.bay_count | string) ~ ' bays | ' ~ ('Enabled' if p.enabled else 'Disabled'),
+              'color': 'rgb(46, 125, 50)' if p.enabled else 'rgb(117, 117, 117)',
+              'tap_action': {
+                'action': 'call-service',
+                'service': 'input_select.select_option',
+                'service_data': {
+                  'entity_id': 'input_select.pwm_selected_paddock',
+                  'option': p.name
+                }
+              }
+            } | tojson }},
+            {% endfor %}
+        sort:
+          method: none
+        card:
+          type: grid
+          columns: 2
+
+  #############################################################################
+  # VIEW 2: PADDOCK DETAIL
+  #############################################################################
+  - title: Paddock
+    path: paddock
+    icon: mdi:waves
+    type: custom:masonry-layout
+    cards:
+      # Title - selected paddock name
+      - type: custom:button-card
+        template: pwm_title
+        entity: sensor.pwm_selected_paddock_details
+        name: |
+          [[[
+            let selected = states['input_select.pwm_selected_paddock'].state;
+            return selected == 'Select Paddock' ? 'Select a Paddock' : selected;
+          ]]]
+
+      # Paddock info
+      - type: conditional
+        conditions:
+          - condition: state
+            entity: input_select.pwm_selected_paddock
+            state_not: "Select Paddock"
+        card:
+          type: horizontal-stack
+          cards:
+            - type: custom:button-card
+              template: pwm_info_block
+              name: "Bays"
+              entity: sensor.pwm_selected_paddock_details
+              state_display: |
+                [[[
+                  return entity.attributes.bay_count || 0;
+                ]]]
+
+            - type: custom:button-card
+              template: pwm_info_block
+              name: "Status"
+              entity: sensor.pwm_selected_paddock_details
+              state_display: |
+                [[[
+                  return entity.attributes.enabled == 'True' ? 'Enabled' : 'Disabled';
+                ]]]
+              color: |
+                [[[
+                  return entity.attributes.enabled == 'True' ? 'rgb(46, 125, 50)' : 'rgb(117, 117, 117)';
+                ]]]
+
+            - type: custom:button-card
+              template: pwm_info_block
+              name: "Mode"
+              entity: sensor.pwm_selected_paddock_details
+              state_display: |
+                [[[
+                  return entity.attributes.individual_mode == 'True' ? 'Individual' : 'Paddock';
+                ]]]
+
+      # Enable/Disable buttons
+      - type: conditional
+        conditions:
+          - condition: state
+            entity: input_select.pwm_selected_paddock
+            state_not: "Select Paddock"
+        card:
+          type: horizontal-stack
+          cards:
+            - type: custom:button-card
+              template: pwm_action
+              name: "Enable"
+              icon: mdi:play-circle
+              tap_action:
+                action: call-service
+                service: script.pwm_enable_paddock
+                service_data:
+                  paddock_id: |
+                    [[[
+                      return states['sensor.pwm_selected_paddock_details'].attributes.paddock_id;
+                    ]]]
+
+            - type: custom:button-card
+              template: pwm_secondary
+              name: "Disable"
+              icon: mdi:pause-circle
+              tap_action:
+                action: call-service
+                service: script.pwm_disable_paddock
+                service_data:
+                  paddock_id: |
+                    [[[
+                      return states['sensor.pwm_selected_paddock_details'].attributes.paddock_id;
+                    ]]]
+
+      # Bay list for selected paddock
+      - type: conditional
+        conditions:
+          - condition: state
+            entity: input_select.pwm_selected_paddock
+            state_not: "Select Paddock"
+        card:
+          type: custom:auto-entities
+          filter:
+            template: |
+              {% set selected = states('input_select.pwm_selected_paddock') %}
+              {% set bays = state_attr('sensor.pwm_data', 'bay_summary') or [] %}
+              {% for b in bays if b.paddock_name == selected %}
+              {{ {
+                'type': 'custom:button-card',
+                'name': b.name,
+                'icon': 'mdi:water' if b.has_device else 'mdi:water-off',
+                'state_display': b.level_sensor or 'No device',
+                'color': 'rgb(21, 101, 192)' if b.has_device else 'rgb(158, 158, 158)',
+                'show_icon': true,
+                'show_name': true,
+                'show_state': true,
+                'styles': {
+                  'card': [{'height': '70px'}, {'border-radius': '10px'}],
+                  'name': [{'font-size': '16px'}, {'font-weight': '700'}],
+                  'state': [{'font-size': '12px'}, {'color': 'rgba(255,255,255,0.7)'}],
+                  'icon': [{'width': '30px'}]
+                }
+              } | tojson }},
+              {% endfor %}
+          sort:
+            method: none
+          card:
+            type: grid
+            columns: 3
+
+  #############################################################################
+  # VIEW 3: SETTINGS
+  #############################################################################
+  - title: Settings
+    path: settings
+    icon: mdi:cog
+    type: custom:masonry-layout
+    cards:
+      # Title
+      - type: custom:button-card
+        template: pwm_title
+        name: "PWM Settings"
+
+      # System status
+      - type: entities
+        title: "System Status"
+        entities:
+          - entity: sensor.pwm_data
+            name: "Status"
+            icon: mdi:check-circle
+
+          - type: attribute
+            entity: sensor.pwm_data
+            attribute: version
+            name: "Version"
+            icon: mdi:tag
+
+          - type: attribute
+            entity: sensor.pwm_data
+            attribute: total_paddocks
+            name: "Total Paddocks"
+            icon: mdi:view-grid
+
+          - type: attribute
+            entity: sensor.pwm_data
+            attribute: total_bays
+            name: "Total Bays"
+            icon: mdi:format-list-numbered
+
+          - type: attribute
+            entity: sensor.pwm_data
+            attribute: device_count
+            name: "Devices in Use"
+            icon: mdi:access-point
+
+          - type: attribute
+            entity: sensor.pwm_data
+            attribute: backup_count
+            name: "Backups"
+            icon: mdi:backup-restore
+
+      # System actions
+      - type: horizontal-stack
+        cards:
+          - type: custom:button-card
+            template: pwm_action
+            name: "Refresh"
+            icon: mdi:refresh
+            tap_action:
+              action: call-service
+              service: script.pwm_refresh_data
+
+          - type: custom:button-card
+            template: pwm_secondary
+            name: "Export"
+            icon: mdi:download
+            tap_action:
+              action: call-service
+              service: script.pwm_export_data
+
+          - type: custom:button-card
+            template: pwm_secondary
+            name: "Initialize"
+            icon: mdi:database-plus
+            tap_action:
+              action: call-service
+              service: script.pwm_init_system
+
+      # Add paddock form
+      - type: custom:button-card
+        template: pwm_title
+        name: "Add Paddock"
+        color: rgb(46, 125, 50)
+
+      - type: entities
+        entities:
+          - entity: input_text.pwm_new_paddock_name
+            name: "Paddock Name"
+
+          - entity: input_number.pwm_new_paddock_bay_count
+            name: "Number of Bays"
+
+          - entity: input_boolean.pwm_new_paddock_individual
+            name: "Individual Bay Mode"
+
+      - type: custom:button-card
+        template: pwm_action
+        name: "Add Paddock"
+        icon: mdi:plus-circle
+        color: rgb(46, 125, 50)
+        tap_action:
+          action: call-service
+          service: script.pwm_add_paddock
+          service_data:
+            name: |
+              [[[
+                return states['input_text.pwm_new_paddock_name'].state;
+              ]]]
+            bay_count: |
+              [[[
+                return states['input_number.pwm_new_paddock_bay_count'].state;
+              ]]]
+            individual: |
+              [[[
+                return states['input_boolean.pwm_new_paddock_individual'].state == 'on';
+              ]]]
+
+      # Paddock list for management
+      - type: custom:button-card
+        template: pwm_title
+        name: "Manage Paddocks"
+
+      - type: custom:auto-entities
+        filter:
+          template: |
+            {% set summary = state_attr('sensor.pwm_data', 'paddock_summary') or [] %}
+            {% for p in summary %}
+            {{ {
+              'type': 'custom:button-card',
+              'name': p.name,
+              'icon': 'mdi:waves',
+              'state_display': (p.bay_count | string) ~ ' bays',
+              'show_icon': true,
+              'show_name': true,
+              'show_state': true,
+              'color': 'rgb(46, 125, 50)' if p.enabled else 'rgb(117, 117, 117)',
+              'styles': {
+                'card': [{'height': '60px'}, {'border-radius': '8px'}],
+                'name': [{'font-size': '14px'}, {'font-weight': '600'}],
+                'state': [{'font-size': '11px'}]
+              },
+              'hold_action': {
+                'action': 'call-service',
+                'service': 'script.pwm_delete_paddock',
+                'service_data': {'paddock_id': p.id},
+                'confirmation': {'text': 'Delete paddock ' ~ p.name ~ '?'}
+              }
+            } | tojson }},
+            {% endfor %}
+        sort:
+          method: none
+        card:
+          type: grid
+          columns: 2
+
+      # Device list
+      - type: custom:button-card
+        template: pwm_title
+        name: "Devices in Use"
+
+      - type: markdown
+        content: |
+          {% set devices = state_attr('sensor.pwm_data', 'device_list') or [] %}
+          {% if devices %}
+          | Device |
+          |--------|
+          {% for d in devices %}
+          | `{{ d }}` |
+          {% endfor %}
+          {% else %}
+          No devices configured
+          {% endif %}

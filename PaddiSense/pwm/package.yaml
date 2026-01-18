@@ -1,0 +1,557 @@
+# =============================================================================
+# PWM - Precision Water Management Package
+# PaddiSense Farm Management System
+# Version: 1.0.0
+# =============================================================================
+#
+# This package provides automated irrigation control for rice paddocks.
+# It reads configuration from local_data/pwm/config.json and farm definitions
+# from server.yaml.
+#
+# Key components:
+#   - sensor.pwm_data: Main data sensor (JSON output from pwm_sensor.py)
+#   - Template sensors: Extract paddock/bay data for UI
+#   - Shell commands: Backend operations (add/edit paddocks, assign devices)
+#   - Scripts: UI actions (refresh, init, export)
+#
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# COMMAND LINE SENSOR - Main data source
+# -----------------------------------------------------------------------------
+command_line:
+  - sensor:
+      name: PWM Data
+      unique_id: pwm_data
+      command: "python3 /config/PaddiSense/pwm/python/pwm_sensor.py"
+      scan_interval: 30
+      command_timeout: 15
+      value_template: "{{ value_json.status }}"
+      json_attributes:
+        - initialized
+        - config_ok
+        - pwm_enabled
+        - version
+        - total_paddocks
+        - total_bays
+        - total_farms
+        - enabled_paddock_count
+        - device_count
+        - backup_count
+        - paddocks
+        - bays
+        - farms
+        - paddock_summary
+        - bay_summary
+        - paddock_names
+        - enabled_paddock_ids
+        - farm_names
+        - device_list
+
+# -----------------------------------------------------------------------------
+# SHELL COMMANDS - Backend operations
+# -----------------------------------------------------------------------------
+shell_command:
+  # System commands
+  pwm_init: "python3 /config/PaddiSense/pwm/python/pwm_backend.py init"
+  pwm_status: "python3 /config/PaddiSense/pwm/python/pwm_backend.py status"
+  pwm_export: "python3 /config/PaddiSense/pwm/python/pwm_backend.py export"
+  pwm_backup_list: "python3 /config/PaddiSense/pwm/python/pwm_backend.py backup_list"
+
+  # Paddock commands
+  pwm_add_paddock: >-
+    python3 /config/PaddiSense/pwm/python/pwm_backend.py add_paddock
+    --farm "{{ farm }}"
+    --name "{{ name }}"
+    --bay_prefix "{{ bay_prefix | default('B-') }}"
+    --bay_count {{ bay_count }}
+    {{ '--individual' if individual else '' }}
+
+  pwm_edit_paddock: >-
+    python3 /config/PaddiSense/pwm/python/pwm_backend.py edit_paddock
+    --id "{{ paddock_id }}"
+    {{ '--name "' ~ name ~ '"' if name else '' }}
+    {{ '--farm "' ~ farm ~ '"' if farm else '' }}
+    {{ '--individual ' ~ individual if individual is defined else '' }}
+
+  pwm_delete_paddock: >-
+    python3 /config/PaddiSense/pwm/python/pwm_backend.py delete_paddock
+    --id "{{ paddock_id }}"
+
+  pwm_enable_paddock: >-
+    python3 /config/PaddiSense/pwm/python/pwm_backend.py enable_paddock
+    --id "{{ paddock_id }}"
+
+  pwm_disable_paddock: >-
+    python3 /config/PaddiSense/pwm/python/pwm_backend.py disable_paddock
+    --id "{{ paddock_id }}"
+
+  # Bay commands
+  pwm_edit_bay: >-
+    python3 /config/PaddiSense/pwm/python/pwm_backend.py edit_bay
+    --id "{{ bay_id }}"
+    {{ '--level_sensor "' ~ level_sensor ~ '"' if level_sensor else '' }}
+    {{ '--water_level_min ' ~ water_level_min if water_level_min is defined else '' }}
+    {{ '--water_level_max ' ~ water_level_max if water_level_max is defined else '' }}
+    {{ '--water_level_offset ' ~ water_level_offset if water_level_offset is defined else '' }}
+    {{ '--flush_time ' ~ flush_time if flush_time is defined else '' }}
+
+  pwm_assign_device: >-
+    python3 /config/PaddiSense/pwm/python/pwm_backend.py assign_device
+    --bay "{{ bay_id }}"
+    --slot "{{ slot }}"
+    --device "{{ device }}"
+    --type "{{ device_type | default('door') }}"
+    {{ '--label "' ~ label ~ '"' if label else '' }}
+
+  # Import/reset (dangerous)
+  pwm_import_backup: >-
+    python3 /config/PaddiSense/pwm/python/pwm_backend.py import_backup
+    --filename "{{ filename }}"
+
+  pwm_reset: >-
+    python3 /config/PaddiSense/pwm/python/pwm_backend.py reset
+    --token "{{ token }}"
+
+# -----------------------------------------------------------------------------
+# INPUT HELPERS - For UI interaction
+# -----------------------------------------------------------------------------
+input_select:
+  pwm_selected_paddock:
+    name: "PWM Selected Paddock"
+    options:
+      - "Select Paddock"
+    icon: mdi:view-grid
+
+  pwm_selected_bay:
+    name: "PWM Selected Bay"
+    options:
+      - "Select Bay"
+    icon: mdi:format-list-numbered
+
+  pwm_editor_mode:
+    name: "PWM Editor Mode"
+    options:
+      - "view"
+      - "add_paddock"
+      - "edit_paddock"
+      - "edit_bay"
+    initial: "view"
+    icon: mdi:pencil
+
+input_text:
+  pwm_new_paddock_name:
+    name: "PWM New Paddock Name"
+    initial: ""
+    max: 50
+    icon: mdi:form-textbox
+
+input_number:
+  pwm_new_paddock_bay_count:
+    name: "PWM New Paddock Bay Count"
+    min: 1
+    max: 20
+    step: 1
+    initial: 5
+    mode: box
+    icon: mdi:numeric
+
+  pwm_bay_water_level_min:
+    name: "PWM Bay Water Level Min"
+    min: 0
+    max: 50
+    step: 1
+    initial: 5
+    mode: box
+    unit_of_measurement: "cm"
+    icon: mdi:water-minus
+
+  pwm_bay_water_level_max:
+    name: "PWM Bay Water Level Max"
+    min: 0
+    max: 50
+    step: 1
+    initial: 15
+    mode: box
+    unit_of_measurement: "cm"
+    icon: mdi:water-plus
+
+  pwm_bay_water_level_offset:
+    name: "PWM Bay Water Level Offset"
+    min: -20
+    max: 20
+    step: 0.5
+    initial: 0
+    mode: box
+    unit_of_measurement: "cm"
+    icon: mdi:water-sync
+
+  pwm_bay_flush_time:
+    name: "PWM Bay Flush Time"
+    min: 600
+    max: 14400
+    step: 300
+    initial: 3600
+    mode: box
+    unit_of_measurement: "s"
+    icon: mdi:timer
+
+input_boolean:
+  pwm_new_paddock_individual:
+    name: "PWM New Paddock Individual Mode"
+    initial: false
+    icon: mdi:account-details
+
+# -----------------------------------------------------------------------------
+# TEMPLATE SENSORS - Extract data from main sensor
+# -----------------------------------------------------------------------------
+template:
+  - sensor:
+      # System status sensor
+      - name: "PWM System Status"
+        unique_id: pwm_system_status
+        state: >-
+          {% set data = state_attr('sensor.pwm_data', 'initialized') %}
+          {% if data == true %}ready{% else %}not_initialized{% endif %}
+        icon: mdi:water-pump
+        attributes:
+          version: "{{ state_attr('sensor.pwm_data', 'version') }}"
+          total_paddocks: "{{ state_attr('sensor.pwm_data', 'total_paddocks') }}"
+          total_bays: "{{ state_attr('sensor.pwm_data', 'total_bays') }}"
+          enabled_paddocks: "{{ state_attr('sensor.pwm_data', 'enabled_paddock_count') }}"
+          device_count: "{{ state_attr('sensor.pwm_data', 'device_count') }}"
+
+      # Paddock count sensor
+      - name: "PWM Enabled Paddock Count"
+        unique_id: pwm_enabled_paddock_count
+        state: "{{ state_attr('sensor.pwm_data', 'enabled_paddock_count') | int(0) }}"
+        icon: mdi:view-grid
+        unit_of_measurement: "paddocks"
+
+      # Selected paddock details
+      - name: "PWM Selected Paddock Details"
+        unique_id: pwm_selected_paddock_details
+        state: >-
+          {% set selected = states('input_select.pwm_selected_paddock') %}
+          {% set paddocks = state_attr('sensor.pwm_data', 'paddocks') or {} %}
+          {% for pid, p in paddocks.items() if p.name == selected %}
+            {{ p.name }}
+          {% else %}
+            none
+          {% endfor %}
+        attributes:
+          paddock_id: >-
+            {% set selected = states('input_select.pwm_selected_paddock') %}
+            {% set paddocks = state_attr('sensor.pwm_data', 'paddocks') or {} %}
+            {% for pid, p in paddocks.items() if p.name == selected %}
+              {{ pid }}
+            {% else %}
+              none
+            {% endfor %}
+          enabled: >-
+            {% set selected = states('input_select.pwm_selected_paddock') %}
+            {% set paddocks = state_attr('sensor.pwm_data', 'paddocks') or {} %}
+            {% for pid, p in paddocks.items() if p.name == selected %}
+              {{ p.enabled }}
+            {% else %}
+              false
+            {% endfor %}
+          individual_mode: >-
+            {% set selected = states('input_select.pwm_selected_paddock') %}
+            {% set paddocks = state_attr('sensor.pwm_data', 'paddocks') or {} %}
+            {% for pid, p in paddocks.items() if p.name == selected %}
+              {{ p.automation_state_individual }}
+            {% else %}
+              false
+            {% endfor %}
+          bay_count: >-
+            {% set selected = states('input_select.pwm_selected_paddock') %}
+            {% set paddocks = state_attr('sensor.pwm_data', 'paddocks') or {} %}
+            {% for pid, p in paddocks.items() if p.name == selected %}
+              {{ p.bay_count }}
+            {% else %}
+              0
+            {% endfor %}
+
+      # Selected bay details
+      - name: "PWM Selected Bay Details"
+        unique_id: pwm_selected_bay_details
+        state: >-
+          {% set selected = states('input_select.pwm_selected_bay') %}
+          {% set bays = state_attr('sensor.pwm_data', 'bay_summary') or [] %}
+          {% for b in bays if b.id == selected or (b.paddock_name ~ ' ' ~ b.name) == selected %}
+            {{ b.name }}
+          {% else %}
+            none
+          {% endfor %}
+        attributes:
+          bay_id: >-
+            {% set selected = states('input_select.pwm_selected_bay') %}
+            {% set bays = state_attr('sensor.pwm_data', 'bays') or {} %}
+            {% for bid, b in bays.items() if selected.endswith(b.name) %}
+              {{ bid }}
+            {% else %}
+              none
+            {% endfor %}
+
+# -----------------------------------------------------------------------------
+# SCRIPTS - UI Actions
+# -----------------------------------------------------------------------------
+script:
+  pwm_refresh_data:
+    alias: "PWM Refresh Data"
+    description: "Force refresh of PWM sensor data"
+    sequence:
+      - action: homeassistant.update_entity
+        target:
+          entity_id: sensor.pwm_data
+    mode: single
+
+  pwm_init_system:
+    alias: "PWM Initialize System"
+    description: "Initialize the PWM system"
+    sequence:
+      - action: shell_command.pwm_init
+      - delay:
+          milliseconds: 500
+      - action: homeassistant.update_entity
+        target:
+          entity_id: sensor.pwm_data
+    mode: single
+
+  pwm_export_data:
+    alias: "PWM Export Data"
+    description: "Export PWM data to backup"
+    sequence:
+      - action: shell_command.pwm_export
+      - delay:
+          milliseconds: 500
+      - action: homeassistant.update_entity
+        target:
+          entity_id: sensor.pwm_data
+    mode: single
+
+  pwm_add_paddock:
+    alias: "PWM Add Paddock"
+    description: "Add a new paddock"
+    fields:
+      name:
+        description: "Paddock name"
+        required: true
+        selector:
+          text:
+      bay_count:
+        description: "Number of bays"
+        required: true
+        selector:
+          number:
+            min: 1
+            max: 20
+      farm:
+        description: "Farm ID"
+        required: false
+        selector:
+          text:
+      individual:
+        description: "Individual automation mode"
+        required: false
+        selector:
+          boolean:
+    sequence:
+      - action: shell_command.pwm_add_paddock
+        data:
+          name: "{{ name }}"
+          bay_count: "{{ bay_count }}"
+          farm: "{{ farm | default('farm_1') }}"
+          individual: "{{ individual | default(false) }}"
+          bay_prefix: "B-"
+      - delay:
+          milliseconds: 500
+      - action: homeassistant.update_entity
+        target:
+          entity_id: sensor.pwm_data
+      - action: script.pwm_update_paddock_dropdown
+    mode: single
+
+  pwm_delete_paddock:
+    alias: "PWM Delete Paddock"
+    description: "Delete a paddock and all its bays"
+    fields:
+      paddock_id:
+        description: "Paddock ID to delete"
+        required: true
+        selector:
+          text:
+    sequence:
+      - action: shell_command.pwm_delete_paddock
+        data:
+          paddock_id: "{{ paddock_id }}"
+      - delay:
+          milliseconds: 500
+      - action: homeassistant.update_entity
+        target:
+          entity_id: sensor.pwm_data
+      - action: script.pwm_update_paddock_dropdown
+    mode: single
+
+  pwm_enable_paddock:
+    alias: "PWM Enable Paddock"
+    fields:
+      paddock_id:
+        description: "Paddock ID"
+        required: true
+        selector:
+          text:
+    sequence:
+      - action: shell_command.pwm_enable_paddock
+        data:
+          paddock_id: "{{ paddock_id }}"
+      - delay:
+          milliseconds: 500
+      - action: homeassistant.update_entity
+        target:
+          entity_id: sensor.pwm_data
+    mode: single
+
+  pwm_disable_paddock:
+    alias: "PWM Disable Paddock"
+    fields:
+      paddock_id:
+        description: "Paddock ID"
+        required: true
+        selector:
+          text:
+    sequence:
+      - action: shell_command.pwm_disable_paddock
+        data:
+          paddock_id: "{{ paddock_id }}"
+      - delay:
+          milliseconds: 500
+      - action: homeassistant.update_entity
+        target:
+          entity_id: sensor.pwm_data
+    mode: single
+
+  pwm_assign_device:
+    alias: "PWM Assign Device to Bay"
+    fields:
+      bay_id:
+        description: "Bay ID"
+        required: true
+        selector:
+          text:
+      slot:
+        description: "Device slot (supply_1, supply_2, drain_1, drain_2)"
+        required: true
+        selector:
+          select:
+            options:
+              - supply_1
+              - supply_2
+              - drain_1
+              - drain_2
+      device:
+        description: "Device name"
+        required: true
+        selector:
+          text:
+      device_type:
+        description: "Device type"
+        required: false
+        selector:
+          select:
+            options:
+              - door
+              - valve
+              - spur
+              - channel_supply
+      label:
+        description: "Custom label"
+        required: false
+        selector:
+          text:
+    sequence:
+      - action: shell_command.pwm_assign_device
+        data:
+          bay_id: "{{ bay_id }}"
+          slot: "{{ slot }}"
+          device: "{{ device }}"
+          device_type: "{{ device_type | default('door') }}"
+          label: "{{ label | default('') }}"
+      - delay:
+          milliseconds: 500
+      - action: homeassistant.update_entity
+        target:
+          entity_id: sensor.pwm_data
+    mode: single
+
+  pwm_edit_bay_settings:
+    alias: "PWM Edit Bay Settings"
+    fields:
+      bay_id:
+        description: "Bay ID"
+        required: true
+        selector:
+          text:
+      level_sensor:
+        description: "Level sensor device"
+        required: false
+        selector:
+          text:
+      water_level_min:
+        description: "Min water level (cm)"
+        required: false
+        selector:
+          number:
+            min: 0
+            max: 50
+      water_level_max:
+        description: "Max water level (cm)"
+        required: false
+        selector:
+          number:
+            min: 0
+            max: 50
+      water_level_offset:
+        description: "Water level offset (cm)"
+        required: false
+        selector:
+          number:
+            min: -20
+            max: 20
+            step: 0.5
+      flush_time:
+        description: "Flush time (seconds)"
+        required: false
+        selector:
+          number:
+            min: 600
+            max: 14400
+    sequence:
+      - action: shell_command.pwm_edit_bay
+        data:
+          bay_id: "{{ bay_id }}"
+          level_sensor: "{{ level_sensor | default('') }}"
+          water_level_min: "{{ water_level_min | default('') }}"
+          water_level_max: "{{ water_level_max | default('') }}"
+          water_level_offset: "{{ water_level_offset | default('') }}"
+          flush_time: "{{ flush_time | default('') }}"
+      - delay:
+          milliseconds: 500
+      - action: homeassistant.update_entity
+        target:
+          entity_id: sensor.pwm_data
+    mode: single
+
+  pwm_update_paddock_dropdown:
+    alias: "PWM Update Paddock Dropdown"
+    description: "Update paddock selector options from sensor data"
+    sequence:
+      - action: input_select.set_options
+        target:
+          entity_id: input_select.pwm_selected_paddock
+        data:
+          options: >-
+            {% set names = state_attr('sensor.pwm_data', 'paddock_names') or [] %}
+            {{ ['Select Paddock'] + names }}
+    mode: single

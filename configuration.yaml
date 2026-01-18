@@ -19,6 +19,8 @@ homeassistant:
   packages:
     ipm: !include PaddiSense/ipm/package.yaml
     asm: !include PaddiSense/asm/package.yaml
+    weather: !include PaddiSense/weather/package.yaml
+    pwm: !include PaddiSense/pwm/package.yaml
 
 # Dashboards: Each module registers its own dashboard
 lovelace:
@@ -36,6 +38,18 @@ lovelace:
       icon: mdi:tractor
       show_in_sidebar: true
       filename: PaddiSense/asm/dashboards/views.yaml
+    weather-service:
+      mode: yaml
+      title: Weather Package
+      icon: mdi:weather-cloudy
+      show_in_sidebar: true
+      filename: PaddiSense/weather/dashboards/views.yaml
+    pwm-service:
+      mode: yaml
+      title: Water Management
+      icon: mdi:waves
+      show_in_sidebar: true
+      filename: PaddiSense/pwm/dashboards/views.yaml
 
 ##############################################################################
 # Database Settings

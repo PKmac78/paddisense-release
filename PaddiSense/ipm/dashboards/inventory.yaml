@@ -622,8 +622,6 @@ views:
                 card:
                   type: entities
                   entities:
-                    - entity: input_select.ipm_edit_chem_group
-                      name: Chemical Group
                     - entity: input_select.ipm_edit_app_unit
                       name: Application Unit
                   card_mod:
@@ -662,12 +660,14 @@ views:
                     # Active 1 (always visible for Chemical/Fertiliser)
                     - type: entities
                       entities:
-                        - entity: input_text.ipm_active_1_name
+                        - entity: input_select.ipm_active_1_name
                           name: "Active 1 Name"
                         - entity: input_number.ipm_active_1_conc
                           name: "Concentration"
                         - entity: input_select.ipm_active_1_unit
                           name: "Unit"
+                        - entity: input_select.ipm_active_1_group
+                          name: "Chem Group"
                       card_mod:
                         style: |
                           ha-card {
@@ -734,12 +734,14 @@ views:
                         cards:
                           - type: entities
                             entities:
-                              - entity: input_text.ipm_active_2_name
+                              - entity: input_select.ipm_active_2_name
                                 name: "Active 2 Name"
                               - entity: input_number.ipm_active_2_conc
                                 name: "Concentration"
                               - entity: input_select.ipm_active_2_unit
                                 name: "Unit"
+                              - entity: input_select.ipm_active_2_group
+                                name: "Chem Group"
                             card_mod:
                               style: |
                                 ha-card {
@@ -805,12 +807,14 @@ views:
                         cards:
                           - type: entities
                             entities:
-                              - entity: input_text.ipm_active_3_name
+                              - entity: input_select.ipm_active_3_name
                                 name: "Active 3 Name"
                               - entity: input_number.ipm_active_3_conc
                                 name: "Concentration"
                               - entity: input_select.ipm_active_3_unit
                                 name: "Unit"
+                              - entity: input_select.ipm_active_3_group
+                                name: "Chem Group"
                             card_mod:
                               style: |
                                 ha-card {
@@ -876,12 +880,14 @@ views:
                         cards:
                           - type: entities
                             entities:
-                              - entity: input_text.ipm_active_4_name
+                              - entity: input_select.ipm_active_4_name
                                 name: "Active 4 Name"
                               - entity: input_number.ipm_active_4_conc
                                 name: "Concentration"
                               - entity: input_select.ipm_active_4_unit
                                 name: "Unit"
+                              - entity: input_select.ipm_active_4_group
+                                name: "Chem Group"
                             card_mod:
                               style: |
                                 ha-card {
@@ -947,12 +953,14 @@ views:
                         cards:
                           - type: entities
                             entities:
-                              - entity: input_text.ipm_active_5_name
+                              - entity: input_select.ipm_active_5_name
                                 name: "Active 5 Name"
                               - entity: input_number.ipm_active_5_conc
                                 name: "Concentration"
                               - entity: input_select.ipm_active_5_unit
                                 name: "Unit"
+                              - entity: input_select.ipm_active_5_group
+                                name: "Chem Group"
                             card_mod:
                               style: |
                                 ha-card {
@@ -1018,12 +1026,14 @@ views:
                         cards:
                           - type: entities
                             entities:
-                              - entity: input_text.ipm_active_6_name
+                              - entity: input_select.ipm_active_6_name
                                 name: "Active 6 Name"
                               - entity: input_number.ipm_active_6_conc
                                 name: "Concentration"
                               - entity: input_select.ipm_active_6_unit
                                 name: "Unit"
+                              - entity: input_select.ipm_active_6_group
+                                name: "Chem Group"
                             card_mod:
                               style: |
                                 ha-card {
@@ -1123,6 +1133,8 @@ views:
                     name: Category
                   - entity: input_select.ipm_subcategory
                     name: Subcategory
+                  - entity: input_select.ipm_active_filter
+                    name: Active Constituent
                   - entity: input_text.ipm_search
                     name: Search
                 card_mod:
@@ -1177,8 +1189,6 @@ views:
                     - box-shadow: none
                     - padding: 0
                     - margin: 0
-                    - overflow-y: auto
-                    - max-height: 65vh
                   grid:
                     - display: block
                   custom_fields:
@@ -1210,10 +1220,12 @@ views:
 
                         const catState = states['input_select.ipm_category'];
                         const subState = states['input_select.ipm_subcategory'];
+                        const activeState = states['input_select.ipm_active_filter'];
                         const searchState = states['input_text.ipm_search'];
 
                         const category = catState ? catState.state : 'All';
                         const subcategory = subState ? subState.state : 'All';
+                        const activeFilter = activeState ? activeState.state : 'All';
                         const search = searchState ? safeStr(searchState.state).toLowerCase().trim() : '';
 
                         const catConfig = {
@@ -1235,10 +1247,16 @@ views:
                             const catMatch = category === 'All' || pCat === category;
                             const subMatch = subcategory === 'All' || pSub === subcategory;
 
+                            // Active constituent filter
+                            let activeMatch = activeFilter === 'All';
+                            if (!activeMatch && Array.isArray(p.active_constituents)) {
+                              activeMatch = p.active_constituents.some(a => a && safeStr(a.name) === activeFilter);
+                            }
+
                             const searchMatch =
                               !search || pName.includes(search) || pId.includes(search);
 
-                            return catMatch && subMatch && searchMatch;
+                            return catMatch && subMatch && activeMatch && searchMatch;
                           })
                           .sort((a, b) => safeStr(a?.name).localeCompare(safeStr(b?.name)));
 
@@ -1318,6 +1336,31 @@ views:
                           html += `<div style="height:6px;background:var(--divider-color,#e0e0e0);border-radius:3px;margin-bottom:12px;overflow:hidden;">`;
                           html += `<div style="height:100%;width:${pct}%;background:${barColor};border-radius:3px;"></div></div>`;
 
+                          // Active constituents section (for Chemical and Fertiliser)
+                          const actives = Array.isArray(p.active_constituents) ? p.active_constituents : [];
+                          if (actives.length > 0) {
+                            html += `<div style="border-top:1px solid var(--divider-color,#e0e0e0);padding-top:8px;margin-bottom:8px;">`;
+                            html += `<div style="font-size:11px;font-weight:600;color:var(--secondary-text-color);margin-bottom:4px;text-transform:uppercase;">Active Constituents</div>`;
+                            for (let a = 0; a < actives.length; a++) {
+                              const active = actives[a];
+                              if (!active || !active.name) continue;
+                              const activeName = safeStr(active.name);
+                              const activeConc = safeNum(active.concentration);
+                              const activeUnit = safeStr(active.unit);
+                              const activeGroup = safeStr(active.group);
+                              const groupDisplay = activeGroup && activeGroup !== 'None' ? `Grp ${activeGroup}` : '';
+                              const concDisplay = activeConc > 0 ? `${activeConc}${activeUnit}` : '';
+                              const details = [concDisplay, groupDisplay].filter(x => x).join(' · ');
+                              html += `<div style="display:flex;justify-content:space-between;padding:2px 0;font-size:12px;">`;
+                              html += `<span style="color:var(--primary-text-color);">${activeName}</span>`;
+                              if (details) {
+                                html += `<span style="color:var(--secondary-text-color);font-weight:500;">${details}</span>`;
+                              }
+                              html += `</div>`;
+                            }
+                            html += `</div>`;
+                          }
+
                           html += `<div style="border-top:1px solid var(--divider-color,#e0e0e0);padding-top:8px;">${locHtml}</div>`;
                           html += `</div>`;
                         }
@@ -1333,3 +1376,461 @@ views:
                                 </div>`;
                       }
                     ]]]
+
+  #============================================================================
+  # VIEW 4: SETTINGS
+  #============================================================================
+  - title: Settings
+    path: settings
+    icon: mdi:cog
+    type: sections
+    max_columns: 1
+    sections:
+      - type: grid
+        cards:
+          - type: vertical-stack
+            cards:
+              #----------------------------------------------------------------
+              # SYSTEM STATUS section
+              #----------------------------------------------------------------
+              - type: custom:button-card
+                template: ipm_title
+                name: SYSTEM STATUS
+
+              # Status display
+              - type: markdown
+                content: |
+                  {% set status = state_attr('sensor.ipm_products', 'system_status') | default('unknown') %}
+                  {% set config_ok = state_attr('sensor.ipm_products', 'config_exists') | default(false) %}
+                  {% set db_ok = state_attr('sensor.ipm_products', 'database_exists') | default(false) %}
+                  {% set products = states('sensor.ipm_products') | int(0) %}
+                  {% set locations = (state_attr('sensor.ipm_products', 'locations') or []) | length %}
+                  {% set version = state_attr('sensor.ipm_products', 'version') | default('unknown') %}
+
+                  | Item | Status |
+                  |:-----|-------:|
+                  | **IPM Version** | **v{{ version }}** |
+                  | System Status | {% if status == 'ready' %}✅ Ready{% elif status == 'not_initialized' %}⚠️ Not Initialized{% else %}❌ Error{% endif %} |
+                  | Configuration | {% if config_ok %}✅ OK{% else %}❌ Missing{% endif %} |
+                  | Database | {% if db_ok %}✅ OK{% else %}❌ Missing{% endif %} |
+                  | Products | {{ products }} |
+                  | Locations | {{ locations }} |
+                card_mod:
+                  style: |
+                    ha-card {
+                      border-radius: 12px;
+                      padding: 16px;
+                    }
+                    table {
+                      width: 100%;
+                    }
+                    th, td {
+                      padding: 8px 12px;
+                    }
+
+              # Initialize button (only shown if not initialized)
+              - type: conditional
+                conditions:
+                  - entity: sensor.ipm_products
+                    attribute: system_status
+                    state: "not_initialized"
+                card:
+                  type: custom:button-card
+                  name: Initialize System
+                  icon: mdi:database-plus
+                  show_icon: true
+                  tap_action:
+                    action: call-service
+                    service: script.ipm_initialize_system
+                  styles:
+                    card:
+                      - height: 60px
+                      - border-radius: 12px
+                      - background: "#28a745"
+                    icon:
+                      - color: white
+                    name:
+                      - font-size: 18px
+                      - font-weight: 700
+                      - color: white
+
+              #----------------------------------------------------------------
+              # LOCATIONS section
+              #----------------------------------------------------------------
+              - type: custom:button-card
+                template: ipm_title
+                name: MANAGE LOCATIONS
+
+              # Current locations list
+              - type: markdown
+                content: |
+                  {% set locations = state_attr('sensor.ipm_products', 'locations') or [] %}
+                  {% set with_stock = state_attr('sensor.ipm_products', 'locations_with_stock') or [] %}
+
+                  | Location | Stock | Removable |
+                  |:---------|:-----:|:---------:|
+                  {% for loc in locations -%}
+                  | {{ loc }} | {% if loc in with_stock %}📦 Yes{% else %}—{% endif %} | {% if loc in with_stock %}🔒 No{% else %}✅ Yes{% endif %} |
+                  {% endfor %}
+                card_mod:
+                  style: |
+                    ha-card {
+                      border-radius: 12px;
+                      padding: 16px;
+                    }
+                    table {
+                      width: 100%;
+                    }
+                    th, td {
+                      padding: 6px 12px;
+                    }
+
+              # Add new location
+              - type: entities
+                entities:
+                  - entity: input_text.ipm_new_location
+                    name: New Location Name
+                card_mod:
+                  style: |
+                    ha-card {
+                      border-radius: 12px;
+                      padding: 4px;
+                    }
+
+              - type: custom:button-card
+                name: Add Location
+                icon: mdi:map-marker-plus
+                show_icon: true
+                tap_action:
+                  action: call-service
+                  service: script.ipm_add_new_location
+                styles:
+                  card:
+                    - height: 50px
+                    - border-radius: 12px
+                    - background: "#28a745"
+                  icon:
+                    - color: white
+                  name:
+                    - font-size: 16px
+                    - font-weight: 700
+                    - color: white
+
+              # Remove location
+              - type: entities
+                entities:
+                  - entity: input_select.ipm_manage_location
+                    name: Select Location to Remove
+                card_mod:
+                  style: |
+                    ha-card {
+                      border-radius: 12px;
+                      padding: 4px;
+                      margin-top: 16px;
+                    }
+
+              - type: custom:button-card
+                name: Remove Location
+                icon: mdi:map-marker-remove
+                show_icon: true
+                tap_action:
+                  action: call-service
+                  service: script.ipm_remove_selected_location
+                styles:
+                  card:
+                    - height: 50px
+                    - border-radius: 12px
+                    - background: "#dc3545"
+                  icon:
+                    - color: white
+                  name:
+                    - font-size: 16px
+                    - font-weight: 700
+                    - color: white
+
+              #----------------------------------------------------------------
+              # ACTIVE CONSTITUENTS section
+              #----------------------------------------------------------------
+              - type: custom:button-card
+                template: ipm_title
+                name: MANAGE ACTIVE CONSTITUENTS
+
+              # Info about actives
+              - type: markdown
+                content: |
+                  {% set all_actives = state_attr('sensor.ipm_products', 'all_actives_list') or [] %}
+                  {% set custom = all_actives | selectattr('type', 'eq', 'custom') | list %}
+                  {% set active_products = state_attr('sensor.ipm_products', 'active_products_map') or {} %}
+
+                  **Standard Actives:** {{ all_actives | selectattr('type', 'eq', 'standard') | list | length }}
+                  **Custom Actives:** {{ custom | length }}
+
+                  {% if custom | length > 0 %}
+                  | Custom Active | Used By |
+                  |:--------------|:-------:|
+                  {% for a in custom -%}
+                  {% set products = active_products.get(a.name, []) %}
+                  | {{ a.name }} | {% if products %}{{ products | length }} product{% if products | length > 1 %}s{% endif %}{% else %}—{% endif %} |
+                  {% endfor %}
+                  {% else %}
+                  *No custom actives defined.*
+                  {% endif %}
+                card_mod:
+                  style: |
+                    ha-card {
+                      border-radius: 12px;
+                      padding: 16px;
+                    }
+                    table {
+                      width: 100%;
+                    }
+                    th, td {
+                      padding: 6px 12px;
+                    }
+
+              # Add new active
+              - type: entities
+                entities:
+                  - entity: input_text.ipm_new_active
+                    name: New Active Name
+                  - entity: input_text.ipm_new_active_groups
+                    name: Chemical Groups (optional, comma-separated)
+                card_mod:
+                  style: |
+                    ha-card {
+                      border-radius: 12px;
+                      padding: 4px;
+                    }
+
+              - type: custom:button-card
+                name: Add Active
+                icon: mdi:flask-plus
+                show_icon: true
+                tap_action:
+                  action: call-service
+                  service: script.ipm_add_new_active
+                styles:
+                  card:
+                    - height: 50px
+                    - border-radius: 12px
+                    - background: "#28a745"
+                  icon:
+                    - color: white
+                  name:
+                    - font-size: 16px
+                    - font-weight: 700
+                    - color: white
+
+              # Remove active
+              - type: entities
+                entities:
+                  - entity: input_select.ipm_manage_active
+                    name: Select Custom Active to Remove
+                card_mod:
+                  style: |
+                    ha-card {
+                      border-radius: 12px;
+                      padding: 4px;
+                      margin-top: 16px;
+                    }
+
+              - type: custom:button-card
+                name: Remove Active
+                icon: mdi:flask-remove
+                show_icon: true
+                tap_action:
+                  action: call-service
+                  service: script.ipm_remove_selected_active
+                styles:
+                  card:
+                    - height: 50px
+                    - border-radius: 12px
+                    - background: "#dc3545"
+                  icon:
+                    - color: white
+                  name:
+                    - font-size: 16px
+                    - font-weight: 700
+                    - color: white
+
+              #----------------------------------------------------------------
+              # REFRESH section
+              #----------------------------------------------------------------
+              - type: custom:button-card
+                template: ipm_title
+                name: DATA REFRESH
+
+              - type: horizontal-stack
+                cards:
+                  - type: custom:button-card
+                    name: Refresh Data
+                    icon: mdi:refresh
+                    show_icon: true
+                    tap_action:
+                      action: call-service
+                      service: homeassistant.update_entity
+                      service_data:
+                        entity_id: sensor.ipm_products
+                    styles:
+                      card:
+                        - height: 50px
+                        - border-radius: 12px
+                        - background: "#007bff"
+                      icon:
+                        - color: white
+                      name:
+                        - font-size: 14px
+                        - font-weight: 600
+                        - color: white
+
+                  - type: custom:button-card
+                    name: Sync Locations
+                    icon: mdi:sync
+                    show_icon: true
+                    tap_action:
+                      action: call-service
+                      service: script.ipm_refresh_locations
+                    styles:
+                      card:
+                        - height: 50px
+                        - border-radius: 12px
+                        - background: "#6c757d"
+                      icon:
+                        - color: white
+                      name:
+                        - font-size: 14px
+                        - font-weight: 600
+                        - color: white
+
+              #----------------------------------------------------------------
+              # DATA MANAGEMENT section (Phase 3)
+              #----------------------------------------------------------------
+              - type: custom:button-card
+                template: ipm_title
+                name: DATA MANAGEMENT
+
+              # Backup info
+              - type: markdown
+                content: |
+                  {% set backup_count = state_attr('sensor.ipm_products', 'backup_count') | default(0) %}
+                  {% set last = state_attr('sensor.ipm_products', 'last_backup') %}
+
+                  **Backups Available:** {{ backup_count }}
+
+                  {% if last %}
+                  **Last Backup:** {{ last.filename }}
+                  *Created:* {{ last.created[:16] | replace('T', ' ') if last.created else 'N/A' }}
+                  *Products:* {{ last.product_count }}
+                  {% else %}
+                  *No backups created yet.*
+                  {% endif %}
+                card_mod:
+                  style: |
+                    ha-card {
+                      border-radius: 12px;
+                      padding: 16px;
+                    }
+
+              # Export button
+              - type: custom:button-card
+                name: Create Backup
+                icon: mdi:content-save-all
+                show_icon: true
+                tap_action:
+                  action: call-service
+                  service: script.ipm_export_backup
+                styles:
+                  card:
+                    - height: 50px
+                    - border-radius: 12px
+                    - background: "#28a745"
+                  icon:
+                    - color: white
+                  name:
+                    - font-size: 16px
+                    - font-weight: 700
+                    - color: white
+
+              # Import section
+              - type: entities
+                entities:
+                  - entity: input_select.ipm_import_backup
+                    name: Select Backup to Restore
+                card_mod:
+                  style: |
+                    ha-card {
+                      border-radius: 12px;
+                      padding: 4px;
+                      margin-top: 16px;
+                    }
+
+              - type: custom:button-card
+                name: Restore Backup
+                icon: mdi:backup-restore
+                show_icon: true
+                tap_action:
+                  action: call-service
+                  service: script.ipm_import_selected_backup
+                styles:
+                  card:
+                    - height: 50px
+                    - border-radius: 12px
+                    - background: "#007bff"
+                  icon:
+                    - color: white
+                  name:
+                    - font-size: 16px
+                    - font-weight: 700
+                    - color: white
+
+              # Reset section (danger zone)
+              - type: custom:button-card
+                template: ipm_title
+                name: DANGER ZONE
+                styles:
+                  card:
+                    - background: "#dc3545"
+                    - margin-top: 24px
+
+              - type: markdown
+                content: |
+                  **Reset System** will delete ALL products and transactions.
+                  A backup will be created automatically before reset.
+                  Check the box below and tap Reset to proceed.
+                card_mod:
+                  style: |
+                    ha-card {
+                      border-radius: 12px;
+                      padding: 16px;
+                      background: #ffebee;
+                    }
+
+              - type: entities
+                entities:
+                  - entity: input_boolean.ipm_confirm_reset
+                    name: "I understand, delete all IPM data"
+                card_mod:
+                  style: |
+                    ha-card {
+                      border-radius: 12px;
+                      padding: 4px;
+                    }
+
+              - type: custom:button-card
+                name: Reset System
+                icon: mdi:delete-forever
+                show_icon: true
+                tap_action:
+                  action: call-service
+                  service: script.ipm_reset_system
+                styles:
+                  card:
+                    - height: 50px
+                    - border-radius: 12px
+                    - background: "#dc3545"
+                  icon:
+                    - color: white
+                  name:
+                    - font-size: 16px
+                    - font-weight: 700
+                    - color: white

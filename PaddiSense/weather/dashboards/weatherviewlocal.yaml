@@ -1,0 +1,1705 @@
+views:
+
+  - title: Weather Station 1 - Hayshed
+    type: sections
+    path: weather-station-1
+    max_columns: 3
+    sections:
+      - label: Wind Data
+        type: grid
+        cards:
+          - type: custom:windrose-card
+            grid_options:
+              rows: auto
+            wind_direction_entity:
+              entity: sensor.ecowittgateway_1_wind_direction
+              use_statistics: false
+            windspeed_entities:
+              - entity: sensor.ecowittgateway_1_wind_speed
+                name: Speed
+                speed_unit: kph
+                output_speed_unit: kph
+                use_statistics: false
+                speed_range_beaufort: false
+                current_speed_arrow: true
+                speed_ranges:
+                  - from_value: 0
+                    color: blue
+                  - from_value: 3
+                    color: green
+                  - from_value: 15
+                    color: orange
+                  - from_value: 20
+                    color: red
+              - entity: sensor.ecowittgateway_1_wind_gust
+                name: Gusts
+                speed_unit: kph
+                output_speed_unit: kph
+                use_statistics: false
+                speed_range_beaufort: false
+                current_speed_arrow: true
+                speed_ranges:
+                  - from_value: 0
+                    color: blue
+                  - from_value: 3
+                    color: green
+                  - from_value: 15
+                    color: orange
+                  - from_value: 20
+                    color: red
+            data_period:
+              period_selector:
+                location: top
+                active_color: white
+                active_bg_color: "var(--primary-color)"
+                color: grey
+                buttons:
+                  - hours: 1
+                    title: 1 hour
+                  - hours: 6
+                    title: 6 hours
+                  - hours: 12
+                    title: 12 hours
+                  - hours: 24
+                    title: 1 day
+            center_calm_percentage: false
+            windspeed_bar_location: right
+            direction_labels:
+              show_intercardinal_directions: true
+              intercardinal_directions_text_size: 30
+            current_direction:
+              show_arrow: true
+              arrow_size: 50
+              centre_circle_size: 10
+            corner_info:
+              top_left:
+                label: Current Wind Speed
+                entity: sensor.ecowittgateway_1_wind_speed
+                value_text_size: 100
+              top_right:
+                label: Current Gusts
+                entity: sensor.ecowittgateway_1_wind_gust
+                value_text_size: 100
+              bottom_left:
+                label: Current Direction
+                entity: sensor.ecowittgateway_1_wind_direction
+                input_unit: degrees
+                output_unit: letters
+                direction_letters: NESWx
+                value_text_size: 80
+            colors:
+              rose_current_direction_arrow: "#dd3322"
+          - type: custom:apexcharts-card
+            grid_options:
+              rows: auto
+            cache: false
+            section_mode: true
+            header:
+              show: true
+              show_states: true
+            experimental:
+              color_threshold: true
+            graph_span: 3h
+            series:
+              - entity: sensor.ecowittgateway_1_wind_speed
+                name: Current Windspeed
+                group_by:
+                  func: max
+                  duration: 15min
+                show:
+                  in_chart: true
+                  in_header: false
+                color_threshold:
+                  - value: 0
+                    color: "#ff0000"
+                  - value: 3
+                    color: "#ffa500"
+                  - value: 5
+                    color: "#008000"
+                  - value: 15
+                    color: "#ffa500"
+                  - value: 40
+                    color: "#ff0000"
+              - entity: sensor.ecowittgateway_1_wind_gust
+                name: Current Gust
+                type: line
+                color: lightskyblue
+                group_by:
+                  func: max
+                  duration: 15min
+                show:
+                  in_chart: true
+                  in_header: false
+            apex_config:
+              legend:
+                show: false
+              yaxis:
+                labels:
+                  formatter: |
+                    EVAL:function (val) {
+                      return Math.floor(val) + " km/h"
+                    }
+                tickAmount: 3
+                min: 0
+                max: |
+                  EVAL:function(max) {
+                    return max * 1.1;
+                  }
+              grid:
+                xaxis:
+                  lines:
+                    show: false
+                yaxis:
+                  lines:
+                    show: false
+                labels:
+                  formatter: |
+                    EVAL: function (val) {
+                      return (val % 1 === 0) ? val : val.toFixed(1);
+                    }
+              stroke:
+                curve: smooth
+      - label: Atmospheric Data
+        type: grid
+        cards:
+          - type: custom:apexcharts-card
+            grid_options:
+              rows: auto
+            cache: false
+            section_mode: true
+            header:
+              show: true
+              show_states: true
+            all_series_config:
+              group_by:
+                func: avg
+                duration: 1h
+            experimental:
+              color_threshold: true
+            apex_config:
+              grid:
+                xaxis:
+                  lines:
+                    show: false
+                yaxis:
+                  lines:
+                    show: false
+              yaxis:
+                tickAmount: 3
+                min: 0
+                max: |
+                  EVAL:function(max) {
+                    return max * 1.1;
+                  }
+              stroke:
+                curve: smooth
+                labels:
+                  formatter: |
+                    EVAL: function (val) {
+                      return (val % 1 === 0) ? val : val.toFixed(1);
+                    }
+            series:
+              - entity: sensor.weather_station_1_delta_t
+                name: Current Delta T
+                color_threshold:
+                  - value: 0
+                    color: "#ff0000"
+                  - value: 1.9999
+                    color: "#008000"
+                  - value: 8
+                    color: "#ffa500"
+                  - value: 12
+                    color: "#ff0000"
+          - type: custom:apexcharts-card
+            grid_options:
+              rows: auto
+            cache: false
+            section_mode: true
+            header:
+              show: true
+              show_states: true
+            all_series_config:
+              group_by:
+                func: avg
+                duration: 1h
+            experimental:
+              color_threshold: true
+            apex_config:
+              legend:
+                show: false
+              grid:
+                xaxis:
+                  lines:
+                    show: false
+                yaxis:
+                  lines:
+                    show: false
+              yaxis:
+                tickAmount: 3
+                min: |
+                  EVAL:function(min) {
+                    if (min < 0) {
+                      return min
+                    } else {
+                      return 0
+                    }
+                  }
+                max: |
+                  EVAL:function(max) {
+                    return max * 1.1;
+                  }
+              stroke:
+                curve: smooth
+                labels:
+                  formatter: |
+                    EVAL: function (val) {
+                      return (val % 1 === 0) ? val : val.toFixed(1);
+                    }
+            series:
+              - entity: sensor.ecowittgateway_1_outdoor_temperature
+                name: Current Temperature
+                color_threshold:
+                  - value: 0
+                    color: "#0000ff"
+                  - value: 10
+                    color: "#008000"
+                  - value: 20
+                    color: "#daa520"
+                  - value: 30
+                    color: "#ffa500"
+                  - value: 40
+                    color: "#ff0000"
+              - entity: sensor.ecowittgateway_1_dewpoint
+                name: Current Dewpoint
+                type: area
+                stroke_width: 0
+                color: skyblue
+                opacity: 0.5
+          - type: custom:apexcharts-card
+            grid_options:
+              rows: auto
+            cache: false
+            section_mode: true
+            header:
+              show: true
+              show_states: true
+            all_series_config:
+              group_by:
+                func: avg
+                duration: 1h
+            experimental:
+              color_threshold: true
+            apex_config:
+              grid:
+                xaxis:
+                  lines:
+                    show: false
+                yaxis:
+                  lines:
+                    show: false
+              yaxis:
+                tickAmount: 3
+                min: 0
+                max: |
+                  EVAL:function(max) {
+                    return max * 1.1;
+                  }
+              stroke:
+                curve: smooth
+                labels:
+                  formatter: |
+                    EVAL: function (val) {
+                      return (val % 1 === 0) ? val : val.toFixed(1);
+                    }
+            series:
+              - entity: sensor.ecowittgateway_1_humidity
+                name: Current Humidity
+                color_threshold:
+                  - value: 0
+                    color: "#ff0000"
+                  - value: 25
+                    color: "#ffa500"
+                  - value: 50
+                    color: "#daa520"
+                  - value: 75
+                    color: "#008000"
+                  - value: 100
+                    color: "#0000ff"
+      - label: Rain Data
+        type: grid
+        cards:
+          - type: custom:apexcharts-card
+            grid_options:
+              rows: auto
+            cache: false
+            section_mode: true
+            header:
+              show: true
+              show_states: true
+            experimental:
+              color_threshold: true
+            apex_config:
+              grid:
+                xaxis:
+                  lines:
+                    show: false
+                yaxis:
+                  lines:
+                    show: false
+              yaxis:
+                tickAmount: 3
+                min: 0
+                max: |
+                  EVAL:function(max) {
+                    return max * 1.1;
+                  }
+                labels:
+                  formatter: |
+                    EVAL:function (val) {
+                      return (val % 1 === 0) ? val : val.toFixed(1) + " mm";
+                    }
+              stroke:
+                curve: smooth
+            all_series_config:
+              type: column
+              color_threshold:
+                - value: 0
+                  color: white
+                - value: 1
+                  color: lightblue
+                - value: 10
+                  color: lightskyblue
+                - value: 20
+                  color: skyblue
+                - value: 30
+                  color: deepskyblue
+                - value: 40
+                  color: cornflowerblue
+                - value: 50
+                  color: mediumblue
+            graph_span: 24h
+            series:
+              - entity: sensor.ecowittgateway_1_hourly_rain
+                name: Hourly Rainfall
+                type: line
+                group_by:
+                  func: max
+                  duration: 1h
+                show:
+                  in_header: false
+              - entity: sensor.ecowittgateway_1_event_rain
+                name: Total Event Rainfall
+                show:
+                  in_chart: false
+                  in_header: true
+          - type: custom:apexcharts-card
+            grid_options:
+              rows: auto
+            section_mode: true
+            all_series_config:
+              type: column
+              color_threshold:
+                - value: 0
+                  color: white
+                - value: 1
+                  color: lightblue
+                - value: 10
+                  color: lightskyblue
+                - value: 20
+                  color: skyblue
+                - value: 30
+                  color: deepskyblue
+                - value: 40
+                  color: cornflowerblue
+                - value: 50
+                  color: mediumblue
+            cache: false
+            header:
+              show: true
+              show_states: true
+            experimental:
+              color_threshold: true
+            apex_config:
+              grid:
+                xaxis:
+                  lines:
+                    show: false
+                yaxis:
+                  lines:
+                    show: false
+              yaxis:
+                tickAmount: 3
+                min: 0
+                max: |
+                  EVAL:function(max) {
+                    return max * 1.1;
+                  }
+                labels:
+                  formatter: |
+                    EVAL:function (val) {
+                      return (val % 1 === 0) ? val : val.toFixed(1) + " mm";
+                    }
+              stroke:
+                curve: smooth
+            graph_span: 365.25d
+            span:
+              start: year
+            series:
+              - entity: sensor.ecowittgateway_1_monthly_rain
+                name: Monthly Rainfall
+                group_by:
+                  func: max
+                  duration: 30d
+                show:
+                  in_chart: true
+                  in_header: false
+              - entity: sensor.ecowittgateway_1_daily_rain
+                name: Total Daily Rainfall
+                show:
+                  in_chart: false
+                  in_header: true
+              - entity: sensor.ecowittgateway_1_weekly_rain
+                name: Total Weekly Rainfall
+                show:
+                  in_chart: false
+                  in_header: true
+              - entity: sensor.ecowittgateway_1_yearly_rain
+                name: Total Yearly Rainfall
+                show:
+                  in_chart: false
+                  in_header: true
+          - type: custom:apexcharts-card
+            grid_options:
+              rows: auto
+            cache: false
+            section_mode: true
+            header:
+              show: true
+              show_states: true
+            experimental:
+              color_threshold: true
+            apex_config:
+              grid:
+                xaxis:
+                  lines:
+                    show: false
+                yaxis:
+                  lines:
+                    show: false
+              yaxis:
+                tickAmount: 3
+                min: 0
+                max: |
+                  EVAL:function(max) {
+                    return max * 1.1;
+                  }
+                labels:
+                  formatter: |
+                    EVAL:function (val) {
+                      return (val % 1 === 0) ? val : val.toFixed(1) + " mm";
+                    }
+              stroke:
+                curve: smooth
+            graph_span: 30d
+            series:
+              - entity: sensor.weather_station_1_evapotranspiration
+                name: Total Daily Evapotranspiration
+                type: column
+                group_by:
+                  func: max
+                  duration: 1d
+                show:
+                  in_header: true
+                color_threshold:
+                  - value: 0
+                    color: "#0000ff"
+                  - value: 2
+                    color: "#008b8b"
+                  - value: 4
+                    color: "#008000"
+                  - value: 6
+                    color: "#daa520"
+                  - value: 8
+                    color: "#ffa500"
+                  - value: 10
+                    color: "#ff0000"
+  - title: Weather Station 2 - Ward Pump
+    type: sections
+    path: weather-station-2
+    max_columns: 3
+    sections:
+      - label: Wind Data
+        type: grid
+        cards:
+          - type: custom:windrose-card
+            grid_options:
+              rows: auto
+            wind_direction_entity:
+              entity: sensor.ecowittgateway_2_wind_direction
+              use_statistics: false
+            windspeed_entities:
+              - entity: sensor.ecowittgateway_2_wind_speed
+                name: Speed
+                speed_unit: kph
+                output_speed_unit: kph
+                use_statistics: false
+                speed_range_beaufort: false
+                current_speed_arrow: true
+                speed_ranges:
+                  - from_value: 0
+                    color: blue
+                  - from_value: 3
+                    color: green
+                  - from_value: 15
+                    color: orange
+                  - from_value: 20
+                    color: red
+              - entity: sensor.ecowittgateway_2_wind_gust
+                name: Gusts
+                speed_unit: kph
+                output_speed_unit: kph
+                use_statistics: false
+                speed_range_beaufort: false
+                current_speed_arrow: true
+                speed_ranges:
+                  - from_value: 0
+                    color: blue
+                  - from_value: 3
+                    color: green
+                  - from_value: 15
+                    color: orange
+                  - from_value: 20
+                    color: red
+            data_period:
+              period_selector:
+                location: top
+                active_color: white
+                active_bg_color: "var(--primary-color)"
+                color: grey
+                buttons:
+                  - hours: 1
+                    title: 1 hour
+                  - hours: 6
+                    title: 6 hours
+                  - hours: 12
+                    title: 12 hours
+                  - hours: 24
+                    title: 1 day
+            center_calm_percentage: false
+            windspeed_bar_location: bottom
+            direction_labels:
+              show_intercardinal_directions: true
+              intercardinal_directions_text_size: 30
+            current_direction:
+              show_arrow: true
+              arrow_size: 50
+              centre_circle_size: 10
+            corner_info:
+              top_left:
+                label: Current Wind Speed
+                entity: sensor.ecowittgateway_2_wind_speed
+                value_text_size: 100
+              top_right:
+                label: Current Gusts
+                entity: sensor.ecowittgateway_2_wind_gust
+                value_text_size: 100
+              bottom_left:
+                label: Current Direction
+                entity: sensor.ecowittgateway_2_wind_direction
+                input_unit: degrees
+                output_unit: letters
+                direction_letters: NESWx
+                value_text_size: 80
+            colors:
+              rose_current_direction_arrow: "#dd3322"
+          - type: custom:apexcharts-card
+            grid_options:
+              rows: auto
+            section_mode: true
+            cache: false
+            header:
+              show: true
+              show_states: true
+            experimental:
+              color_threshold: true
+            graph_span: 3h
+            series:
+              - entity: sensor.ecowittgateway_2_wind_speed
+                name: Current Windspeed
+                group_by:
+                  func: max
+                  duration: 15min
+                show:
+                  in_chart: true
+                  in_header: false
+                  legend_value: false
+                color_threshold:
+                  - value: 0
+                    color: "#ff0000"
+                  - value: 3
+                    color: "#ffa500"
+                  - value: 5
+                    color: "#008000"
+                  - value: 15
+                    color: "#ffa500"
+                  - value: 40
+                    color: "#ff0000"
+              - entity: sensor.ecowittgateway_2_wind_gust
+                name: Current Gust
+                type: line
+                color: lightskyblue
+                group_by:
+                  func: max
+                  duration: 15min
+                show:
+                  in_chart: true
+                  in_header: false
+                  legend_value: false
+            apex_config:
+              legend:
+                show: false
+                position: top
+              yaxis:
+                labels:
+                  formatter: |
+                    EVAL:function (val) {
+                      return Math.floor(val) + " km/h"
+                    }
+                tickAmount: 3
+                min: 0
+                max: |
+                  EVAL:function(max) {
+                    return max * 1.1;
+                  }
+              grid:
+                xaxis:
+                  lines:
+                    show: false
+                yaxis:
+                  lines:
+                    show: false
+                labels:
+                  formatter: |
+                    EVAL: function (val) {
+                      return (val % 1 === 0) ? val : val.toFixed(1);
+                    }
+              stroke:
+                curve: smooth
+      - label: Atmospheric Data
+        type: grid
+        cards:
+          - type: custom:apexcharts-card
+            grid_options:
+              rows: auto
+            section_mode: true
+            cache: false
+            header:
+              show: true
+              show_states: true
+            all_series_config:
+              group_by:
+                func: avg
+                duration: 1h
+            experimental:
+              color_threshold: true
+            apex_config:
+              grid:
+                xaxis:
+                  lines:
+                    show: false
+                yaxis:
+                  lines:
+                    show: false
+              yaxis:
+                tickAmount: 3
+                min: 0
+                max: |
+                  EVAL:function(max) {
+                    return max * 1.1;
+                  }
+              stroke:
+                curve: smooth
+                labels:
+                  formatter: |
+                    EVAL: function (val) {
+                      return (val % 1 === 0) ? val : val.toFixed(1);
+                    }
+            series:
+              - entity: sensor.weather_station_2_delta_t
+                name: Current Delta T
+                color_threshold:
+                  - value: 0
+                    color: "#ff0000"
+                  - value: 1.9999
+                    color: "#008000"
+                  - value: 8
+                    color: "#ffa500"
+                  - value: 12
+                    color: "#ff0000"
+          - type: custom:apexcharts-card
+            grid_options:
+              rows: auto
+            section_mode: true
+            cache: false
+            header:
+              show: true
+              show_states: true
+            all_series_config:
+              group_by:
+                func: avg
+                duration: 1h
+            experimental:
+              color_threshold: true
+            apex_config:
+              legend:
+                show: false
+              grid:
+                xaxis:
+                  lines:
+                    show: false
+                yaxis:
+                  lines:
+                    show: false
+              yaxis:
+                tickAmount: 3
+                min: |
+                  EVAL:function(min) {
+                    if (min < 0) {
+                      return min
+                    } else {
+                      return 0
+                    }
+                  }
+                max: |
+                  EVAL:function(max) {
+                    return max * 1.1;
+                  }
+              stroke:
+                curve: smooth
+                labels:
+                  formatter: |
+                    EVAL: function (val) {
+                      return (val % 1 === 0) ? val : val.toFixed(1);
+                    }
+            series:
+              - entity: sensor.ecowittgateway_2_outdoor_temperature
+                name: Current Temperature
+                color_threshold:
+                  - value: 0
+                    color: "#0000ff"
+                  - value: 10
+                    color: "#008000"
+                  - value: 20
+                    color: "#daa520"
+                  - value: 30
+                    color: "#ffa500"
+                  - value: 40
+                    color: "#ff0000"
+              - entity: sensor.ecowittgateway_1_dewpoint
+                name: Current Dewpoint
+                type: area
+                stroke_width: 0
+                color: skyblue
+                opacity: 0.5
+          - type: custom:apexcharts-card
+            grid_options:
+              rows: auto
+            section_mode: true
+            cache: false
+            header:
+              show: true
+              show_states: true
+            all_series_config:
+              group_by:
+                func: avg
+                duration: 1h
+            experimental:
+              color_threshold: true
+            apex_config:
+              grid:
+                xaxis:
+                  lines:
+                    show: false
+                yaxis:
+                  lines:
+                    show: false
+              yaxis:
+                tickAmount: 3
+                min: 0
+                max: |
+                  EVAL:function(max) {
+                    return max * 1.1;
+                  }
+              stroke:
+                curve: smooth
+                labels:
+                  formatter: |
+                    EVAL: function (val) {
+                      return (val % 1 === 0) ? val : val.toFixed(1);
+                    }
+            series:
+              - entity: sensor.ecowittgateway_2_humidity
+                name: Current Humidity
+                color_threshold:
+                  - value: 0
+                    color: "#ff0000"
+                  - value: 25
+                    color: "#ffa500"
+                  - value: 50
+                    color: "#daa520"
+                  - value: 75
+                    color: "#008000"
+                  - value: 100
+                    color: "#0000ff"
+      - label: Rain Data
+        type: grid
+        cards:
+          - type: custom:apexcharts-card
+            grid_options:
+              rows: auto
+            section_mode: true
+            cache: false
+            header:
+              show: true
+              show_states: true
+            experimental:
+              color_threshold: true
+            apex_config:
+              grid:
+                xaxis:
+                  lines:
+                    show: false
+                yaxis:
+                  lines:
+                    show: false
+              yaxis:
+                tickAmount: 3
+                min: 0
+                max: |
+                  EVAL:function(max) {
+                    return max * 1.1;
+                  }
+                labels:
+                  formatter: |
+                    EVAL:function (val) {
+                      return (val % 1 === 0) ? val : val.toFixed(1) + " mm";
+                    }
+              stroke:
+                curve: smooth
+            all_series_config:
+              type: column
+              color_threshold:
+                - value: 0
+                  color: white
+                - value: 1
+                  color: lightblue
+                - value: 10
+                  color: lightskyblue
+                - value: 20
+                  color: skyblue
+                - value: 30
+                  color: deepskyblue
+                - value: 40
+                  color: cornflowerblue
+                - value: 50
+                  color: mediumblue
+            graph_span: 24h
+            series:
+              - entity: sensor.ecowittgateway_2_hourly_rain
+                name: Hourly Rainfall
+                type: line
+                group_by:
+                  func: max
+                  duration: 1h
+                show:
+                  in_header: false
+              - entity: sensor.ecowittgateway_2_event_rain
+                name: Total Event Rainfall
+                show:
+                  in_chart: false
+                  in_header: true
+          - type: custom:apexcharts-card
+            grid_options:
+              rows: auto
+            section_mode: true
+            all_series_config:
+              type: column
+              color_threshold:
+                - value: 0
+                  color: white
+                - value: 1
+                  color: lightblue
+                - value: 10
+                  color: lightskyblue
+                - value: 20
+                  color: skyblue
+                - value: 30
+                  color: deepskyblue
+                - value: 40
+                  color: cornflowerblue
+                - value: 50
+                  color: mediumblue
+            cache: false
+            header:
+              show: true
+              show_states: true
+            experimental:
+              color_threshold: true
+            apex_config:
+              grid:
+                xaxis:
+                  lines:
+                    show: false
+                yaxis:
+                  lines:
+                    show: false
+              yaxis:
+                tickAmount: 3
+                min: 0
+                max: |
+                  EVAL:function(max) {
+                    return max * 1.1;
+                  }
+                labels:
+                  formatter: |
+                    EVAL:function (val) {
+                      return (val % 1 === 0) ? val : val.toFixed(1) + " mm";
+                    }
+              stroke:
+                curve: smooth
+            graph_span: 365.25d
+            span:
+              start: year
+            series:
+              - entity: sensor.ecowittgateway_2_monthly_rain
+                name: Monthly Rainfall
+                group_by:
+                  func: max
+                  duration: 30d
+                show:
+                  in_header: false
+              - entity: sensor.ecowittgateway_2_daily_rain
+                name: Total Daily Rainfall
+                show:
+                  in_chart: false
+                  in_header: true
+              - entity: sensor.ecowittgateway_2_weekly_rain
+                name: Total Weekly Rainfall
+                show:
+                  in_chart: false
+                  in_header: true
+              - entity: sensor.ecowittgateway_2_yearly_rain
+                name: Total Yearly Rainfall
+                show:
+                  in_chart: false
+                  in_header: true
+          - type: custom:apexcharts-card
+            grid_options:
+              rows: auto
+            section_mode: true
+            cache: false
+            header:
+              show: true
+              show_states: true
+            experimental:
+              color_threshold: true
+            apex_config:
+              grid:
+                xaxis:
+                  lines:
+                    show: false
+                yaxis:
+                  lines:
+                    show: false
+              yaxis:
+                tickAmount: 3
+                min: 0
+                max: |
+                  EVAL:function(max) {
+                    return max * 1.1;
+                  }
+                labels:
+                  formatter: |
+                    EVAL:function (val) {
+                      return (val % 1 === 0) ? val : val.toFixed(1) + " mm";
+                    }
+              stroke:
+                curve: smooth
+            graph_span: 30d
+            series:
+              - entity: sensor.weather_station_2_evapotranspiration
+                name: Total Daily Evapotranspiration
+                type: column
+                group_by:
+                  func: max
+                  duration: 1d
+                show:
+                  in_header: true
+                color_threshold:
+                  - value: 0
+                    color: "#0000ff"
+                  - value: 2
+                    color: "#008b8b"
+                  - value: 4
+                    color: "#008000"
+                  - value: 6
+                    color: "#daa520"
+                  - value: 8
+                    color: "#ffa500"
+                  - value: 10
+                    color: "#ff0000"
+  - title: Spraying
+    path: spraying
+    type: sections
+    max_columns: 3
+    subview: false
+    sections:
+      - title: Weather Recording - Hay Shed
+        type: grid
+        cards:
+          - type: custom:layout-card
+            layout_type: custom:grid-layout
+            layout:
+              grid-template-columns: 1fr 1fr
+            cards:
+              - type: custom:mushroom-template-card
+                layout: vertical
+                primary: >-
+                  {{ now().day }}/{{ now().month }}/{{ now().year }} 
+                  {{ now().hour % 12 if now().hour % 12 != 0 else 12 }}:{{ '%02d' % now().minute }} {{ 'am' if now().hour < 12 else 'pm' }}
+                view_layout:
+                  grid-column: 1 / span 2
+              - type: custom:mushroom-entity-card
+                entity: sensor.ecowittgateway_1_outdoor_temperature
+                icon: mdi:thermometer
+                name: Temperature
+                view_layout:
+                  grid-column-start: 1
+              - type: custom:mushroom-entity-card
+                entity: sensor.ecowittgateway_1_humidity
+                icon: mdi:cloud-percent-outline
+                name: Humidity
+                view_layout:
+                  grid-column-start: 2
+              - type: custom:mushroom-entity-card
+                entity: sensor.ecowittgateway_1_wind_speed
+                icon: mdi:weather-windy
+                name: Wind Speed
+                view_layout:
+                  grid-column-start: 1
+              - type: custom:mushroom-entity-card
+                entity: sensor.ecowittgateway_1_wind_gust
+                icon: mdi:weather-dust
+                name: Gust Speed
+                view_layout:
+                  grid-column-start: 2
+              - type: custom:mushroom-template-card
+                entity: sensor.ecowittgateway_1_wind_direction
+                icon: mdi:compass-outline
+                primary: Wind Direction
+                secondary: >-
+                  {% set val = states('sensor.ecowittgateway_1_wind_direction') | float %}
+                  {% if val >= 0 and val < 22.5 %}
+                    {% set dir = 'N' %}
+                  {% elif val < 67.5 %}
+                    {% set dir = 'NE' %}
+                  {% elif val < 112.5 %}
+                    {% set dir = 'E' %}
+                  {% elif val < 157.5 %}
+                    {% set dir = 'SE' %}
+                  {% elif val < 202.5 %}
+                    {% set dir = 'S' %}
+                  {% elif val < 247.5 %}
+                    {% set dir = 'SW' %}
+                  {% elif val < 292.5 %}
+                    {% set dir = 'W' %}
+                  {% elif val < 337.5 %}
+                    {% set dir = 'NW' %}
+                  {% else %}
+                    {% set dir = 'N' %}
+                  {% endif %}
+                  {{ val }}° ({{ dir }})
+                tap_action:
+                  action: more-info
+                  entity: sensor.ecowittgateway_1_wind_direction
+                card_mod:
+                  style: |
+                    mushroom-state-icon {
+                      color: var(--primary-color);
+                    }
+                view_layout:
+                  grid-column-start: 1
+              - type: custom:mushroom-entity-card
+                entity: sensor.weather_station_1_delta_t
+                icon: mdi:thermometer-lines
+                name: Delta T
+                view_layout:
+                  grid-column-start: 2
+      - title: Weather Recording - Ward Pump
+        type: grid
+        cards:
+          - type: custom:layout-card
+            layout_type: custom:grid-layout
+            layout:
+              grid-template-columns: 1fr 1fr
+            cards:
+              - type: custom:mushroom-template-card
+                layout: vertical
+                primary: >-
+                  {{ now().day }}/{{ now().month }}/{{ now().year }} 
+                  {{ now().hour % 12 if now().hour % 12 != 0 else 12 }}:{{ '%02d' % now().minute }} {{ 'am' if now().hour < 12 else 'pm' }}
+                view_layout:
+                  grid-column: 1 / span 2
+              - type: custom:mushroom-entity-card
+                entity: sensor.ecowittgateway_2_outdoor_temperature
+                icon: mdi:thermometer
+                name: Temperature
+                view_layout:
+                  grid-column-start: 1
+              - type: custom:mushroom-entity-card
+                entity: sensor.ecowittgateway_2_humidity
+                icon: mdi:cloud-percent-outline
+                name: Humidity
+                view_layout:
+                  grid-column-start: 2
+              - type: custom:mushroom-entity-card
+                entity: sensor.ecowittgateway_2_wind_speed
+                icon: mdi:weather-windy
+                name: Wind Speed
+                view_layout:
+                  grid-column-start: 1
+              - type: custom:mushroom-entity-card
+                entity: sensor.ecowittgateway_2_wind_gust
+                icon: mdi:weather-dust
+                name: Gust Speed
+                view_layout:
+                  grid-column-start: 2
+              - type: custom:mushroom-template-card
+                entity: sensor.ecowittgateway_2_wind_direction
+                icon: mdi:compass-outline
+                primary: Wind Direction
+                secondary: >-
+                  {% set val = states('sensor.ecowittgateway_2_wind_direction') | float %}
+                  {% if val >= 0 and val < 22.5 %}
+                    {% set dir = 'N' %}
+                  {% elif val < 67.5 %}
+                    {% set dir = 'NE' %}
+                  {% elif val < 112.5 %}
+                    {% set dir = 'E' %}
+                  {% elif val < 157.5 %}
+                    {% set dir = 'SE' %}
+                  {% elif val < 202.5 %}
+                    {% set dir = 'S' %}
+                  {% elif val < 247.5 %}
+                    {% set dir = 'SW' %}
+                  {% elif val < 292.5 %}
+                    {% set dir = 'W' %}
+                  {% elif val < 337.5 %}
+                    {% set dir = 'NW' %}
+                  {% else %}
+                    {% set dir = 'N' %}
+                  {% endif %}
+                  {{ val }}° ({{ dir }})
+                tap_action:
+                  action: more-info
+                  entity: sensor.ecowittgateway_2_wind_direction
+                card_mod:
+                  style: |
+                    mushroom-state-icon {
+                      color: var(--primary-color);
+                    }
+                view_layout:
+                  grid-column-start: 1
+              - type: custom:mushroom-entity-card
+                entity: sensor.weather_station_2_delta_t
+                icon: mdi:thermometer-lines
+                name: Delta T
+                view_layout:
+                  grid-column-start: 2
+      - title: Inversion
+        type: grid
+        cards:
+          - type: custom:mushroom-title-card
+            title: Inversion Calculation
+            subtitle: >-
+              2 temp sensors, 1.25m and 10m above ground level.
+
+              Subtract high from low (temp(10m) - temp(1.25m))
+
+              If result is positive, inversion.
+
+              (e.g. T(10m) = 15, T(1.25m) = 10. T(10m)-T(1.25m)=5)
+
+              If result is negative, no inversion.
+
+              (e.g. T(10m) = 15, T(1.25m) = 20. T(10m)-T(1.25m)=-5)
+
+              https://grdc.com.au/__data/assets/pdf_file/0033/579390/hazardous-inversion-grdc-20250109.pdf
+      - title: Charts
+        type: grid
+        cards:
+          - type: custom:mini-graph-card
+            entities:
+              - entity: sensor.weather_station_1_delta_t
+            icon: mdi:thermometer-lines
+            name: Weather Station 1 Delta T - 24 hr
+            unit: °C
+            decimals: 1
+            show:
+              icon_adaptive_color: true
+            color_thresholds:
+              - value: 0
+                color: "#ff0000"
+              - value: 1.9999
+                color: "#008000"
+              - value: 8
+                color: "#ffa500"
+              - value: 12
+                color: "#ff0000"
+            color_thresholds_transition: hard
+          - type: custom:mini-graph-card
+            entities:
+              - entity: sensor.ecowittgateway_2_wind_speed
+              - entity: sensor.ecowittgateway_2_wind_gust
+                show_fill: false
+                show_state: true
+            name: Weather Station 2 Wind Speed - 24 hrs
+            icon: mdi:weather-dust
+            show:
+              icon_adaptive_color: true
+              legend: false
+              average: true
+            color_thresholds:
+              - value: 0
+                color: "#ff0000"
+              - value: 3
+                color: "#ffa500"
+              - value: 5
+                color: "#008000"
+              - value: 15
+                color: "#ffa500"
+              - value: 20
+                color: "#ff0000"
+          - type: custom:windrose-card
+            title: Weather Station 2 Wind Direction - 1 hr
+            wind_direction_entity:
+              entity: sensor.ecowittgateway_2_wind_direction
+              use_statistics: false
+            windspeed_entities:
+              - entity: sensor.ecowittgateway_2_wind_speed
+                speed_unit: kph
+                output_speed_unit: kph
+                use_statistics: false
+                speed_range_beaufort: false
+                speed_ranges:
+                  - from_value: 0
+                    color: blue
+                  - from_value: 3
+                    color: green
+                  - from_value: 15
+                    color: orange
+                  - from_value: 20
+                    color: red
+            data_period:
+              hours_to_show: 1
+            center_calm_percentage: false
+            windspeed_bar_location: right
+            direction_labels:
+              show_intercardinal_directions: true
+              intercardinal_directions_text_size: 30
+            current_direction:
+              show_arrow: true
+              arrow_size: 50
+              centre_circle_size: 10
+            corner_info:
+              top_left:
+                label: Current Direction
+                entity: sensor.ecowittgateway_2_wind_direction
+                input_unit: degrees
+                output_unit: letters
+                direction_letters: NESWx
+                value_text_size: 80
+            colors:
+              rose_current_direction_arrow: "#dd3322"
+          - type: gauge
+            entity: sensor.ecowittgateway_2_outdoor_temperature
+            needle: true
+            severity:
+              green: 5
+              yellow: 25
+              red: 40
+            min: -5
+            max: 50
+            name: Current Temp
+  - title: Homestead
+    type: sections
+    path: homestead
+    max_columns: 3
+    sections:
+      - title: Homestead Rain Data
+        type: grid
+        cards:
+          - type: custom:apexcharts-card
+            cache: false
+            header:
+              show: true
+              show_states: true
+            experimental:
+              color_threshold: true
+            apex_config:
+              grid:
+                xaxis:
+                  lines:
+                    show: false
+                yaxis:
+                  lines:
+                    show: false
+              yaxis:
+                tickAmount: 3
+                min: 0
+                max: |
+                  EVAL:function(max) {
+                    return max * 1.1;
+                  }
+                labels:
+                  formatter: |
+                    EVAL:function (val) {
+                      return (val % 1 === 0) ? val : val.toFixed(1) + " mm";
+                    }
+              stroke:
+                curve: smooth
+              chart:
+                height: 150
+            all_series_config:
+              type: column
+              color_threshold:
+                - value: 0
+                  color: white
+                - value: 1
+                  color: lightblue
+                - value: 10
+                  color: lightskyblue
+                - value: 20
+                  color: skyblue
+                - value: 30
+                  color: deepskyblue
+                - value: 40
+                  color: cornflowerblue
+                - value: 50
+                  color: mediumblue
+            graph_span: 24h
+            series:
+              - entity: sensor.ecowittgateway_4_hourly_rain
+                name: Hourly Rainfall
+                type: line
+                group_by:
+                  func: max
+                  duration: 1h
+                show:
+                  in_header: false
+              - entity: sensor.ecowittgateway_4_event_rain
+                name: Total Event Rainfall
+                show:
+                  in_chart: false
+                  in_header: true
+          - type: custom:apexcharts-card
+            all_series_config:
+              type: column
+              color_threshold:
+                - value: 0
+                  color: white
+                - value: 1
+                  color: lightblue
+                - value: 10
+                  color: lightskyblue
+                - value: 20
+                  color: skyblue
+                - value: 30
+                  color: deepskyblue
+                - value: 40
+                  color: cornflowerblue
+                - value: 50
+                  color: mediumblue
+            cache: false
+            header:
+              show: true
+              show_states: true
+            experimental:
+              color_threshold: true
+            apex_config:
+              grid:
+                xaxis:
+                  lines:
+                    show: false
+                yaxis:
+                  lines:
+                    show: false
+              yaxis:
+                tickAmount: 3
+                min: 0
+                max: |
+                  EVAL:function(max) {
+                    return max * 1.1;
+                  }
+                labels:
+                  formatter: |
+                    EVAL:function (val) {
+                      return (val % 1 === 0) ? val : val.toFixed(1) + " mm";
+                    }
+              stroke:
+                curve: smooth
+              chart:
+                height: 200
+            graph_span: 365.25d
+            span:
+              start: year
+            series:
+              - entity: sensor.ecowittgateway_4_monthly_rain
+                name: Monthly Rainfall
+                group_by:
+                  func: max
+                  duration: 30d
+                show:
+                  in_chart: true
+                  in_header: false
+              - entity: sensor.ecowittgateway_4_daily_rain
+                name: Total Daily Rainfall
+                show:
+                  in_chart: false
+                  in_header: true
+              - entity: sensor.ecowittgateway_4_weekly_rain
+                name: Total Weekly Rainfall
+                show:
+                  in_chart: false
+                  in_header: true
+              - entity: sensor.ecowittgateway_4_yearly_rain
+                name: Total Yearly Rainfall
+                show:
+                  in_chart: false
+                  in_header: true
+          - type: gauge
+            entity: sensor.sb_01_homestead_water_depth
+            name: Homestead Water
+            needle: true
+            severity:
+              green: 300
+              yellow: 150
+              red: 0
+            min: 50
+            max: 500
+            unit: cm
+  - title: UQ Rain Gauge SW4
+    type: sections
+    path: uq-rain-gauge-sw4
+    max_columns: 3
+    sections:
+      - title: UQ Rain Data
+        type: grid
+        cards:
+          - type: custom:apexcharts-card
+            cache: false
+            header:
+              show: true
+              show_states: true
+            experimental:
+              color_threshold: true
+            apex_config:
+              grid:
+                xaxis:
+                  lines:
+                    show: false
+                yaxis:
+                  lines:
+                    show: false
+              yaxis:
+                tickAmount: 3
+                min: 0
+                max: |
+                  EVAL:function(max) {
+                    return max * 1.1;
+                  }
+                labels:
+                  formatter: |
+                    EVAL:function (val) {
+                      return (val % 1 === 0) ? val : val.toFixed(1) + " mm";
+                    }
+              stroke:
+                curve: smooth
+              chart:
+                height: 150
+            all_series_config:
+              type: column
+              color_threshold:
+                - value: 0
+                  color: white
+                - value: 1
+                  color: lightblue
+                - value: 10
+                  color: lightskyblue
+                - value: 20
+                  color: skyblue
+                - value: 30
+                  color: deepskyblue
+                - value: 40
+                  color: cornflowerblue
+                - value: 50
+                  color: mediumblue
+            graph_span: 24h
+            series:
+              - entity: sensor.ecowittgateway_5_hourly_rain
+                name: Hourly Rainfall
+                type: line
+                group_by:
+                  func: max
+                  duration: 1h
+                show:
+                  in_header: false
+              - entity: sensor.ecowittgateway_5_event_rain
+                name: Total Event Rainfall
+                show:
+                  in_chart: false
+                  in_header: true
+          - type: custom:apexcharts-card
+            all_series_config:
+              type: column
+              color_threshold:
+                - value: 0
+                  color: white
+                - value: 1
+                  color: lightblue
+                - value: 10
+                  color: lightskyblue
+                - value: 20
+                  color: skyblue
+                - value: 30
+                  color: deepskyblue
+                - value: 40
+                  color: cornflowerblue
+                - value: 50
+                  color: mediumblue
+            cache: false
+            header:
+              show: true
+              show_states: true
+            experimental:
+              color_threshold: true
+            apex_config:
+              grid:
+                xaxis:
+                  lines:
+                    show: false
+                yaxis:
+                  lines:
+                    show: false
+              yaxis:
+                tickAmount: 3
+                min: 0
+                max: |
+                  EVAL:function(max) {
+                    return max * 1.1;
+                  }
+                labels:
+                  formatter: |
+                    EVAL:function (val) {
+                      return (val % 1 === 0) ? val : val.toFixed(1) + " mm";
+                    }
+              stroke:
+                curve: smooth
+              chart:
+                height: 200
+            graph_span: 365.25d
+            span:
+              start: year
+            series:
+              - entity: sensor.ecowittgateway_5_monthly_rain
+                name: Monthly Rainfall
+                group_by:
+                  func: max
+                  duration: 30d
+                show:
+                  in_chart: true
+                  in_header: false
+              - entity: sensor.ecowittgateway_5_daily_rain
+                name: Total Daily Rainfall
+                show:
+                  in_chart: false
+                  in_header: true
+              - entity: sensor.ecowittgateway_5_weekly_rain
+                name: Total Weekly Rainfall
+                show:
+                  in_chart: false
+                  in_header: true
+              - entity: sensor.ecowittgateway_5_yearly_rain
+                name: Total Yearly Rainfall
+                show:
+                  in_chart: false
+                  in_header: true
+  - title: Cumulative Degree Days
+    type: sections
+    path: cumulative-degree-days
+    max_columns: 3
+    sections:
+      - title: Weather Station 1
+        type: grid
+        cards:
+          - type: vertical-stack
+            cards:
+              - type: horizontal-stack
+                cards:
+                  - type: custom:mushroom-entity-card
+                    entity: sensor.weather_station_1_degree_day
+                    name: Degree Day
+                    layout: vertical
+                    fill_container: true
+                  - type: custom:mushroom-entity-card
+                    entity: input_number.weather_station_1_cdd
+                    name: Cumulative Degree Days
+                    layout: vertical
+                    fill_container: true
+              - type: custom:apexcharts-card
+                series:
+                  - entity: sensor.weather_station_1_degree_day
+                    name: Degree Day
+                  - entity: input_number.weather_station_1_cdd
+                    name: Cumulative Degree Days
+              - type: button
+                name: Reset Cumulative Degree Days
+                icon: mdi:restore
+                icon_height: 80px
+                tap_action:
+                  confirmation:
+                    text: Are you sure you want to reset the The Cumulative Degree Days?
+                  action: call-service
+                  service: script.reset_weather_station_1_cdd
+      - title: Weather Station 2
+        type: grid
+        cards:
+          - type: vertical-stack
+            cards:
+              - type: horizontal-stack
+                cards:
+                  - type: custom:mushroom-entity-card
+                    entity: sensor.weather_station_2_degree_day
+                    name: Degree Day
+                    layout: vertical
+                    fill_container: true
+                  - type: custom:mushroom-entity-card
+                    entity: input_number.weather_station_2_cdd
+                    name: Cumulative Degree Days
+                    layout: vertical
+                    fill_container: true
+              - type: custom:apexcharts-card
+                series:
+                  - entity: sensor.weather_station_2_degree_day
+                    name: Degree Day
+                  - entity: input_number.weather_station_2_cdd
+                    name: Cumulative Degree Days
+              - type: button
+                name: Reset Cumulative Degree Days
+                icon: mdi:restore
+                icon_height: 80px
+                tap_action:
+                  confirmation:
+                    text: Are you sure you want to reset the The Cumulative Degree Days?
+                  action: call-service
+                  service: script.reset_weather_station_2_cdd

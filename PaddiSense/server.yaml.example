@@ -1,0 +1,67 @@
+# PaddiSense Server Configuration
+# ================================
+# Copy this file to /config/server.yaml and customize for your farm.
+# This file is NOT tracked in git - each server has its own config.
+#
+# Usage:
+#   cp PaddiSense/server.yaml.example server.yaml
+#   nano server.yaml  # Edit for your farm
+#   ./PaddiSense/install.sh
+#
+
+# Server identification
+server:
+  name: "My Farm"
+  location: "Farm Location"
+
+# Enable/disable modules
+# Set to true/false based on what you need
+modules:
+  ipm: true           # Inventory Product Manager - track chemicals, fertiliser, seed, lubricants
+  asm: true           # Asset Service Manager - track assets, parts, service events
+  weather: false      # Weather - local gateway + API stations (requires setup, see below)
+  pwm: false          # Precision Water Management - automated irrigation (requires farm config below)
+
+# Weather settings (only needed if weather module enabled)
+# The unified weather module supports both:
+# - Local Ecowitt gateway (auto-detected via entity availability)
+# - Remote API stations (requires API credentials in secrets.yaml)
+weather:
+  latitude: -35.0
+  elevation: 100    # meters above sea level
+
+# PWM settings (only needed if pwm module enabled)
+# Define farms at server level - paddocks and bays are managed via UI
+pwm:
+  farms:
+    # Farm 1 - Primary farm
+    farm_1:
+      name: "Main Farm"
+      location:
+        latitude: -35.5575
+        longitude: 145.1234
+      water_source: channel       # channel, bore, river, dam
+      channel_info:
+        name: "Main Channel"
+        supply_point: "Offtake A"
+    # Uncomment to add more farms (up to 5)
+    # farm_2:
+    #   name: "North Block"
+    #   location:
+    #     latitude: -35.5600
+    #     longitude: 145.1300
+    #   water_source: channel
+    #   channel_info:
+    #     name: "Main Channel"
+    #     supply_point: "Offtake B"
+
+# Notes:
+# - IPM and ASM work out of the box, no additional setup required
+# - Weather module combines local gateway + API stations:
+#   - Local gateway: requires Ecowitt gateway already integrated with Home Assistant
+#   - API stations: requires ecowitt_app_key and ecowitt_api_key in secrets.yaml
+# - PWM module:
+#   - Farms are defined here (server level) - one time setup
+#   - Paddocks and bays are created/managed via the PWM dashboard Settings
+#   - ESPHome devices must be integrated with Home Assistant first
+#   - Device discovery looks for sensors matching *_1m_water_depth pattern

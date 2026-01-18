@@ -40,6 +40,9 @@ esphome/*.yaml
 secrets.yaml
 secrets/*.yaml
 
+# PaddiSense per-server configuration
+server.yaml
+
 ########################################
 # Editor / OS junk
 ########################################
