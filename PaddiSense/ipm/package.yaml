@@ -4023,7 +4023,14 @@ script:
     sequence:
       - variables:
           category: "{{ states('input_select.ipm_manage_category') }}"
-          products: "{{ state_attr('sensor.ipm_products', 'products') | default({}) | default({}) %}{% set ns = namespace(items=[]) %}{% for k, v in _.items() %}{% if v.category == category %}{% set ns.items = ns.items + [{'key': k, 'value': v}] %}{% endif %}{% endfor %}{{ ns.items }} }}"
+          products: >-
+            {%- set ns = namespace(items=[]) -%}
+            {%- for k, v in (state_attr('sensor.ipm_products', 'products') | default({})).items() -%}
+              {%- if v.category == category -%}
+                {%- set ns.items = ns.items + [{'key': k, 'value': v}] -%}
+              {%- endif -%}
+            {%- endfor -%}
+            {{ ns.items }}
 
       - choose:
           - conditions:
@@ -4129,11 +4136,14 @@ script:
       - variables:
           parent: "{{ states('input_select.ipm_manage_subcategory_parent') }}"
           subcategory: "{{ states('input_select.ipm_manage_subcategory') }}"
-          products: "{{ state_attr('sensor.ipm_products', 'products') | default({}) | default({}) %}
+          products: >-
             {%- set ns = namespace(items=[]) -%}
             {%- for k, v in (state_attr('sensor.ipm_products', 'products') | default({})).items() -%}
-              {%- if v.subcategory == subcategory -%}{%- set ns.items = ns.items + [{'key': k, 'value': v}] -%}{%- endif -%}
-            {%- endfor -%}{{ ns.items }}"
+              {%- if v.subcategory == subcategory -%}
+                {%- set ns.items = ns.items + [{'key': k, 'value': v}] -%}
+              {%- endif -%}
+            {%- endfor -%}
+            {{ ns.items }}
 
       - choose:
           - conditions:
