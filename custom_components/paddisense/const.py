@@ -141,6 +141,16 @@ REQUIRED_HACS_CARDS = [
     {"repository": "thomasloven/lovelace-card-mod", "category": "plugin"},
 ]
 
+# Registry is always installed (core component)
+REGISTRY_MODULE = {
+    "id": "registry",
+    "name": "Farm Registry",
+    "dashboard_slug": "paddisense-registry",
+    "dashboard_title": "Farm Registry",
+    "dashboard_file": "registry/dashboards/config.yaml",
+    "icon": "mdi:barn",
+}
+
 # =============================================================================
 # PLATFORMS & ATTRIBUTES
 # =============================================================================
