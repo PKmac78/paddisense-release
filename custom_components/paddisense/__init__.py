@@ -531,17 +531,21 @@ async def _async_update_sensors(hass: HomeAssistant) -> None:
 
 async def _async_register_frontend(hass: HomeAssistant) -> None:
     """Register frontend resources."""
+    from homeassistant.components.http import StaticPathConfig
+
     # Register custom card JS as static paths
-    hass.http.register_static_path(
-        "/paddisense/paddisense-registry-card.js",
-        hass.config.path("custom_components/paddisense/www/paddisense-registry-card.js"),
-        cache_headers=False,
-    )
-    hass.http.register_static_path(
-        "/paddisense/paddisense-manager-card.js",
-        hass.config.path("custom_components/paddisense/www/paddisense-manager-card.js"),
-        cache_headers=False,
-    )
+    await hass.http.async_register_static_paths([
+        StaticPathConfig(
+            "/paddisense/paddisense-registry-card.js",
+            hass.config.path("custom_components/paddisense/www/paddisense-registry-card.js"),
+            cache_headers=False,
+        ),
+        StaticPathConfig(
+            "/paddisense/paddisense-manager-card.js",
+            hass.config.path("custom_components/paddisense/www/paddisense-manager-card.js"),
+            cache_headers=False,
+        ),
+    ])
 
     _LOGGER.info(
         "PaddiSense frontend registered. Add to Lovelace resources: "
