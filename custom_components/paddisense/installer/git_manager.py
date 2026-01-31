@@ -118,9 +118,17 @@ class GitManager:
                 if self.repo_dir.exists():
                     shutil.rmtree(self.repo_dir)
 
-                # Copy modules to target
-                shutil.copytree(source_dir, self.repo_dir)
-                _LOGGER.info("Copied modules to %s", self.repo_dir)
+                # Copy modules to target, excluding packages folder (growers start fresh)
+                def ignore_packages(dir, files):
+                    if Path(dir).name == "PaddiSense" or dir == str(source_dir):
+                        return ["packages"] if "packages" in files else []
+                    return []
+
+                shutil.copytree(source_dir, self.repo_dir, ignore=ignore_packages)
+
+                # Create empty packages directory
+                (self.repo_dir / "packages").mkdir(exist_ok=True)
+                _LOGGER.info("Copied modules to %s (packages excluded)", self.repo_dir)
 
             _LOGGER.info("Successfully cloned PaddiSense repository")
             return {
@@ -187,12 +195,33 @@ class GitManager:
                 else:
                     source_dir = temp_path
 
-                # Backup existing data directories (local_data is separate, but just in case)
+                # Backup existing packages folder (preserve installed modules)
+                existing_packages = None
+                packages_dir = self.repo_dir / "packages"
+                if packages_dir.exists():
+                    existing_packages = Path(temp_dir) / "packages_backup"
+                    shutil.copytree(packages_dir, existing_packages)
+                    _LOGGER.info("Backed up existing packages folder")
+
                 # Remove old modules and copy new
                 if self.repo_dir.exists():
                     shutil.rmtree(self.repo_dir)
 
-                shutil.copytree(source_dir, self.repo_dir)
+                # Copy new modules, excluding packages folder from repo
+                def ignore_packages(dir, files):
+                    if Path(dir).name == "PaddiSense" or dir == str(source_dir):
+                        return ["packages"] if "packages" in files else []
+                    return []
+
+                shutil.copytree(source_dir, self.repo_dir, ignore=ignore_packages)
+
+                # Restore packages folder
+                if existing_packages and existing_packages.exists():
+                    shutil.copytree(existing_packages, packages_dir)
+                    _LOGGER.info("Restored packages folder")
+                else:
+                    packages_dir.mkdir(exist_ok=True)
+
                 _LOGGER.info("Updated modules at %s", self.repo_dir)
 
             _LOGGER.info("Successfully pulled latest changes")
