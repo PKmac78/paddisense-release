@@ -133,6 +133,13 @@ SERVICE_REMOVE_MODULE = "remove_module"
 SERVICE_CREATE_BACKUP = "create_backup"
 SERVICE_RESTORE_BACKUP = "restore_backup"
 SERVICE_ROLLBACK = "rollback"
+SERVICE_INSTALL_HACS_CARDS = "install_hacs_cards"
+
+# Required HACS frontend cards
+REQUIRED_HACS_CARDS = [
+    {"repository": "custom-cards/button-card", "category": "plugin"},
+    {"repository": "thomasloven/lovelace-card-mod", "category": "plugin"},
+]
 
 # =============================================================================
 # PLATFORMS & ATTRIBUTES

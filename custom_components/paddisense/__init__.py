@@ -38,11 +38,13 @@ from .const import (
     # Installer services
     SERVICE_CHECK_UPDATES,
     SERVICE_CREATE_BACKUP,
+    SERVICE_INSTALL_HACS_CARDS,
     SERVICE_INSTALL_MODULE,
     SERVICE_REMOVE_MODULE,
     SERVICE_RESTORE_BACKUP,
     SERVICE_ROLLBACK,
     SERVICE_UPDATE_PADDISENSE,
+    REQUIRED_HACS_CARDS,
 )
 from .installer import BackupManager, ConfigWriter, GitManager, ModuleManager
 from .registry.backend import RegistryBackend
@@ -214,7 +216,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             # Installer
             SERVICE_CHECK_UPDATES, SERVICE_UPDATE_PADDISENSE, SERVICE_INSTALL_MODULE,
             SERVICE_REMOVE_MODULE, SERVICE_CREATE_BACKUP, SERVICE_RESTORE_BACKUP,
-            SERVICE_ROLLBACK,
+            SERVICE_ROLLBACK, SERVICE_INSTALL_HACS_CARDS,
         ]
         for service in all_services:
             hass.services.async_remove(DOMAIN, service)
@@ -502,6 +504,55 @@ async def _async_register_installer_services(hass: HomeAssistant) -> None:
         if result.get("success") and result.get("restart_required"):
             await hass.services.async_call("homeassistant", "restart")
 
+    async def handle_install_hacs_cards(call: ServiceCall) -> None:
+        """Install required HACS frontend cards."""
+        # Check if HACS is available
+        if not hass.services.has_service("hacs", "install"):
+            _LOGGER.error("HACS is not installed or not ready")
+            await hass.services.async_call(
+                "persistent_notification", "create",
+                {
+                    "title": "PaddiSense",
+                    "message": "HACS is not installed. Please install HACS first, then run this service again.",
+                },
+            )
+            return
+
+        installed = []
+        failed = []
+
+        for card in REQUIRED_HACS_CARDS:
+            try:
+                _LOGGER.info("Installing HACS card: %s", card["repository"])
+                await hass.services.async_call(
+                    "hacs", "install",
+                    {
+                        "repository": card["repository"],
+                        "category": card["category"],
+                    },
+                )
+                installed.append(card["repository"])
+            except Exception as e:
+                _LOGGER.error("Failed to install %s: %s", card["repository"], e)
+                failed.append(card["repository"])
+
+        # Notify user
+        if installed:
+            msg = f"Installed: {', '.join(installed)}"
+            if failed:
+                msg += f"\nFailed: {', '.join(failed)}"
+            msg += "\n\nPlease refresh your browser (Ctrl+F5) to load the new cards."
+        else:
+            msg = f"Failed to install cards: {', '.join(failed)}"
+
+        await hass.services.async_call(
+            "persistent_notification", "create",
+            {
+                "title": "PaddiSense - HACS Cards",
+                "message": msg,
+            },
+        )
+
     # Register installer services
     hass.services.async_register(DOMAIN, SERVICE_CHECK_UPDATES, handle_check_updates)
     hass.services.async_register(DOMAIN, SERVICE_UPDATE_PADDISENSE, handle_update_paddisense, UPDATE_PADDISENSE_SCHEMA)
@@ -510,6 +561,7 @@ async def _async_register_installer_services(hass: HomeAssistant) -> None:
     hass.services.async_register(DOMAIN, SERVICE_CREATE_BACKUP, handle_create_backup)
     hass.services.async_register(DOMAIN, SERVICE_RESTORE_BACKUP, handle_restore_backup, RESTORE_BACKUP_SCHEMA)
     hass.services.async_register(DOMAIN, SERVICE_ROLLBACK, handle_rollback)
+    hass.services.async_register(DOMAIN, SERVICE_INSTALL_HACS_CARDS, handle_install_hacs_cards)
 
 
 # =============================================================================
