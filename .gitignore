@@ -8,6 +8,12 @@
 home-assistant.log*
 cloud/
 tts/
+image/
+
+########################################
+# Separate repos / dev folders
+########################################
+paddisense-hacs/
 
 ########################################
 # PaddiSense local data (DO NOT COMMIT)
