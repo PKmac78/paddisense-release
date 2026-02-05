@@ -3,6 +3,9 @@ from __future__ import annotations
 
 import json
 import logging
+import shutil
+from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +20,59 @@ from ..const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+
+# =============================================================================
+# ERROR TYPES
+# =============================================================================
+
+class ModuleError(Exception):
+    """Base exception for module operations."""
+    pass
+
+
+class ModuleNotFoundError(ModuleError):
+    """Module does not exist in repository."""
+    pass
+
+
+class ModuleValidationError(ModuleError):
+    """Module failed validation checks."""
+    pass
+
+
+class ModuleInstallError(ModuleError):
+    """Module installation failed."""
+    pass
+
+
+class ModuleRollbackError(ModuleError):
+    """Failed to rollback after error."""
+    pass
+
+
+# =============================================================================
+# INSTALLATION STATE TRACKING
+# =============================================================================
+
+@dataclass
+class InstallState:
+    """Track installation state for rollback."""
+    module_id: str
+    symlink_created: bool = False
+    symlink_path: Path | None = None
+    previous_symlink_target: Path | None = None
+    data_dir_created: bool = False
+    data_dir_path: Path | None = None
+    dashboard_added: bool = False
+    dashboard_slug: str | None = None
+    previous_dashboards: dict | None = None
+    errors: list[str] = field(default_factory=list)
+
+    def add_error(self, error: str) -> None:
+        """Add an error message."""
+        self.errors.append(error)
+        _LOGGER.error("Module %s: %s", self.module_id, error)
 
 
 class ModuleManager:
@@ -105,12 +161,297 @@ class ModuleManager:
         # Check if there are any files in the data directory
         return any(data_path.iterdir())
 
-    def install_module(self, module_id: str) -> dict[str, Any]:
-        """Install a module by creating symlink and updating dashboards."""
+    # =========================================================================
+    # YAML VALIDATION
+    # =========================================================================
+
+    def validate_package_yaml(self, module_id: str) -> dict[str, Any]:
+        """Validate a module's package.yaml file.
+
+        Checks:
+        - File exists and is readable
+        - Valid YAML syntax
+        - No duplicate top-level keys (HA requirement)
+        - Required sections present
+
+        Returns:
+            dict with 'valid' bool and 'errors' list
+        """
+        errors = []
+        warnings = []
+        package_file = self.paddisense_dir / module_id / "package.yaml"
+
+        if not package_file.exists():
+            return {
+                "valid": False,
+                "errors": [f"package.yaml not found: {package_file}"],
+                "warnings": [],
+            }
+
+        try:
+            import yaml
+
+            content = package_file.read_text(encoding="utf-8")
+
+            # Check for empty file
+            if not content.strip():
+                return {
+                    "valid": False,
+                    "errors": ["package.yaml is empty"],
+                    "warnings": [],
+                }
+
+            # Parse YAML
+            try:
+                data = yaml.safe_load(content)
+            except yaml.YAMLError as e:
+                return {
+                    "valid": False,
+                    "errors": [f"Invalid YAML syntax: {e}"],
+                    "warnings": [],
+                }
+
+            if data is None:
+                return {
+                    "valid": False,
+                    "errors": ["package.yaml parsed as empty/null"],
+                    "warnings": [],
+                }
+
+            if not isinstance(data, dict):
+                return {
+                    "valid": False,
+                    "errors": [f"package.yaml must be a dict, got {type(data).__name__}"],
+                    "warnings": [],
+                }
+
+            # Check for valid HA package keys
+            valid_keys = {
+                "automation", "binary_sensor", "command_line", "counter",
+                "group", "homeassistant", "input_boolean", "input_datetime",
+                "input_number", "input_select", "input_text", "light",
+                "logger", "media_player", "mqtt", "notify", "recorder",
+                "scene", "script", "sensor", "shell_command", "switch",
+                "template", "timer", "utility_meter", "zone",
+            }
+
+            for key in data.keys():
+                if key not in valid_keys:
+                    warnings.append(f"Unusual top-level key: '{key}' (may be valid)")
+
+            # Check for common issues
+            if "template" in data:
+                templates = data["template"]
+                if not isinstance(templates, list):
+                    errors.append("'template' should be a list of template definitions")
+
+            _LOGGER.debug("Validated package.yaml for %s: valid=%s", module_id, len(errors) == 0)
+
+            return {
+                "valid": len(errors) == 0,
+                "errors": errors,
+                "warnings": warnings,
+                "keys": list(data.keys()) if isinstance(data, dict) else [],
+            }
+
+        except IOError as e:
+            return {
+                "valid": False,
+                "errors": [f"Failed to read package.yaml: {e}"],
+                "warnings": [],
+            }
+
+    def validate_dashboard_yaml(self, module_id: str) -> dict[str, Any]:
+        """Validate a module's dashboard YAML file.
+
+        Returns:
+            dict with 'valid' bool and 'errors' list
+        """
+        errors = []
+        warnings = []
+
+        meta = self.get_modules_metadata().get(module_id, MODULE_METADATA.get(module_id, {}))
+        dashboard_file_path = meta.get("dashboard_file")
+
+        if dashboard_file_path:
+            dashboard_file = self.paddisense_dir / dashboard_file_path
+        else:
+            dashboard_file = self.paddisense_dir / module_id / "dashboards" / "views.yaml"
+
+        if not dashboard_file.exists():
+            # Try alternate paths
+            alt_paths = [
+                self.paddisense_dir / module_id / "dashboards" / f"{module_id}.yaml",
+                self.paddisense_dir / module_id / "dashboards" / "inventory.yaml",
+            ]
+            for alt in alt_paths:
+                if alt.exists():
+                    dashboard_file = alt
+                    break
+            else:
+                return {
+                    "valid": False,
+                    "errors": [f"Dashboard file not found: {dashboard_file}"],
+                    "warnings": [],
+                }
+
+        try:
+            import yaml
+
+            content = dashboard_file.read_text(encoding="utf-8")
+            data = yaml.safe_load(content)
+
+            if data is None:
+                errors.append("Dashboard YAML parsed as empty/null")
+            elif not isinstance(data, dict):
+                errors.append(f"Dashboard must be a dict, got {type(data).__name__}")
+            else:
+                # Check for required dashboard keys
+                if "title" not in data:
+                    warnings.append("Dashboard missing 'title' key")
+                if "views" not in data:
+                    errors.append("Dashboard missing 'views' key")
+                elif not isinstance(data["views"], list):
+                    errors.append("Dashboard 'views' must be a list")
+
+            return {
+                "valid": len(errors) == 0,
+                "errors": errors,
+                "warnings": warnings,
+                "file": str(dashboard_file),
+            }
+
+        except yaml.YAMLError as e:
+            return {
+                "valid": False,
+                "errors": [f"Invalid dashboard YAML: {e}"],
+                "warnings": [],
+            }
+        except IOError as e:
+            return {
+                "valid": False,
+                "errors": [f"Failed to read dashboard: {e}"],
+                "warnings": [],
+            }
+
+    def preflight_check(self, module_id: str) -> dict[str, Any]:
+        """Run all preflight checks before installation.
+
+        Returns:
+            dict with 'ready' bool and detailed check results
+        """
+        checks = {
+            "module_exists": False,
+            "version_file": False,
+            "package_yaml_valid": False,
+            "dashboard_yaml_valid": False,
+            "no_conflicts": True,
+        }
+        errors = []
+        warnings = []
+
+        # Check module exists
+        module_dir = self.paddisense_dir / module_id
+        if module_dir.is_dir():
+            checks["module_exists"] = True
+        else:
+            errors.append(f"Module directory not found: {module_dir}")
+
+        # Check VERSION file
+        version_file = module_dir / "VERSION"
+        if version_file.exists():
+            checks["version_file"] = True
+        else:
+            warnings.append(f"VERSION file missing (will use 'unknown')")
+
+        # Validate package.yaml
+        pkg_result = self.validate_package_yaml(module_id)
+        checks["package_yaml_valid"] = pkg_result["valid"]
+        errors.extend(pkg_result.get("errors", []))
+        warnings.extend(pkg_result.get("warnings", []))
+
+        # Validate dashboard.yaml
+        dash_result = self.validate_dashboard_yaml(module_id)
+        checks["dashboard_yaml_valid"] = dash_result["valid"]
+        errors.extend(dash_result.get("errors", []))
+        warnings.extend(dash_result.get("warnings", []))
+
+        # Check for conflicts (e.g., already installed)
+        symlink_path = self.packages_dir / f"{module_id}.yaml"
+        if symlink_path.exists() and symlink_path.is_symlink():
+            warnings.append(f"Module already installed (will be reinstalled)")
+
+        ready = checks["module_exists"] and checks["package_yaml_valid"]
+
+        return {
+            "ready": ready,
+            "checks": checks,
+            "errors": errors,
+            "warnings": warnings,
+            "module_id": module_id,
+        }
+
+    # =========================================================================
+    # ROLLBACK SUPPORT
+    # =========================================================================
+
+    def _rollback(self, state: InstallState) -> None:
+        """Rollback a failed installation.
+
+        Args:
+            state: InstallState tracking what was changed
+        """
+        _LOGGER.warning("Rolling back installation of %s", state.module_id)
+
+        rollback_errors = []
+
+        # Rollback symlink
+        if state.symlink_created and state.symlink_path:
+            try:
+                if state.symlink_path.exists() or state.symlink_path.is_symlink():
+                    state.symlink_path.unlink()
+                    _LOGGER.debug("Rollback: removed symlink %s", state.symlink_path)
+
+                # Restore previous symlink if there was one
+                if state.previous_symlink_target:
+                    state.symlink_path.symlink_to(state.previous_symlink_target)
+                    _LOGGER.debug("Rollback: restored previous symlink")
+            except OSError as e:
+                rollback_errors.append(f"Failed to rollback symlink: {e}")
+
+        # Rollback dashboard
+        if state.dashboard_added and state.previous_dashboards is not None:
+            try:
+                self._write_lovelace_dashboards(state.previous_dashboards)
+                _LOGGER.debug("Rollback: restored previous dashboards")
+            except Exception as e:
+                rollback_errors.append(f"Failed to rollback dashboard: {e}")
+
+        # Note: We don't remove data_dir as it may contain user data
+
+        if rollback_errors:
+            _LOGGER.error("Rollback completed with errors: %s", rollback_errors)
+        else:
+            _LOGGER.info("Rollback completed successfully for %s", state.module_id)
+
+    def install_module(self, module_id: str, skip_validation: bool = False) -> dict[str, Any]:
+        """Install a module by creating symlink and updating dashboards.
+
+        Args:
+            module_id: The module to install
+            skip_validation: Skip YAML validation (not recommended)
+
+        Returns:
+            dict with success status, errors, and metadata
+        """
+        state = InstallState(module_id=module_id)
+
+        # Basic checks
         if module_id not in AVAILABLE_MODULES:
             return {
                 "success": False,
                 "error": f"Unknown module: {module_id}",
+                "error_type": "ModuleNotFoundError",
             }
 
         module_dir = self.paddisense_dir / module_id
@@ -118,36 +459,79 @@ class ModuleManager:
             return {
                 "success": False,
                 "error": f"Module not found in repository: {module_id}",
+                "error_type": "ModuleNotFoundError",
             }
 
-        package_file = module_dir / "package.yaml"
-        if not package_file.exists():
-            return {
-                "success": False,
-                "error": f"Module package.yaml not found: {module_id}",
-            }
+        # Run preflight validation
+        if not skip_validation:
+            preflight = self.preflight_check(module_id)
+            if not preflight["ready"]:
+                return {
+                    "success": False,
+                    "error": f"Preflight check failed: {'; '.join(preflight['errors'])}",
+                    "error_type": "ModuleValidationError",
+                    "preflight": preflight,
+                }
+
+            # Log warnings but continue
+            for warning in preflight.get("warnings", []):
+                _LOGGER.warning("Module %s: %s", module_id, warning)
 
         try:
             # Ensure packages directory exists
             self.packages_dir.mkdir(parents=True, exist_ok=True)
 
-            # Create symlink
+            # Save current dashboard state for rollback
+            if LOVELACE_DASHBOARDS_YAML.exists():
+                try:
+                    import yaml
+                    content = LOVELACE_DASHBOARDS_YAML.read_text(encoding="utf-8")
+                    state.previous_dashboards = yaml.safe_load(content) or {}
+                except Exception:
+                    state.previous_dashboards = {}
+            else:
+                state.previous_dashboards = {}
+
+            # Step 1: Create symlink
             symlink_path = self.packages_dir / f"{module_id}.yaml"
-            if symlink_path.exists() or symlink_path.is_symlink():
+            state.symlink_path = symlink_path
+
+            # Save previous symlink target if exists
+            if symlink_path.is_symlink():
+                try:
+                    state.previous_symlink_target = symlink_path.readlink()
+                except OSError:
+                    pass
                 symlink_path.unlink()
 
-            # Relative symlink: from packages/ipm.yaml to ../ipm/package.yaml
+            elif symlink_path.exists():
+                symlink_path.unlink()
+
+            # Create new symlink
             relative_target = Path("..") / module_id / "package.yaml"
             symlink_path.symlink_to(relative_target)
+            state.symlink_created = True
+            _LOGGER.debug("Created symlink: %s -> %s", symlink_path, relative_target)
 
-            # Create data directory
+            # Step 2: Create data directory
             data_path = self.data_dir / module_id
+            data_existed = data_path.exists()
             data_path.mkdir(parents=True, exist_ok=True)
             (data_path / "backups").mkdir(exist_ok=True)
 
-            # Update lovelace dashboards
-            self._add_dashboard(module_id)
+            if not data_existed:
+                state.data_dir_created = True
+                state.data_dir_path = data_path
+            _LOGGER.debug("Data directory ready: %s", data_path)
 
+            # Step 3: Update lovelace dashboards
+            meta = self.get_modules_metadata().get(module_id, MODULE_METADATA.get(module_id, {}))
+            state.dashboard_slug = meta.get("dashboard_slug", f"{module_id}-dashboard")
+            self._add_dashboard(module_id)
+            state.dashboard_added = True
+            _LOGGER.debug("Dashboard registered: %s", state.dashboard_slug)
+
+            # Success
             version = self._get_module_version(module_id)
             _LOGGER.info("Installed module %s v%s", module_id, version)
 
@@ -155,15 +539,33 @@ class ModuleManager:
                 "success": True,
                 "module_id": module_id,
                 "version": version,
-                "message": f"Installed {module_id}",
+                "message": f"Successfully installed {module_id} v{version}",
                 "restart_required": True,
+                "steps_completed": {
+                    "symlink": True,
+                    "data_dir": True,
+                    "dashboard": True,
+                },
             }
 
         except OSError as e:
-            _LOGGER.error("Failed to install module %s: %s", module_id, e)
+            state.add_error(f"OS error during installation: {e}")
+            self._rollback(state)
             return {
                 "success": False,
                 "error": f"Installation failed: {e}",
+                "error_type": "ModuleInstallError",
+                "rollback_performed": True,
+            }
+
+        except Exception as e:
+            state.add_error(f"Unexpected error: {e}")
+            self._rollback(state)
+            return {
+                "success": False,
+                "error": f"Unexpected error during installation: {e}",
+                "error_type": "ModuleInstallError",
+                "rollback_performed": True,
             }
 
     def remove_module(self, module_id: str) -> dict[str, Any]:
@@ -259,7 +661,8 @@ class ModuleManager:
 
     def _remove_dashboard(self, module_id: str) -> None:
         """Remove dashboard entry for a module."""
-        meta = MODULE_METADATA.get(module_id, {})
+        all_meta = self.get_modules_metadata()
+        meta = all_meta.get(module_id, MODULE_METADATA.get(module_id, {}))
         slug = meta.get("dashboard_slug", f"{module_id}-dashboard")
 
         if not LOVELACE_DASHBOARDS_YAML.exists():

@@ -103,7 +103,8 @@ def extract_grower(server_config: dict[str, Any]) -> dict[str, Any]:
     """Extract grower/server info from server.yaml."""
     server = server_config.get("server", {})
     return {
-        "name": server.get("name", "PaddiSense Farm"),
+        "name": server.get("name", ""),
+        "email": server.get("email", ""),
         "location": server.get("location", ""),
     }
 

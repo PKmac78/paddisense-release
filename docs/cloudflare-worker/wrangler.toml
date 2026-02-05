@@ -1,0 +1,24 @@
+# PaddiSense Registration Worker
+# Deploy with: npx wrangler deploy
+
+name = "paddisense-registration"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+# Uncomment to add custom domain
+# routes = [
+#   { pattern = "api.paddisense.com/*", zone_name = "paddisense.com" }
+# ]
+
+# Environment variables (set via dashboard or wrangler secret)
+# Run these commands to set secrets:
+#   npx wrangler secret put GITHUB_TOKEN
+#   npx wrangler secret put GIST_ID
+#   npx wrangler secret put WORKER_SECRET
+#   npx wrangler secret put ADMIN_TOKEN
+#   npx wrangler secret put RESEND_API_KEY
+#   npx wrangler secret put ADMIN_EMAIL
+
+[vars]
+# Non-secret variables can go here
+# ENVIRONMENT = "production"

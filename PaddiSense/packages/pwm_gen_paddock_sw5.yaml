@@ -1,1 +1,178 @@
-../pwm/generated/pwm_paddock_sw5.yaml
+# PWM Generated - SW5
+# Generated: 2026-01-26T21:12:17
+# Version: 2026.01.1
+# DO NOT EDIT - Changes will be overwritten on regeneration
+
+#==============================================================================
+# PADDOCK INPUT HELPERS
+#==============================================================================
+input_select:
+  sw5_automation_state:
+    name: "PWM SW5 Automation State"
+    options: ["Off", "Flush", "Pond", "Drain"]
+    initial: "Off"
+    icon: mdi:water
+
+  sw5_drain_door_control:
+    name: "PWM SW5 Drain Door Control"
+    options: ["Close", "Open", "HoldOne", "HoldTwo"]
+    initial: "Close"
+    icon: mdi:door
+
+input_number:
+  sw5_supply_waterleveloffset:
+    name: "PWM SW5 Supply Water Level Offset"
+    unit_of_measurement: "cm"
+    min: -150
+    max: 150
+    step: 0.1
+    mode: box
+    icon: mdi:arrow-up-down
+
+timer:
+  sw5_flushclosesupply:
+    name: "PWM SW5 Flush Close Supply Timer"
+    duration: "01:00:00"
+    icon: mdi:timer
+
+#==============================================================================
+# PADDOCK TEMPLATE SENSORS
+#==============================================================================
+template:
+  - sensor:
+      - name: "PWM SW5 Version"
+        unique_id: "pwm_sw5_version"
+        icon: mdi:tag
+        state: "2026.01.1"
+
+      - name: "PWM SW5 Supply Water Depth"
+        unique_id: "pwm_sw5_supply_water_depth"
+        state_class: measurement
+        device_class: distance
+        unit_of_measurement: "cm"
+        state: >-
+          {% set bays = state_attr('sensor.pwm_data', 'bays') or {} %}
+          {% set bay = bays.get('sw5_b_01', {}) %}
+          {% set device = bay.get('supply_1', {}).get('device', '') %}
+          {% if not device or device == 'unset' %}
+            unavailable
+          {% else %}
+            {% set depth_id = 'sensor.' ~ device ~ '_' ~ device ~ '_1m_water_depth' %}
+            {% set depth = states(depth_id) | float(default=-999) %}
+            {% set offset = states('input_number.sw5_supply_waterleveloffset') | float(0) %}
+            {% if depth == -999 %}unavailable{% else %}{{ (depth - offset) | round(1) }}{% endif %}
+          {% endif %}
+
+#==============================================================================
+# PADDOCK AUTOMATIONS
+#==============================================================================
+automation:
+  #----------------------------------------------------------------------------
+  # Door Control - Maps UI door controls to ESPHome devices
+  #----------------------------------------------------------------------------
+  - id: "pwm_sw5_door_control"
+    alias: "PWM SW5 Door Control"
+    description: "Maps door control input_selects to ESPHome actuator states"
+    mode: parallel
+    max: 20
+    trigger:
+      - platform: state
+        entity_id:
+          - input_select.sw5_drain_door_control
+          - input_select.sw5_b_01_door_control
+          - input_select.sw5_b_02_door_control
+          - input_select.sw5_b_03_door_control
+          - input_select.sw5_b_04_door_control
+          - input_select.sw5_b_05_door_control
+    variables:
+      control_entity: "{{ trigger.entity_id }}"
+      control_state: "{{ trigger.to_state.state }}"
+      entity_id_part: "{{ control_entity.split('.')[1] }}"
+      is_drain: "{{ '_drain_door_control' in entity_id_part }}"
+      bay_match: >-
+        {% set bays = state_attr('sensor.pwm_data', 'bays') or {} %}
+        {% if is_drain %}
+          {% for bid, b in bays.items() if b.paddock_id == 'sw5' and b.get('is_last_bay') %}
+            {{ b.get('drain_1', {}).get('device', '') }}
+          {% endfor %}
+        {% else %}
+          {% set bay_num = entity_id_part | regex_findall('_b_(\d+)_') | first | default('') %}
+          {% set bay_id = 'sw5_b_' ~ bay_num %}
+          {% set bay = bays.get(bay_id, {}) %}
+          {{ bay.get('supply_1', {}).get('device', '') }}
+        {% endif %}
+      device: "{{ bay_match | trim }}"
+    condition:
+      - condition: template
+        value_template: "{{ device | length > 0 and device != 'unset' }}"
+    action:
+      - service: input_select.select_option
+        target:
+          entity_id: "input_select.{{ device }}_actuator_state"
+        data:
+          option: "{{ control_state }}"
+
+  #----------------------------------------------------------------------------
+  # State Propagation - Paddock state to all bays (when not individual mode)
+  #----------------------------------------------------------------------------
+  - id: "pwm_sw5_propagate_state"
+    alias: "PWM SW5 Propagate State"
+    description: "Propagate paddock automation state to all bays unless individual mode"
+    mode: single
+    trigger:
+      - platform: state
+        entity_id: input_select.sw5_automation_state
+    condition:
+      - condition: template
+        value_template: >-
+          {% set paddocks = state_attr('sensor.pwm_data', 'paddocks') or {} %}
+          {% set p = paddocks.get('sw5', {}) %}
+          {{ not p.get('automation_state_individual', false) }}
+    action:
+      - service: input_select.select_option
+        target:
+          entity_id:
+            - input_select.sw5_b_01_automation_state
+            - input_select.sw5_b_02_automation_state
+            - input_select.sw5_b_03_automation_state
+            - input_select.sw5_b_04_automation_state
+            - input_select.sw5_b_05_automation_state
+        data:
+          option: "{{ states('input_select.sw5_automation_state') }}"
+
+  #----------------------------------------------------------------------------
+  # All Bays Off - Set paddock to Off when all bays are Off
+  #----------------------------------------------------------------------------
+  - id: "pwm_sw5_all_bays_off"
+    alias: "PWM SW5 All Bays Off"
+    description: "Set paddock state to Off when all bay states are Off"
+    mode: single
+    trigger:
+      - platform: state
+        entity_id:
+          - input_select.sw5_b_01_automation_state
+          - input_select.sw5_b_02_automation_state
+          - input_select.sw5_b_03_automation_state
+          - input_select.sw5_b_04_automation_state
+          - input_select.sw5_b_05_automation_state
+        to: "Off"
+    condition:
+      - condition: not
+        conditions:
+          - condition: state
+            entity_id: input_select.sw5_automation_state
+            state: "Off"
+      - condition: state
+        entity_id:
+          - input_select.sw5_b_01_automation_state
+          - input_select.sw5_b_02_automation_state
+          - input_select.sw5_b_03_automation_state
+          - input_select.sw5_b_04_automation_state
+          - input_select.sw5_b_05_automation_state
+        state: "Off"
+    action:
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.sw5_automation_state
+        data:
+          option: "Off"

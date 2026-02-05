@@ -39,7 +39,14 @@ PADDISENSE_REPO_BRANCH = "main"
 # MODULES
 # =============================================================================
 
-AVAILABLE_MODULES = ["ipm", "asm", "weather", "pwm"]
+# All available modules
+AVAILABLE_MODULES = ["ipm", "asm", "weather", "pwm", "rtr", "str", "wss", "hfm"]
+
+# Free modules - available to all registered users
+FREE_MODULES = ["ipm", "asm", "weather", "pwm", "rtr", "str", "wss"]
+
+# Data-sharing modules - require agreement to share aggregated data
+DATA_SHARING_MODULES = ["hfm"]
 
 # Module folder paths (relative to PADDISENSE_DIR) for cleanup of unlicensed modules
 MODULE_FOLDERS = {
@@ -47,6 +54,10 @@ MODULE_FOLDERS = {
     "asm": ["asm"],
     "weather": ["weather"],
     "pwm": ["pwm"],
+    "rtr": ["rtr"],
+    "str": ["str"],
+    "wss": ["wss"],
+    "hfm": ["hfm"],
 }
 
 MODULE_METADATA = {
@@ -56,6 +67,7 @@ MODULE_METADATA = {
         "icon": "mdi:warehouse",
         "dashboard_slug": "ipm-inventory",
         "dashboard_title": "Inventory Manager",
+        "tier": "free",
     },
     "asm": {
         "name": "Asset Service Manager",
@@ -63,6 +75,7 @@ MODULE_METADATA = {
         "icon": "mdi:tractor",
         "dashboard_slug": "asm-service",
         "dashboard_title": "Asset Service Manager",
+        "tier": "free",
     },
     "weather": {
         "name": "Weather Stations",
@@ -70,6 +83,7 @@ MODULE_METADATA = {
         "icon": "mdi:weather-cloudy",
         "dashboard_slug": "weather-station",
         "dashboard_title": "Weather",
+        "tier": "free",
     },
     "pwm": {
         "name": "Water Management",
@@ -77,6 +91,48 @@ MODULE_METADATA = {
         "icon": "mdi:water",
         "dashboard_slug": "pwm-irrigation",
         "dashboard_title": "Water Management",
+        "tier": "free",
+    },
+    "rtr": {
+        "name": "Real Time Rice",
+        "description": "Crop growth predictions from Real Time Rice",
+        "icon": "mdi:rice",
+        "dashboard_slug": "rtr-predictions",
+        "dashboard_title": "Real Time Rice",
+        "dashboard_file": "rtr/dashboards/views.yaml",
+        "tier": "free",
+    },
+    "str": {
+        "name": "Stock Tracker",
+        "description": "Livestock inventory and movement tracking",
+        "icon": "mdi:cow",
+        "dashboard_slug": "str-stock",
+        "dashboard_title": "Stock Tracker",
+        "dashboard_file": "str/dashboards/views.yaml",
+        "status": "placeholder",
+        "tier": "free",
+    },
+    "wss": {
+        "name": "Worker Safety",
+        "description": "Worker check-in/check-out safety system",
+        "icon": "mdi:account-hard-hat",
+        "dashboard_slug": "wss-safety",
+        "dashboard_title": "Worker Safety",
+        "dashboard_file": "wss/dashboards/views.yaml",
+        "status": "placeholder",
+        "tier": "free",
+    },
+    "hfm": {
+        "name": "Hey Farm",
+        "description": "Community insights and benchmarking from aggregated farm data",
+        "icon": "mdi:chart-areaspline",
+        "dashboard_slug": "hfm-insights",
+        "dashboard_title": "Hey Farm",
+        "dashboard_file": "hfm/dashboards/views.yaml",
+        "status": "placeholder",
+        "tier": "data_sharing",
+        "agreement_required": True,
+        "agreement_text": "By enabling Hey Farm, you agree to share aggregated, anonymized farm data (nutrient applications, yields, etc.) to help improve recommendations for all growers.",
     },
 }
 
@@ -85,6 +141,7 @@ MODULE_METADATA = {
 # =============================================================================
 
 CONF_GROWER_NAME = "grower_name"
+CONF_GROWER_EMAIL = "grower_email"
 CONF_FARM_NAME = "farm_name"
 CONF_FARM_ID = "farm_id"
 CONF_TIMEZONE = "timezone"
@@ -108,6 +165,26 @@ INSTALL_TYPE_IMPORT = "import"
 # Default values
 DEFAULT_FARM_ID = "farm_1"
 DEFAULT_BAY_PREFIX = "B-"
+
+# =============================================================================
+# REGISTRATION & TELEMETRY
+# =============================================================================
+
+# Registration is local-only (no external calls during install)
+# Telemetry is reported when users check for updates
+# See telemetry.py for configuration
+
+# Configuration keys for registration status
+CONF_REGISTERED = "registered"
+CONF_REGISTRATION_DATE = "registration_date"
+CONF_SERVER_ID = "server_id"
+
+# Configuration keys for data-sharing agreements
+CONF_AGREEMENTS = "agreements"  # Dict of module_id -> agreement_date
+
+# Terms of service version (increment when terms change)
+TOS_VERSION = "1.0"
+DATA_SHARING_AGREEMENT_VERSION = "1.0"
 
 # =============================================================================
 # SERVICES - REGISTRY

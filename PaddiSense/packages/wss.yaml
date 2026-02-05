@@ -1,0 +1,33 @@
+# =============================================================================
+# WSS (Worker Safety System) Package - PLACEHOLDER
+# =============================================================================
+# Worker check-in/check-out system for farm safety monitoring.
+# This is a placeholder for future development.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# COMMAND LINE SENSORS
+# -----------------------------------------------------------------------------
+command_line:
+  # WSS module version from VERSION file
+  - sensor:
+      name: "WSS Module Version"
+      unique_id: wss_module_version
+      command: "cat /config/PaddiSense/wss/VERSION 2>/dev/null || echo 'unknown'"
+      scan_interval: 86400
+
+# -----------------------------------------------------------------------------
+# TEMPLATE SENSORS
+# -----------------------------------------------------------------------------
+template:
+  - sensor:
+      # Placeholder status sensor
+      - name: "PaddiSense Worker Safety"
+        unique_id: paddisense_wss_status
+        icon: mdi:account-hard-hat
+        state: "Coming Soon"
+        attributes:
+          module: "wss"
+          module_name: "Worker Safety System"
+          status: "placeholder"
+          description: "Worker check-in/check-out system for farm safety monitoring"

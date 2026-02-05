@@ -1,0 +1,33 @@
+# =============================================================================
+# STR (Stock Tracker) Package - PLACEHOLDER
+# =============================================================================
+# Track livestock inventory, movements, and management records.
+# This is a placeholder for future development.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# COMMAND LINE SENSORS
+# -----------------------------------------------------------------------------
+command_line:
+  # STR module version from VERSION file
+  - sensor:
+      name: "STR Module Version"
+      unique_id: str_module_version
+      command: "cat /config/PaddiSense/str/VERSION 2>/dev/null || echo 'unknown'"
+      scan_interval: 86400
+
+# -----------------------------------------------------------------------------
+# TEMPLATE SENSORS
+# -----------------------------------------------------------------------------
+template:
+  - sensor:
+      # Placeholder status sensor
+      - name: "PaddiSense Stock Tracker"
+        unique_id: paddisense_str_status
+        icon: mdi:cow
+        state: "Coming Soon"
+        attributes:
+          module: "str"
+          module_name: "Stock Tracker"
+          status: "placeholder"
+          description: "Track livestock inventory, movements, and management records"

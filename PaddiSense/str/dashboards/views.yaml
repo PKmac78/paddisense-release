@@ -1,0 +1,36 @@
+# =============================================================================
+# STOCK TRACKER (STR) DASHBOARD - PLACEHOLDER
+# =============================================================================
+# Placeholder dashboard for Stock Tracker module.
+# =============================================================================
+
+title: Stock Tracker
+views:
+  - title: Overview
+    path: overview
+    icon: mdi:cow
+    cards:
+      # Coming Soon notice
+      - type: markdown
+        content: |
+          ## Stock Tracker
+
+          ### Coming Soon
+
+          This module will provide:
+
+          - **Livestock Inventory** - Track cattle, sheep, and other stock
+          - **Movement Records** - Paddock movements and transfers
+          - **Health Management** - Treatment and vaccination records
+          - **Mob Management** - Group and track mobs
+          - **NLIS Integration** - National Livestock Identification System
+
+          ---
+
+          *Module is under development*
+        card_mod:
+          style: |
+            ha-card {
+              background: rgba(156, 39, 176, 0.1);
+              border-left: 4px solid #9c27b0;
+            }

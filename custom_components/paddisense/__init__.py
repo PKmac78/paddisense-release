@@ -509,10 +509,29 @@ async def _async_register_installer_services(hass: HomeAssistant) -> None:
     """Register installer services."""
 
     async def handle_check_updates(call: ServiceCall) -> None:
-        """Check for PaddiSense updates."""
+        """Check for PaddiSense updates and report telemetry."""
+        from .telemetry import report_update_check
+
         git_manager: GitManager = hass.data[DOMAIN]["git_manager"]
+        module_manager: ModuleManager = hass.data[DOMAIN]["module_manager"]
+
+        # Check for updates
         result = await hass.async_add_executor_job(git_manager.check_for_updates)
         _log_service_result("check_for_updates", result)
+
+        # Get installed modules for telemetry
+        installed = await hass.async_add_executor_job(module_manager.get_installed_modules)
+        installed_ids = [m["id"] for m in installed]
+
+        # Report telemetry (non-blocking, fire and forget)
+        hass.async_create_task(
+            report_update_check(
+                installed_modules=installed_ids,
+                local_version=result.get("local_version"),
+                remote_version=result.get("remote_version"),
+                update_available=result.get("update_available", False),
+            )
+        )
 
         # Update version sensor
         if result.get("success"):

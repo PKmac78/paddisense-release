@@ -3,13 +3,12 @@
 # Comprehensive management interface for PaddiSense Farm Management System
 #
 # Views:
-#   1. System Status - License, version, updates, RTR config
-#   2. RTR Data - Real Time Rice predictions and upcoming events
-#   3. Modules - Install/remove modules
-#   4. Farm Management - Add/edit farms
-#   5. Paddock Editor - Add/edit paddocks
-#   6. Season - Manage seasons
-#   7. Settings - Backup, restore, HACS
+#   1. System Status - Version, updates, registration info
+#   2. Modules - Install/remove modules
+#   3. Farm Management - Add/edit farms
+#   4. Paddock Editor - Add/edit paddocks
+#   5. Season - Manage seasons
+#   6. Settings - Backup, restore, HACS
 ##############################################################################
 
 title: PaddiSense Manager
@@ -331,256 +330,17 @@ views:
                       text: Update PaddiSense to latest version? A backup will be created first.
 
                   - type: custom:button-card
-                    template: template_warning
-                    name: Renew License
-                    icon: mdi:key-variant
+                    template: template_secondary
+                    name: Settings
+                    icon: mdi:cog
                     tap_action:
                       action: navigate
                       navigation_path: /config/integrations/integration/paddisense
                     hold_action:
                       action: none
 
-              # RTR Configuration Section
-              - type: custom:button-card
-                template: template_titleblock
-                variables:
-                  var_name: REAL TIME RICE
-
-              # RTR Status Display
-              - type: custom:button-card
-                entity: sensor.paddisense_real_time_rice
-                show_icon: false
-                show_name: false
-                show_state: false
-                styles:
-                  card:
-                    - background: var(--card-background-color)
-                    - border-radius: 12px
-                    - padding: 16px
-                    - box-shadow: 0 2px 6px rgba(0,0,0,0.1)
-                  grid:
-                    - display: block
-                custom_fields:
-                  rtr_status: |
-                    [[[
-                      try {
-                        if (!entity || entity.state === 'unavailable' || entity.state === 'unknown') {
-                          return `
-                            <div style="display:flex;align-items:center;gap:12px;padding:12px;background:rgba(255,152,0,0.1);border-radius:8px;border-left:4px solid #ff9800;">
-                              <ha-icon icon="mdi:alert" style="--mdc-icon-size:24px;color:#ff9800;"></ha-icon>
-                              <div>
-                                <div style="font-weight:600;color:var(--primary-text-color);">RTR Sensor Not Available</div>
-                                <div style="font-size:13px;color:var(--secondary-text-color);">Restart Home Assistant after saving the URL</div>
-                              </div>
-                            </div>`;
-                        }
-
-                        const attr = entity.attributes || {};
-                        const isConfigured = attr.rtr_url_set === true;
-                        const lastUpdated = attr.rtr_last_updated || 'Never';
-                        const paddockCount = attr.rtr_paddock_count || 0;
-                        const status = entity.state || 'Unknown';
-
-                        const statusColor = isConfigured ? '#4caf50' : '#ff9800';
-                        const statusBg = isConfigured ? 'rgba(76,175,80,0.1)' : 'rgba(255,152,0,0.1)';
-                        const statusIcon = isConfigured ? 'mdi:check-circle' : 'mdi:alert-circle';
-
-                        return `
-                          <div style="display:flex;align-items:center;gap:16px;">
-                            <div style="width:60px;height:60px;border-radius:50%;background:${statusBg};display:flex;align-items:center;justify-content:center;">
-                              <ha-icon icon="mdi:rice" style="--mdc-icon-size:32px;color:${statusColor};"></ha-icon>
-                            </div>
-                            <div style="flex:1;">
-                              <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-                                <span style="font-size:18px;font-weight:700;color:var(--primary-text-color);">Real Time Rice</span>
-                                <ha-icon icon="${statusIcon}" style="--mdc-icon-size:20px;color:${statusColor};"></ha-icon>
-                              </div>
-                              <div style="font-size:14px;color:var(--secondary-text-color);">${status}</div>
-                            </div>
-                            <div style="text-align:right;">
-                              <div style="font-size:24px;font-weight:700;color:var(--primary-text-color);">${paddockCount}</div>
-                              <div style="font-size:12px;color:var(--secondary-text-color);">Paddocks</div>
-                            </div>
-                          </div>
-                          ${isConfigured ? `
-                          <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--divider-color,#e0e0e0);">
-                            <div style="display:flex;justify-content:space-between;font-size:13px;">
-                              <span style="color:var(--secondary-text-color);">Last Updated</span>
-                              <span style="color:var(--primary-text-color);">${lastUpdated}</span>
-                            </div>
-                          </div>` : ''}
-                        `;
-                      } catch (e) {
-                        return `<div style="padding:14px;border-radius:12px;background:rgba(244,67,54,0.12);">Error: ${e}</div>`;
-                      }
-                    ]]]
-
-              # RTR URL Instructions
-              - type: markdown
-                content: |
-                  To set your RTR URL, go to **Developer Tools → Services** and call `paddisense.set_rtr_url` with your dashboard URL. This allows pasting long SafeLinks URLs.
-                card_mod:
-                  style: |
-                    ha-card {
-                      border-radius: 12px;
-                      padding: 12px;
-                      background: rgba(33,150,243,0.1);
-                      border-left: 4px solid #2196f3;
-                    }
-
-              # RTR Action Buttons
-              - type: horizontal-stack
-                cards:
-                  - type: custom:button-card
-                    template: template_action
-                    name: Open Services
-                    icon: mdi:wrench
-                    tap_action:
-                      action: navigate
-                      navigation_path: /developer-tools/service
-
-                  - type: custom:button-card
-                    template: template_success
-                    name: Refresh Data
-                    icon: mdi:refresh
-                    tap_action:
-                      action: call-service
-                      service: paddisense.refresh_rtr_data
-                    hold_action:
-                      action: none
-
   # ===========================================================================
-  # View 2: Real Time Rice Data
-  # ===========================================================================
-  - title: RTR Data
-    path: rtr
-    icon: mdi:rice
-    type: sections
-    max_columns: 1
-    sections:
-      - type: grid
-        cards:
-          - type: vertical-stack
-            cards:
-              # Title
-              - type: custom:button-card
-                template: template_titleblock
-                variables:
-                  var_name: REAL TIME RICE
-
-              # Refresh button
-              - type: custom:button-card
-                template: template_action
-                name: Refresh RTR Data
-                icon: mdi:refresh
-                tap_action:
-                  action: call-service
-                  service: paddisense.refresh_rtr_data
-                styles:
-                  card:
-                    - height: 50px
-
-              - type: custom:button-card
-                entity: sensor.paddisense_real_time_rice
-                show_icon: false
-                show_name: false
-                show_state: false
-                styles:
-                  card:
-                    - background: transparent
-                    - box-shadow: none
-                    - padding: 0
-                  grid:
-                    - display: block
-                custom_fields:
-                  paddock_cards: |
-                    [[[
-                      try {
-                        if (!entity || !entity.attributes || !entity.attributes.paddocks) {
-                          return '<div style="text-align:center;padding:30px;color:var(--secondary-text-color);"><ha-icon icon="mdi:rice" style="--mdc-icon-size:36px;opacity:0.5;"></ha-icon><div style="margin-top:8px;">No RTR data loaded</div></div>';
-                        }
-
-                        var paddocks = entity.attributes.paddocks || {};
-                        var now = new Date();
-
-                        function fmt(d) {
-                          if (!d) return '—';
-                          try { return new Date(d).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }); }
-                          catch (err) { return d; }
-                        }
-
-                        function getDays(d) {
-                          if (!d) return null;
-                          try { return Math.round((new Date(d) - now) / 86400000); }
-                          catch (err) { return null; }
-                        }
-
-                        function badge(d) {
-                          if (!d) return '<span style="color:var(--secondary-text-color);">—</span>';
-                          var days = getDays(d);
-                          var color = 'var(--primary-text-color)', bg = 'transparent';
-                          if (days !== null && days <= 0) { color = '#f44336'; bg = 'rgba(244,67,54,0.15)'; }
-                          else if (days !== null && days <= 7) { color = '#ff9800'; bg = 'rgba(255,152,0,0.15)'; }
-                          else if (days !== null && days <= 14) { color = '#4caf50'; bg = 'rgba(76,175,80,0.15)'; }
-                          return '<span style="padding:4px 10px;border-radius:6px;background:' + bg + ';color:' + color + ';font-weight:600;">' + fmt(d) + '</span>';
-                        }
-
-                        // Filter current season paddocks
-                        var entries = Object.entries(paddocks);
-                        var current = [];
-                        for (var k = 0; k < entries.length; k++) {
-                          var p = entries[k][1];
-                          if (!p.sow_date) continue;
-                          var months = (now - new Date(p.sow_date)) / (1000 * 60 * 60 * 24 * 30);
-                          if (months >= 0 && months <= 12) current.push(entries[k]);
-                        }
-                        current.sort(function(a, b) {
-                          return new Date(b[1].sow_date) - new Date(a[1].sow_date);
-                        });
-
-                        if (current.length === 0) {
-                          return '<div style="text-align:center;padding:30px;color:var(--secondary-text-color);">No current season paddocks</div>';
-                        }
-
-                        var html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:16px;">';
-
-                        for (var i = 0; i < current.length; i++) {
-                          var id = current[i][0];
-                          var pd = current[i][1];
-                          var warn = pd.warnings && pd.warnings.trim();
-                          var border = warn ? '#f44336' : '#43a047';
-                          var name = pd.paddock || id;
-                          var variety = pd.variety || '';
-                          var method = pd.sow_method || '';
-
-                          html += '<div style="background:var(--card-background-color);border-radius:12px;padding:16px;border-left:5px solid ' + border + ';box-shadow:0 2px 8px rgba(0,0,0,0.1);">';
-                          html += '<div style="display:flex;align-items:center;gap:14px;margin-bottom:14px;">';
-                          html += '<div style="width:48px;height:48px;border-radius:50%;background:rgba(67,160,71,0.15);display:flex;align-items:center;justify-content:center;"><ha-icon icon="mdi:rice" style="--mdc-icon-size:26px;color:#43a047;"></ha-icon></div>';
-                          html += '<div style="flex:1;min-width:0;"><div style="font-size:18px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + name + '</div>';
-                          html += '<div style="font-size:13px;color:var(--secondary-text-color);margin-top:2px;">' + variety + ' · ' + method + '</div></div>';
-                          if (warn) html += '<ha-icon icon="mdi:alert" style="--mdc-icon-size:22px;color:#f44336;"></ha-icon>';
-                          html += '</div>';
-                          html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:14px;">';
-                          html += '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--divider-color,#333);"><span style="color:var(--secondary-text-color);">Sown</span><span style="font-weight:500;">' + fmt(pd.sow_date) + '</span></div>';
-                          html += '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--divider-color,#333);"><span style="color:var(--secondary-text-color);">PI</span>' + badge(pd.pi_date) + '</div>';
-                          html += '<div style="display:flex;justify-content:space-between;padding:8px 0;"><span style="color:var(--secondary-text-color);">Flower</span>' + badge(pd.flowering_date) + '</div>';
-                          html += '<div style="display:flex;justify-content:space-between;padding:8px 0;"><span style="color:var(--secondary-text-color);">Harvest</span>' + badge(pd.harvest_date) + '</div>';
-                          html += '</div>';
-                          if (warn) {
-                            var warnText = pd.warnings.replace(/<br>/g, ' ');
-                            html += '<div style="margin-top:12px;padding:10px;background:rgba(244,67,54,0.1);border-radius:6px;font-size:13px;color:#f44336;">' + warnText + '</div>';
-                          }
-                          html += '</div>';
-                        }
-
-                        return html + '</div>';
-                      } catch (err) {
-                        return '<div style="color:#f44336;">Error: ' + err + '</div>';
-                      }
-                    ]]]
-
-  # ===========================================================================
-  # View 3: Module Management
+  # View 2: Module Management
   # ===========================================================================
   - title: Modules
     path: modules
@@ -622,18 +382,22 @@ views:
                         const availableModules = entity.attributes.available_modules || [];
                         const licensedModules = entity.attributes.license_modules || [];
 
-                        // Module metadata
+                        // Module metadata - all available modules
                         const moduleInfo = {
                           'ipm': { name: 'Inventory Manager', icon: 'mdi:warehouse', desc: 'Track chemicals, fertilizers, and consumables', color: '#4caf50' },
                           'asm': { name: 'Asset Service Manager', icon: 'mdi:tractor', desc: 'Track equipment, parts, and service history', color: '#ff9800' },
                           'weather': { name: 'Weather Stations', icon: 'mdi:weather-cloudy', desc: 'Local gateway and API weather data', color: '#2196f3' },
                           'pwm': { name: 'Water Management', icon: 'mdi:water', desc: 'Irrigation scheduling and bay monitoring', color: '#00bcd4' },
+                          'rtr': { name: 'Real Time Rice', icon: 'mdi:rice', desc: 'Crop growth predictions from Real Time Rice', color: '#43a047' },
+                          'str': { name: 'Stock Tracker', icon: 'mdi:cow', desc: 'Livestock inventory and movement tracking', color: '#8d6e63' },
+                          'wss': { name: 'Worker Safety', icon: 'mdi:account-hard-hat', desc: 'Worker check-in/check-out safety system', color: '#e53935' },
+                          'hfm': { name: 'Hey Farmer', icon: 'mdi:chart-areaspline', desc: 'Community insights (requires data sharing)', color: '#7b1fa2' },
                         };
 
                         let html = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;padding:4px;">`;
 
-                        // Show all possible modules
-                        const allModules = ['ipm', 'asm', 'weather', 'pwm'];
+                        // Show all available modules
+                        const allModules = ['ipm', 'asm', 'weather', 'pwm', 'rtr', 'str', 'wss', 'hfm'];
 
                         for (const modId of allModules) {
                           const info = moduleInfo[modId] || { name: modId, icon: 'mdi:puzzle', desc: '', color: '#666' };
@@ -694,7 +458,7 @@ views:
               # Install/Remove Module section
               - type: markdown
                 content: |
-                  Select a module to install or remove. Only licensed modules can be installed.
+                  Select a module to install or remove. All modules are free for registered users.
                   Removing a module preserves its data for later reinstallation.
                 card_mod:
                   style: |
@@ -742,7 +506,7 @@ views:
                       text: Remove this module? Data will be preserved.
 
   # ===========================================================================
-  # View 4: Farm Management
+  # View 3: Farm Management
   # ===========================================================================
   - title: Farms
     path: farms
@@ -976,7 +740,7 @@ views:
                     ]]]
 
   # ===========================================================================
-  # View 5: Paddock Editor
+  # View 4: Paddock Editor
   # ===========================================================================
   - title: Paddocks
     path: paddocks
@@ -1256,7 +1020,7 @@ views:
                     ]]]
 
   # ===========================================================================
-  # View 6: Season Management
+  # View 5: Season Management
   # ===========================================================================
   - title: Seasons
     path: seasons
@@ -1531,7 +1295,7 @@ views:
                     ]]]
 
   # ===========================================================================
-  # View 7: Settings
+  # View 6: Settings
   # ===========================================================================
   - title: Settings
     path: settings

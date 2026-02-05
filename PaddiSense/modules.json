@@ -1,0 +1,79 @@
+{
+  "schema_version": "1.0.0",
+  "modules": {
+    "ipm": {
+      "name": "Inventory Manager",
+      "description": "Track chemicals, fertilizers, and consumables",
+      "icon": "mdi:warehouse",
+      "dashboard_slug": "ipm-inventory",
+      "dashboard_title": "Inventory Manager",
+      "dashboard_file": "ipm/dashboards/inventory.yaml",
+      "status": "stable"
+    },
+    "asm": {
+      "name": "Asset Service Manager",
+      "description": "Track equipment, parts, and service history",
+      "icon": "mdi:tractor",
+      "dashboard_slug": "asm-service",
+      "dashboard_title": "Asset Service Manager",
+      "dashboard_file": "asm/dashboards/views.yaml",
+      "status": "stable"
+    },
+    "weather": {
+      "name": "Weather Stations",
+      "description": "Local gateway and API weather data",
+      "icon": "mdi:weather-cloudy",
+      "dashboard_slug": "weather-station",
+      "dashboard_title": "Weather",
+      "dashboard_file": "weather/dashboards/views.yaml",
+      "status": "stable"
+    },
+    "pwm": {
+      "name": "Water Management",
+      "description": "Irrigation scheduling and bay monitoring",
+      "icon": "mdi:water",
+      "dashboard_slug": "pwm-irrigation",
+      "dashboard_title": "Water Management",
+      "dashboard_file": "pwm/dashboards/views.yaml",
+      "status": "stable"
+    },
+    "rtr": {
+      "name": "Real Time Rice",
+      "description": "Crop growth predictions from Real Time Rice",
+      "icon": "mdi:rice",
+      "dashboard_slug": "rtr-predictions",
+      "dashboard_title": "Real Time Rice",
+      "dashboard_file": "rtr/dashboards/views.yaml",
+      "status": "stable"
+    },
+    "str": {
+      "name": "Stock Tracker",
+      "description": "Livestock inventory and movement tracking",
+      "icon": "mdi:cow",
+      "dashboard_slug": "str-stock",
+      "dashboard_title": "Stock Tracker",
+      "dashboard_file": "str/dashboards/views.yaml",
+      "status": "placeholder"
+    },
+    "wss": {
+      "name": "Worker Safety",
+      "description": "Worker check-in/check-out safety system",
+      "icon": "mdi:account-hard-hat",
+      "dashboard_slug": "wss-safety",
+      "dashboard_title": "Worker Safety",
+      "dashboard_file": "wss/dashboards/views.yaml",
+      "status": "placeholder"
+    },
+    "hfm": {
+      "name": "Hey Farmer",
+      "description": "Community insights and benchmarking from aggregated farm data",
+      "icon": "mdi:chart-areaspline",
+      "dashboard_slug": "hfm-insights",
+      "dashboard_title": "Hey Farmer",
+      "dashboard_file": "hfm/dashboards/views.yaml",
+      "status": "placeholder",
+      "tier": "data_sharing",
+      "agreement_required": true
+    }
+  }
+}

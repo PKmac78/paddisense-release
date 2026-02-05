@@ -3,7 +3,7 @@
     "step": {
       "welcome_fresh": {
         "title": "Welcome to PaddiSense",
-        "description": "PaddiSense is a modular farm management platform for Home Assistant.\n\nThis wizard will:\n1. Download PaddiSense from GitHub\n2. Set up your farm identity\n3. Install your selected modules\n4. Configure Home Assistant\n\nClick Submit to continue."
+        "description": "PaddiSense is a modular farm management platform for Home Assistant.\n\nThis wizard will:\n1. Register your account\n2. Download PaddiSense from GitHub\n3. Configure Home Assistant\n\nAfter setup, use the **PaddiSense Manager** dashboard to:\n- Add farms and paddocks\n- Install modules\n- Manage seasons\n\nClick Submit to continue."
       },
       "welcome_upgrade": {
         "title": "Existing Installation Detected",
@@ -19,34 +19,17 @@
           "import_existing": "Import existing data"
         }
       },
-      "farm": {
-        "title": "Farm Setup",
-        "description": "Enter your farm details. These will be used throughout PaddiSense.",
+      "registration": {
+        "title": "Account Registration",
+        "description": "Enter your details to register.\n\nYour email is used for verification and important notifications.\n\nDev mode: {dev_mode}",
         "data": {
-          "grower_name": "Grower / Server Name",
-          "farm_name": "Farm Name"
-        }
-      },
-      "license": {
-        "title": "License Key",
-        "description": "Enter your PaddiSense license key for the current season.\n\nFarm: {farm_name}\nGrowerContact your administrator if you don't have a key.",
-        "data": {
-          "license_key": "License Key"
-        }
-      },
-      "modules": {
-        "title": "Select Modules",
-        "description": "Choose which modules to install. You can add or remove modules later from PaddiSense Manager.\n\n**{ipm_name}**: {ipm_desc}\n\n**{asm_name}**: {asm_desc}\n\n**{weather_name}**: {weather_desc}\n\n**{pwm_name}**: {pwm_desc}",
-        "data": {
-          "module_ipm": "Inventory Manager (IPM)",
-          "module_asm": "Asset Service Manager (ASM)",
-          "module_weather": "Weather Stations",
-          "module_pwm": "Water Management (PWM)"
+          "grower_name": "Your Name",
+          "grower_email": "Email Address"
         }
       },
       "install": {
         "title": "Installing",
-        "description": "Installing PaddiSense..."
+        "description": "Setting up PaddiSense..."
       }
     },
     "abort": {
@@ -55,14 +38,11 @@
       "clone_failed": "Failed to download PaddiSense: {error}"
     },
     "error": {
-      "paddock_error": "Failed to create paddock",
-      "delete_error": "Failed to delete",
-      "season_error": "Failed to create/update season",
-      "invalid_format": "Invalid license key format",
-      "invalid_key": "License key is invalid or corrupted",
-      "expired": "This license key has expired",
-      "missing_cryptography": "Cryptography library not installed",
-      "missing_public_key": "License verification key not found"
+      "required": "This field is required",
+      "invalid_email": "Please enter a valid email address",
+      "registration_invalid_email": "This email address could not be verified. Please check and try again.",
+      "registration_network_error": "Could not connect to registration service. Please check your internet connection and try again.",
+      "registration_failed": "Registration failed. Please try again."
     }
   },
   "options": {
@@ -70,80 +50,16 @@
       "init": {
         "title": "PaddiSense Options",
         "menu_options": {
-          "renew_license": "Renew License",
-          "module_management": "Manage Modules",
-          "paddock_management": "Manage Paddocks",
-          "season_management": "Manage Seasons",
+          "update_profile": "Update Profile",
           "backup_restore": "Backup & Restore"
         }
       },
-      "renew_license": {
-        "title": "Renew License",
-        "description": "Current license expires: {current_expiry}\nGrower: {grower}\n\nPaste your new license key below:",
+      "update_profile": {
+        "title": "Update Profile",
+        "description": "Update your name and email address.",
         "data": {
-          "license_key": "New License Key"
-        }
-      },
-      "module_management": {
-        "title": "Module Management",
-        "data": {
-          "action": "Action"
-        }
-      },
-      "install_module": {
-        "title": "Install Module",
-        "description": "Select a module to install. Home Assistant will restart after installation.",
-        "data": {
-          "module_id": "Module"
-        }
-      },
-      "remove_module": {
-        "title": "Remove Module",
-        "description": "Select a module to remove. Your data will be preserved. Home Assistant will restart after removal.",
-        "data": {
-          "module_id": "Module"
-        }
-      },
-      "paddock_management": {
-        "title": "Paddock Management",
-        "data": {
-          "action": "Action"
-        }
-      },
-      "add_paddock": {
-        "title": "Add Paddock",
-        "data": {
-          "name": "Paddock Name",
-          "bay_count": "Number of Bays",
-          "bay_prefix": "Bay Prefix"
-        }
-      },
-      "delete_paddock": {
-        "title": "Delete Paddock",
-        "description": "Warning: This will also delete all bays in this paddock.",
-        "data": {
-          "paddock_id": "Paddock"
-        }
-      },
-      "season_management": {
-        "title": "Season Management",
-        "data": {
-          "action": "Action"
-        }
-      },
-      "add_season": {
-        "title": "Add Season",
-        "data": {
-          "name": "Season Name",
-          "start_date": "Start Date (YYYY-MM-DD)",
-          "end_date": "End Date (YYYY-MM-DD)",
-          "active": "Set as Active Season"
-        }
-      },
-      "set_active_season": {
-        "title": "Set Active Season",
-        "data": {
-          "season_id": "Season"
+          "grower_name": "Your Name",
+          "grower_email": "Email Address"
         }
       },
       "backup_restore": {
@@ -161,10 +77,6 @@
       }
     },
     "abort": {
-      "no_modules_available": "All modules are already installed",
-      "no_modules_installed": "No modules are installed",
-      "no_paddocks": "No paddocks to delete",
-      "no_seasons": "No seasons defined",
       "no_backups": "No backups available"
     }
   }

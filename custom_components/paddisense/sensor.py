@@ -26,8 +26,10 @@ from .const import (
     DOMAIN,
     EVENT_DATA_UPDATED,
     EVENT_MODULES_CHANGED,
+    FREE_MODULES,
 )
 from .helpers import get_version
+from .registration import load_registration, get_allowed_modules
 from .registry.sensor import PaddiSenseRegistrySensor
 from .rtr.sensor import get_rtr_sensors
 
@@ -117,8 +119,14 @@ class PaddiSenseVersionSensor(SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return additional attributes."""
-        # Get license info from config entry
-        entry_data = self._entry.data
+        # Get registration info (grower data)
+        reg_data = load_registration()
+        grower_name = reg_data.get("grower_name", "Not registered")
+        grower_email = reg_data.get("grower_email", "")
+
+        # Get allowed modules (all free modules if registered)
+        allowed_modules = get_allowed_modules()
+
         return {
             ATTR_INSTALLED_VERSION: get_version(),
             ATTR_LATEST_VERSION: self._latest_version,
@@ -126,13 +134,14 @@ class PaddiSenseVersionSensor(SensorEntity):
             ATTR_LAST_CHECKED: self._last_checked,
             ATTR_INSTALLED_MODULES: self._installed_modules,
             ATTR_AVAILABLE_MODULES: self._available_modules,
-            # License info
-            "license_grower": entry_data.get(CONF_LICENSE_GROWER, "Unknown"),
-            "license_expiry": entry_data.get(CONF_LICENSE_EXPIRY, "Unknown"),
-            "license_modules": entry_data.get(CONF_LICENSE_MODULES, []),
-            "license_season": entry_data.get(CONF_LICENSE_SEASON, "Unknown"),
-            "grower_name": entry_data.get(CONF_GROWER_NAME, "Unknown"),
-            "farm_name": entry_data.get(CONF_FARM_NAME, "Unknown"),
+            # Registration info (replaces license info)
+            "license_grower": grower_name,
+            "license_expiry": "Never (Free)",
+            "license_modules": allowed_modules,
+            "license_season": "All Seasons",
+            "grower_name": grower_name,
+            "grower_email": grower_email,
+            "farm_name": "All Farms",
         }
 
     async def async_update(self) -> None:

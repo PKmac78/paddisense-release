@@ -1,1 +1,355 @@
-../pwm/generated/pwm_bay_sw5_b_02.yaml
+# PWM Generated - SW5 B-02
+# Generated: 2026-01-26T21:12:17
+# Version: 2026.01.1
+# DO NOT EDIT - Changes will be overwritten on regeneration
+
+#==============================================================================
+# BAY INPUT HELPERS
+#==============================================================================
+input_select:
+  sw5_b_02_door_control:
+    name: "PWM SW5 B-02 Door Control"
+    options: ["Close", "Open", "HoldOne", "HoldTwo"]
+    initial: "Close"
+    icon: mdi:door
+
+  sw5_b_02_automation_state:
+    name: "PWM SW5 B-02 Automation State"
+    options: ["Off", "Flush", "Pond", "Drain"]
+    initial: "Off"
+    icon: mdi:water
+
+input_number:
+  sw5_b_02_waterlevelmax:
+    name: "PWM SW5 B-02 Water Level Max"
+    unit_of_measurement: "cm"
+    min: 0
+    max: 40
+    step: 1
+    initial: 15
+    mode: box
+    icon: mdi:water
+
+  sw5_b_02_waterlevelmin:
+    name: "PWM SW5 B-02 Water Level Min"
+    unit_of_measurement: "cm"
+    min: -10
+    max: 40
+    step: 1
+    initial: 5
+    mode: box
+    icon: mdi:water-minus
+
+  sw5_b_02_waterleveloffset:
+    name: "PWM SW5 B-02 Water Level Offset"
+    unit_of_measurement: "cm"
+    min: -150
+    max: 150
+    step: 0.1
+    initial: 0
+    mode: box
+    icon: mdi:arrow-up-down
+
+input_boolean:
+  sw5_b_02_flushactive:
+    name: "PWM SW5 B-02 Flush Active"
+    initial: false
+    icon: mdi:water-pump
+
+timer:
+  sw5_b_02_flushtimeonwater:
+    name: "PWM SW5 B-02 Flush Time On Water"
+    duration: "01:00:00"
+    icon: mdi:timer
+
+#==============================================================================
+# BAY TEMPLATE SENSORS
+#==============================================================================
+template:
+  - sensor:
+      - name: "PWM SW5 B-02 Water Depth"
+        unique_id: "pwm_sw5_b_02_water_depth"
+        state_class: measurement
+        device_class: distance
+        unit_of_measurement: "cm"
+        state: >-
+          {% set bays = state_attr('sensor.pwm_data', 'bays') or {} %}
+          {% set bay = bays.get('sw5_b_02', {}) %}
+          {% set device = '' %}
+          {% if bay.get('is_last_bay') %}
+            {% set device = bay.get('drain_1', {}).get('device', '') %}
+          {% else %}
+            {% set next_order = 2 + 1 %}
+            {% set next_id = 'sw5_b_' ~ '%02d' | format(next_order) %}
+            {% set next_bay = bays.get(next_id, {}) %}
+            {% set device = next_bay.get('supply_1', {}).get('device', '') %}
+            {% if not device %}
+              {% set device = bay.get('supply_1', {}).get('device', '') %}
+            {% endif %}
+          {% endif %}
+          {% if not device or device == 'unset' %}
+            unavailable
+          {% else %}
+            {% set depth_id = 'sensor.' ~ device ~ '_' ~ device ~ '_1m_water_depth' %}
+            {% set depth = states(depth_id) | float(default=-999) %}
+            {% set offset = states('input_number.sw5_b_02_waterleveloffset') | float(0) %}
+            {% if depth == -999 %}unavailable{% else %}{{ (depth - offset) | round(1) }}{% endif %}
+          {% endif %}
+
+#==============================================================================
+# BAY AUTOMATIONS
+#==============================================================================
+automation:
+  #----------------------------------------------------------------------------
+  # Irrigation Automation - Main water control logic
+  #----------------------------------------------------------------------------
+  - id: "pwm_sw5_b_02_irrigation"
+    alias: "PWM SW5 B-02 Irrigation"
+    description: "Main irrigation automation for B-02"
+    mode: restart
+    trigger:
+      - platform: homeassistant
+        event: start
+      - platform: state
+        entity_id: input_select.sw5_b_02_automation_state
+        for: "00:02:00"
+      - platform: state
+        entity_id: input_boolean.sw5_b_02_flushactive
+      - platform: state
+        entity_id: input_boolean.sw5_b_01_flushactive
+      - platform: state
+        entity_id:
+          - input_number.sw5_b_02_waterlevelmin
+          - input_number.sw5_b_02_waterlevelmax
+        for: "00:05:00"
+      - platform: time_pattern
+        minutes: "/10"
+    condition:
+      - condition: not
+        conditions:
+          - condition: state
+            entity_id: input_select.sw5_b_02_automation_state
+            state: "Off"
+    action:
+      - variables:
+          water_level: "{{ states('sensor.pwm_sw5_b_02_water_depth') | float(-999) }}"
+          level_min: "{{ states('input_number.sw5_b_02_waterlevelmin') | float(5) }}"
+          level_max: "{{ states('input_number.sw5_b_02_waterlevelmax') | float(15) }}"
+          flush_active: "{{ is_state('input_boolean.sw5_b_02_flushactive', 'on') }}"
+          prev_flushing: "{{ is_state('input_boolean.sw5_b_01_flushactive', 'on') }}"
+          mode: "{{ states('input_select.sw5_b_02_automation_state') }}"
+      - choose:
+          #------------------------------------------------------------------
+          # FLUSH MODE
+          #------------------------------------------------------------------
+          - conditions:
+              - condition: template
+                value_template: "{{ mode == 'Flush' }}"
+            sequence:
+              - choose:
+                  # Need water - open supply, close drain
+                  - conditions:
+                      - condition: template
+                        value_template: "{{ water_level < level_min and not prev_flushing }}"
+                    sequence:
+                      - service: input_select.select_option
+                        target:
+                          entity_id: input_select.sw5_b_03_door_control
+                        data:
+                          option: "Close"
+                      - service: input_select.select_option
+                        target:
+                          entity_id: input_select.sw5_b_02_door_control
+                        data:
+                          option: "Open"
+                  # Water at level and flush active - release water
+                  - conditions:
+                      - condition: template
+                        value_template: "{{ water_level >= level_max and flush_active and not prev_flushing }}"
+                    sequence:
+                      - service: input_select.select_option
+                        target:
+                          entity_id: input_select.sw5_b_02_door_control
+                        data:
+                          option: "Close"
+                      - service: input_select.select_option
+                        target:
+                          entity_id: input_select.sw5_b_03_door_control
+                        data:
+                          option: "Open"
+                  # Flush complete - turn off
+                  - conditions:
+                      - condition: template
+                        value_template: "{{ not flush_active and not prev_flushing }}"
+                    sequence:
+                      - service: input_select.select_option
+                        target:
+                          entity_id: input_select.sw5_b_03_door_control
+                        data:
+                          option: "Open"
+                      - service: input_select.select_option
+                        target:
+                          entity_id: input_select.sw5_b_02_automation_state
+                        data:
+                          option: "Off"
+
+          #------------------------------------------------------------------
+          # POND MODE - Maintain water level
+          #------------------------------------------------------------------
+          - conditions:
+              - condition: template
+                value_template: "{{ mode == 'Pond' }}"
+            sequence:
+              - choose:
+                  # Below min - add water
+                  - conditions:
+                      - condition: template
+                        value_template: "{{ water_level < level_min }}"
+                    sequence:
+                      - service: input_select.select_option
+                        target:
+                          entity_id: input_select.sw5_b_02_door_control
+                        data:
+                          option: "Open"
+                  # Above max - release water
+                  - conditions:
+                      - condition: template
+                        value_template: "{{ water_level > level_max }}"
+                    sequence:
+                      - service: input_select.select_option
+                        target:
+                          entity_id: input_select.sw5_b_02_door_control
+                        data:
+                          option: "Close"
+                      - service: input_select.select_option
+                        target:
+                          entity_id: input_select.sw5_b_03_door_control
+                        data:
+                          option: "Open"
+                  # At level - hold
+                  - conditions:
+                      - condition: template
+                        value_template: "{{ water_level >= level_min and water_level <= level_max }}"
+                    sequence:
+                      - service: input_select.select_option
+                        target:
+                          entity_id: input_select.sw5_b_02_door_control
+                        data:
+                          option: "Close"
+
+          #------------------------------------------------------------------
+          # DRAIN MODE - Empty the bay
+          #------------------------------------------------------------------
+          - conditions:
+              - condition: template
+                value_template: "{{ mode == 'Drain' }}"
+            sequence:
+              - service: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.sw5_b_02_flushactive
+              - service: input_select.select_option
+                target:
+                  entity_id: input_select.sw5_b_02_door_control
+                data:
+                  option: "Close"
+              - service: input_select.select_option
+                target:
+                  entity_id: input_select.sw5_b_03_door_control
+                data:
+                  option: "Open"
+
+  #----------------------------------------------------------------------------
+  # Automation Setup - Initialize bay when mode changes
+  #----------------------------------------------------------------------------
+  - id: "pwm_sw5_b_02_setup"
+    alias: "PWM SW5 B-02 Setup"
+    description: "Setup bay when automation mode changes from Off"
+    mode: restart
+    trigger:
+      - platform: state
+        entity_id: input_select.sw5_b_02_automation_state
+        from: "Off"
+        for: "00:01:00"
+    action:
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: input_select.sw5_b_02_automation_state
+                state: "Flush"
+            sequence:
+              - service: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.sw5_b_02_flushactive
+              - service: input_select.select_option
+                target:
+                  entity_id: input_select.sw5_b_03_door_control
+                data:
+                  option: "Close"
+          - conditions:
+              - condition: state
+                entity_id: input_select.sw5_b_02_automation_state
+                state: "Pond"
+            sequence:
+              - service: input_select.select_option
+                target:
+                  entity_id: input_select.sw5_b_02_door_control
+                data:
+                  option: "Open"
+
+  #----------------------------------------------------------------------------
+  # Flush Timer Start - Start countdown when water reaches min level
+  #----------------------------------------------------------------------------
+  - id: "pwm_sw5_b_02_flush_timer_start"
+    alias: "PWM SW5 B-02 Flush Timer Start"
+    mode: restart
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.pwm_sw5_b_02_water_depth
+        above: input_number.sw5_b_02_waterlevelmin
+        for: "00:05:00"
+    condition:
+      - condition: state
+        entity_id: input_boolean.sw5_b_02_flushactive
+        state: "on"
+    action:
+      - service: timer.start
+        target:
+          entity_id: timer.sw5_b_02_flushtimeonwater
+
+  #----------------------------------------------------------------------------
+  # Flush Timer End - Turn off flush when timer completes
+  #----------------------------------------------------------------------------
+  - id: "pwm_sw5_b_02_flush_timer_end"
+    alias: "PWM SW5 B-02 Flush Timer End"
+    mode: restart
+    trigger:
+      - platform: state
+        entity_id: timer.sw5_b_02_flushtimeonwater
+        from: "active"
+        to: "idle"
+    condition:
+      - condition: state
+        entity_id: input_select.sw5_b_02_automation_state
+        state: "Flush"
+    action:
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.sw5_b_02_flushactive
+
+  #----------------------------------------------------------------------------
+  # Flush Deactivate - Turn off flush active when leaving Flush mode
+  #----------------------------------------------------------------------------
+  - id: "pwm_sw5_b_02_flush_deactivate"
+    alias: "PWM SW5 B-02 Flush Deactivate"
+    mode: restart
+    trigger:
+      - platform: state
+        entity_id: input_select.sw5_b_02_automation_state
+        from: "Flush"
+    action:
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.sw5_b_02_flushactive
+      - service: timer.cancel
+        target:
+          entity_id: timer.sw5_b_02_flushtimeonwater

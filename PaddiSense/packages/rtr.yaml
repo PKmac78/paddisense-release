@@ -1,0 +1,86 @@
+# =============================================================================
+# RTR (Real Time Rice) Package
+# =============================================================================
+# Integrates Real Time Rice prediction data into PaddiSense.
+# Data fetching/parsing is handled by custom_components/paddisense/rtr/
+# This package provides the automation for scheduled refreshes.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# TEMPLATE SENSORS
+# -----------------------------------------------------------------------------
+template:
+  - sensor:
+      # Version sensor for module tracking
+      - name: "PaddiSense RTR Version"
+        unique_id: paddisense_rtr_version
+        icon: mdi:rice
+        state: >-
+          {% set ver_path = '/config/PaddiSense/rtr/VERSION' %}
+          {{ states.sensor.date.state is defined }}
+          {% set ns = namespace(version='unknown') %}
+          {% if true %}{% set ns.version = '1.0.0' %}{% endif %}
+          {{ ns.version }}
+        attributes:
+          module: "rtr"
+          module_name: "Real Time Rice"
+
+# -----------------------------------------------------------------------------
+# SHELL COMMANDS
+# -----------------------------------------------------------------------------
+shell_command:
+  # Read RTR version from file
+  rtr_version: "cat /config/PaddiSense/rtr/VERSION 2>/dev/null || echo 'unknown'"
+
+# -----------------------------------------------------------------------------
+# COMMAND LINE SENSORS
+# -----------------------------------------------------------------------------
+command_line:
+  # RTR module version from VERSION file
+  - sensor:
+      name: "RTR Module Version"
+      unique_id: rtr_module_version
+      command: "cat /config/PaddiSense/rtr/VERSION 2>/dev/null || echo 'unknown'"
+      scan_interval: 86400
+
+# -----------------------------------------------------------------------------
+# AUTOMATIONS
+# -----------------------------------------------------------------------------
+automation:
+  # Daily RTR data refresh at 6am
+  - id: rtr_daily_refresh
+    alias: "RTR Daily Refresh"
+    description: "Refresh Real Time Rice data daily at 6am"
+    trigger:
+      - platform: time
+        at: "06:00:00"
+    condition:
+      # Only run if RTR is configured
+      - condition: not
+        conditions:
+          - condition: state
+            entity_id: sensor.paddisense_real_time_rice
+            state: "Not configured"
+    action:
+      - service: paddisense.refresh_rtr_data
+    mode: single
+
+  # Refresh RTR on Home Assistant start (if configured)
+  - id: rtr_startup_refresh
+    alias: "RTR Startup Refresh"
+    description: "Refresh RTR data on Home Assistant startup"
+    trigger:
+      - platform: homeassistant
+        event: start
+    condition:
+      - condition: not
+        conditions:
+          - condition: state
+            entity_id: sensor.paddisense_real_time_rice
+            state: "Not configured"
+    action:
+      # Delay to allow entities to load
+      - delay:
+          minutes: 2
+      - service: paddisense.refresh_rtr_data
+    mode: single

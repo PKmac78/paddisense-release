@@ -1,0 +1,36 @@
+# =============================================================================
+# WORKER SAFETY SYSTEM (WSS) DASHBOARD - PLACEHOLDER
+# =============================================================================
+# Placeholder dashboard for Worker Safety System module.
+# =============================================================================
+
+title: Worker Safety
+views:
+  - title: Overview
+    path: overview
+    icon: mdi:account-hard-hat
+    cards:
+      # Coming Soon notice
+      - type: markdown
+        content: |
+          ## Worker Safety System
+
+          ### Coming Soon
+
+          This module will provide:
+
+          - **Check-In/Check-Out** - Track worker presence on farm
+          - **Lone Worker Alerts** - Automated safety check-ins
+          - **Location Tracking** - GPS-based worker locations
+          - **Emergency Alerts** - SOS and duress capabilities
+          - **Activity Logging** - Work activity records
+
+          ---
+
+          *Module is under development*
+        card_mod:
+          style: |
+            ha-card {
+              background: rgba(255, 152, 0, 0.1);
+              border-left: 4px solid #ff9800;
+            }
