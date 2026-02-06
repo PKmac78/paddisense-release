@@ -62,6 +62,8 @@ views:
       # Paddock Predictions - filtered by RTR Year matching active season
       - type: custom:button-card
         entity: sensor.farm_registry_data
+        triggers_update:
+          - sensor.paddisense_real_time_rice
         show_name: false
         show_state: false
         show_icon: false
