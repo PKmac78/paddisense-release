@@ -32,3 +32,9 @@ ipm-inventory:
   icon: mdi:warehouse
   show_in_sidebar: true
   filename: PaddiSense/ipm/dashboards/inventory.yaml
+str-stock:
+  mode: yaml
+  title: Stock Tracker
+  icon: mdi:cow
+  show_in_sidebar: true
+  filename: PaddiSense/str/dashboards/views.yaml

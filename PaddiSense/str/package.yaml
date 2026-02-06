@@ -1,14 +1,62 @@
 # =============================================================================
-# STR (Stock Tracker) Package - PLACEHOLDER
+# STR (Stock Tracker) Package
 # =============================================================================
-# Track livestock inventory, movements, and management records.
-# This is a placeholder for future development.
+# Track livestock mobs: inventory, movements, and management records.
+#
+# Features:
+#   - Mob management (add, edit, delete)
+#   - Head count tracking with adjustments
+#   - Paddock movement tracking
+#   - Off-farm tracking (agistment, sale, etc.)
+#   - Custom attributes per mob
+#   - Movement history
 # =============================================================================
 
 # -----------------------------------------------------------------------------
 # COMMAND LINE SENSORS
 # -----------------------------------------------------------------------------
 command_line:
+  # Main STR sensor - provides all mob data
+  - sensor:
+      name: STR Mobs
+      unique_id: str_mobs
+      command: 'python3 /config/PaddiSense/str/python/str_sensor.py'
+      command_timeout: 30
+      scan_interval: 300
+      value_template: '{{ value_json.total_head | default(0) }}'
+      json_attributes:
+        - total_mobs
+        - total_head
+        - on_farm_head
+        - off_farm_head
+        - mobs
+        - mob_names
+        - mob_ids
+        - mobs_by_location
+        - mobs_by_age_class
+        - mobs_by_cross
+        - on_farm_mobs
+        - off_farm_mobs
+        - location_summaries
+        - age_class_summaries
+        - age_classes
+        - crosses
+        - attributes
+        - attribute_ids
+        - off_farm_locations
+        - paddocks
+        - paddock_names
+        - recent_movements
+        - system_status
+        - config_exists
+        - mobs_file_exists
+        - registry_exists
+        - config_version
+        - backup_count
+        - last_backup
+        - backup_filenames
+        - version
+
   # STR module version from VERSION file
   - sensor:
       name: "STR Module Version"
@@ -17,17 +65,822 @@ command_line:
       scan_interval: 86400
 
 # -----------------------------------------------------------------------------
+# SHELL COMMANDS - Python backend calls
+# -----------------------------------------------------------------------------
+shell_command:
+  # ----- System Commands -----
+  str_init: >-
+    python3 /config/PaddiSense/str/python/str_backend.py init
+
+  str_status: >-
+    python3 /config/PaddiSense/str/python/str_backend.py status
+
+  # ----- Mob Management Commands -----
+  str_add_mob: >-
+    python3 /config/PaddiSense/str/python/str_backend.py add_mob
+    --name "{{ name }}"
+    --age_class "{{ age_class | default('') }}"
+    --cross "{{ cross | default('') }}"
+    --head_count "{{ head_count | default(0) }}"
+    --location "{{ location | default('') }}"
+    --attributes '{{ attributes | default("[]") }}'
+    --notes "{{ notes | default('') }}"
+
+  str_edit_mob: >-
+    python3 /config/PaddiSense/str/python/str_backend.py edit_mob
+    --id "{{ mob_id }}"
+    --name "{{ name }}"
+    --age_class "{{ age_class }}"
+    --cross "{{ cross }}"
+    --notes "{{ notes }}"
+
+  str_delete_mob: >-
+    python3 /config/PaddiSense/str/python/str_backend.py delete_mob
+    --id "{{ mob_id }}"
+    --token "{{ token }}"
+
+  str_adjust_count: >-
+    python3 /config/PaddiSense/str/python/str_backend.py adjust_count
+    --id "{{ mob_id }}"
+    --delta "{{ delta }}"
+    --reason "{{ reason | default('') }}"
+    --note "{{ note | default('') }}"
+
+  # ----- Movement Commands -----
+  str_move_mob: >-
+    python3 /config/PaddiSense/str/python/str_backend.py move_mob
+    --id "{{ mob_id }}"
+    --to_location "{{ to_location }}"
+    --note "{{ note | default('') }}"
+
+  str_set_off_farm: >-
+    python3 /config/PaddiSense/str/python/str_backend.py set_off_farm
+    --id "{{ mob_id }}"
+    --reason "{{ reason }}"
+    --note "{{ note | default('') }}"
+
+  str_return_to_farm: >-
+    python3 /config/PaddiSense/str/python/str_backend.py return_to_farm
+    --id "{{ mob_id }}"
+    --to_location "{{ to_location }}"
+    --note "{{ note | default('') }}"
+
+  # ----- Attribute Commands -----
+  str_toggle_attribute: >-
+    python3 /config/PaddiSense/str/python/str_backend.py toggle_attribute
+    --id "{{ mob_id }}"
+    --attribute "{{ attribute }}"
+
+  str_add_attribute_type: >-
+    python3 /config/PaddiSense/str/python/str_backend.py add_attribute_type
+    --id "{{ attr_id }}"
+    --name "{{ name }}"
+
+  str_remove_attribute_type: >-
+    python3 /config/PaddiSense/str/python/str_backend.py remove_attribute_type
+    --id "{{ attr_id }}"
+
+  # ----- Config Commands -----
+  str_add_age_class: >-
+    python3 /config/PaddiSense/str/python/str_backend.py add_age_class
+    --name "{{ name }}"
+
+  str_remove_age_class: >-
+    python3 /config/PaddiSense/str/python/str_backend.py remove_age_class
+    --name "{{ name }}"
+
+  str_add_cross: >-
+    python3 /config/PaddiSense/str/python/str_backend.py add_cross
+    --name "{{ name }}"
+
+  str_remove_cross: >-
+    python3 /config/PaddiSense/str/python/str_backend.py remove_cross
+    --name "{{ name }}"
+
+  str_add_off_farm_location: >-
+    python3 /config/PaddiSense/str/python/str_backend.py add_off_farm_location
+    --name "{{ name }}"
+
+  str_remove_off_farm_location: >-
+    python3 /config/PaddiSense/str/python/str_backend.py remove_off_farm_location
+    --name "{{ name }}"
+
+  # ----- Data Management Commands -----
+  str_export: >-
+    python3 /config/PaddiSense/str/python/str_backend.py export
+
+  str_import_backup: >-
+    python3 /config/PaddiSense/str/python/str_backend.py import_backup
+    --filename "{{ filename }}"
+
+  str_reset: >-
+    python3 /config/PaddiSense/str/python/str_backend.py reset
+    --token "{{ token }}"
+
+  str_backup_list: >-
+    python3 /config/PaddiSense/str/python/str_backend.py backup_list
+
+# -----------------------------------------------------------------------------
+# INPUT HELPERS - User interface controls
+# -----------------------------------------------------------------------------
+input_select:
+  # ----- Mob Selection -----
+  str_mob:
+    name: STR Mob
+    icon: mdi:cow
+    options:
+      - Select Mob
+
+  # ----- Add/Edit Mob Form -----
+  str_editor_mode:
+    name: STR Editor Mode
+    icon: mdi:pencil
+    options:
+      - Add New Mob
+      - Edit Existing Mob
+
+  str_age_class:
+    name: STR Age Class
+    icon: mdi:calendar-range
+    options:
+      - Calves
+      - Weaners
+      - Yearlings
+      - Heifers
+      - Cows
+      - Bulls
+      - Steers
+
+  str_cross:
+    name: STR Cross/Breed
+    icon: mdi:dna
+    options:
+      - Angus
+      - Hereford
+      - Angus x Hereford
+      - Brahman
+      - Droughtmaster
+      - Murray Grey
+      - Charolais
+      - Simmental
+      - Shorthorn
+
+  str_paddock:
+    name: STR Paddock
+    icon: mdi:grass
+    options:
+      - Select Paddock
+
+  # ----- Movement Form -----
+  str_move_destination:
+    name: STR Move Destination
+    icon: mdi:map-marker-right
+    options:
+      - Select Destination
+
+  str_off_farm_reason:
+    name: STR Off-Farm Reason
+    icon: mdi:truck-delivery
+    options:
+      - Agistment
+      - Feedlot
+      - Sold
+      - Deceased
+      - Saleyards
+      - Abattoir
+
+  # ----- Adjust Count Reason -----
+  str_adjust_reason:
+    name: STR Adjust Reason
+    icon: mdi:clipboard-list
+    options:
+      - births
+      - death
+      - sale
+      - transfer
+
+  # ----- Settings -----
+  str_backup_file:
+    name: STR Backup File
+    icon: mdi:file-restore
+    options:
+      - Select Backup
+
+input_number:
+  str_head_count:
+    name: STR Head Count
+    icon: mdi:counter
+    min: 0
+    max: 10000
+    step: 1
+    mode: box
+
+  str_adjust_delta:
+    name: STR Adjust Delta
+    icon: mdi:plus-minus
+    min: -1000
+    max: 1000
+    step: 1
+    mode: box
+
+input_text:
+  str_mob_name:
+    name: STR Mob Name
+    icon: mdi:label
+    max: 100
+
+  str_notes:
+    name: STR Notes
+    icon: mdi:note-text
+    max: 255
+
+  str_move_note:
+    name: STR Movement Note
+    icon: mdi:note-text
+    max: 200
+
+  str_new_age_class:
+    name: STR New Age Class
+    icon: mdi:calendar-range
+    max: 50
+
+  str_new_cross:
+    name: STR New Cross
+    icon: mdi:dna
+    max: 50
+
+  str_new_attr_id:
+    name: STR New Attribute ID
+    icon: mdi:identifier
+    max: 50
+
+  str_new_attr_name:
+    name: STR New Attribute Name
+    icon: mdi:label
+    max: 50
+
+  str_new_off_farm:
+    name: STR New Off-Farm Location
+    icon: mdi:truck
+    max: 50
+
+input_boolean:
+  str_confirm_delete:
+    name: STR Confirm Delete
+    icon: mdi:alert
+
+  str_off_farm_toggle:
+    name: STR Off-Farm Toggle
+    icon: mdi:truck-delivery
+
+  # Attribute toggles (for mob editing)
+  str_attr_lick_active:
+    name: Lick Active
+    icon: mdi:cube
+
+  str_attr_vaccinated:
+    name: Vaccinated
+    icon: mdi:needle
+
+  str_attr_pregnant:
+    name: Pregnant
+    icon: mdi:human-pregnant
+
+  str_attr_for_sale:
+    name: For Sale
+    icon: mdi:tag
+
+  str_attr_weaned:
+    name: Weaned
+    icon: mdi:baby-bottle
+
+  str_attr_drenched:
+    name: Drenched
+    icon: mdi:water
+
+# -----------------------------------------------------------------------------
 # TEMPLATE SENSORS
 # -----------------------------------------------------------------------------
 template:
   - sensor:
-      # Placeholder status sensor
+      # Status sensor for dashboard
       - name: "PaddiSense Stock Tracker"
         unique_id: paddisense_str_status
         icon: mdi:cow
-        state: "Coming Soon"
+        state: >
+          {% set sensor = state_attr('sensor.str_mobs', 'system_status') %}
+          {% if sensor == 'ready' %}
+            {{ state_attr('sensor.str_mobs', 'total_head') | default(0) }} head
+          {% elif sensor == 'not_initialized' %}
+            Not Initialized
+          {% else %}
+            {{ sensor | default('Unknown') }}
+          {% endif %}
         attributes:
           module: "str"
           module_name: "Stock Tracker"
-          status: "placeholder"
-          description: "Track livestock inventory, movements, and management records"
+          status: "{{ state_attr('sensor.str_mobs', 'system_status') | default('unknown') }}"
+          total_mobs: "{{ state_attr('sensor.str_mobs', 'total_mobs') | default(0) }}"
+          total_head: "{{ state_attr('sensor.str_mobs', 'total_head') | default(0) }}"
+          on_farm_head: "{{ state_attr('sensor.str_mobs', 'on_farm_head') | default(0) }}"
+          off_farm_head: "{{ state_attr('sensor.str_mobs', 'off_farm_head') | default(0) }}"
+
+      # Selected mob details sensor
+      - name: "STR Selected Mob"
+        unique_id: str_selected_mob
+        icon: mdi:cow
+        state: "{{ states('input_select.str_mob') }}"
+        attributes:
+          mob_id: >-
+            {% set selected = states('input_select.str_mob') %}
+            {% set mobs = state_attr('sensor.str_mobs', 'mobs') or {} %}
+            {% for mid, m in mobs.items() if m.name == selected %}{{ mid }}{% endfor %}
+          mob_data: >-
+            {% set selected = states('input_select.str_mob') %}
+            {% set mobs = state_attr('sensor.str_mobs', 'mobs') or {} %}
+            {% for mid, m in mobs.items() if m.name == selected %}{{ m | tojson }}{% endfor %}
+          name: >-
+            {% set selected = states('input_select.str_mob') %}
+            {% set mobs = state_attr('sensor.str_mobs', 'mobs') or {} %}
+            {% for mid, m in mobs.items() if m.name == selected %}{{ m.name }}{% endfor %}
+          head_count: >-
+            {% set selected = states('input_select.str_mob') %}
+            {% set mobs = state_attr('sensor.str_mobs', 'mobs') or {} %}
+            {% for mid, m in mobs.items() if m.name == selected %}{{ m.head_count | default(0) }}{% endfor %}
+          location: >-
+            {% set selected = states('input_select.str_mob') %}
+            {% set mobs = state_attr('sensor.str_mobs', 'mobs') or {} %}
+            {% for mid, m in mobs.items() if m.name == selected %}{{ m.location | default('') }}{% endfor %}
+          location_name: >-
+            {% set selected = states('input_select.str_mob') %}
+            {% set mobs = state_attr('sensor.str_mobs', 'mobs') or {} %}
+            {% for mid, m in mobs.items() if m.name == selected %}{{ m.location_name | default('') }}{% endfor %}
+          off_farm: >-
+            {% set selected = states('input_select.str_mob') %}
+            {% set mobs = state_attr('sensor.str_mobs', 'mobs') or {} %}
+            {% for mid, m in mobs.items() if m.name == selected %}{{ m.off_farm | default(false) }}{% endfor %}
+          age_class: >-
+            {% set selected = states('input_select.str_mob') %}
+            {% set mobs = state_attr('sensor.str_mobs', 'mobs') or {} %}
+            {% for mid, m in mobs.items() if m.name == selected %}{{ m.age_class | default('') }}{% endfor %}
+          cross: >-
+            {% set selected = states('input_select.str_mob') %}
+            {% set mobs = state_attr('sensor.str_mobs', 'mobs') or {} %}
+            {% for mid, m in mobs.items() if m.name == selected %}{{ m.cross | default('') }}{% endfor %}
+
+# -----------------------------------------------------------------------------
+# SCRIPTS - Form submission handlers
+# -----------------------------------------------------------------------------
+script:
+  str_add_mob_submit:
+    alias: "STR Add Mob Submit"
+    icon: mdi:cow
+    sequence:
+      - service: shell_command.str_add_mob
+        data:
+          name: "{{ states('input_text.str_mob_name') }}"
+          age_class: "{{ states('input_select.str_age_class') }}"
+          cross: "{{ states('input_select.str_cross') }}"
+          head_count: "{{ states('input_number.str_head_count') | int }}"
+          location: >
+            {% set sel = states('input_select.str_paddock') %}
+            {% set paddocks = state_attr('sensor.str_mobs', 'paddock_names') or [] %}
+            {% for p in paddocks if p.name == sel %}{{ p.id }}{% endfor %}
+          attributes: >
+            {% set attrs = [] %}
+            {% if is_state('input_boolean.str_attr_lick_active', 'on') %}{% set attrs = attrs + ['lick_active'] %}{% endif %}
+            {% if is_state('input_boolean.str_attr_vaccinated', 'on') %}{% set attrs = attrs + ['vaccinated'] %}{% endif %}
+            {% if is_state('input_boolean.str_attr_pregnant', 'on') %}{% set attrs = attrs + ['pregnant'] %}{% endif %}
+            {% if is_state('input_boolean.str_attr_for_sale', 'on') %}{% set attrs = attrs + ['for_sale'] %}{% endif %}
+            {% if is_state('input_boolean.str_attr_weaned', 'on') %}{% set attrs = attrs + ['weaned'] %}{% endif %}
+            {% if is_state('input_boolean.str_attr_drenched', 'on') %}{% set attrs = attrs + ['drenched'] %}{% endif %}
+            {{ attrs | tojson }}
+          notes: "{{ states('input_text.str_notes') }}"
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.str_mobs
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.str_mob_name
+        data:
+          value: ""
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.str_head_count
+        data:
+          value: 0
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.str_notes
+        data:
+          value: ""
+
+  str_edit_mob_submit:
+    alias: "STR Edit Mob Submit"
+    icon: mdi:pencil
+    sequence:
+      - service: shell_command.str_edit_mob
+        data:
+          mob_id: "{{ state_attr('sensor.str_selected_mob', 'mob_id') }}"
+          name: "{{ states('input_text.str_mob_name') }}"
+          age_class: "{{ states('input_select.str_age_class') }}"
+          cross: "{{ states('input_select.str_cross') }}"
+          notes: "{{ states('input_text.str_notes') }}"
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.str_mobs
+
+  str_delete_mob_submit:
+    alias: "STR Delete Mob Submit"
+    icon: mdi:delete
+    sequence:
+      - condition: state
+        entity_id: input_boolean.str_confirm_delete
+        state: "on"
+      - service: shell_command.str_delete_mob
+        data:
+          mob_id: "{{ state_attr('sensor.str_selected_mob', 'mob_id') }}"
+          token: "CONFIRM"
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.str_mobs
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.str_confirm_delete
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.str_mob
+        data:
+          option: "Select Mob"
+
+  str_move_mob_submit:
+    alias: "STR Move Mob Submit"
+    icon: mdi:map-marker-right
+    sequence:
+      - service: shell_command.str_move_mob
+        data:
+          mob_id: "{{ state_attr('sensor.str_selected_mob', 'mob_id') }}"
+          to_location: >
+            {% set sel = states('input_select.str_move_destination') %}
+            {% set paddocks = state_attr('sensor.str_mobs', 'paddock_names') or [] %}
+            {% for p in paddocks if p.name == sel %}{{ p.id }}{% endfor %}
+          note: "{{ states('input_text.str_move_note') }}"
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.str_mobs
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.str_move_note
+        data:
+          value: ""
+
+  str_set_off_farm_submit:
+    alias: "STR Set Off-Farm Submit"
+    icon: mdi:truck-delivery
+    sequence:
+      - service: shell_command.str_set_off_farm
+        data:
+          mob_id: "{{ state_attr('sensor.str_selected_mob', 'mob_id') }}"
+          reason: "{{ states('input_select.str_off_farm_reason') }}"
+          note: "{{ states('input_text.str_move_note') }}"
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.str_mobs
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.str_move_note
+        data:
+          value: ""
+
+  str_return_to_farm_submit:
+    alias: "STR Return to Farm Submit"
+    icon: mdi:home
+    sequence:
+      - service: shell_command.str_return_to_farm
+        data:
+          mob_id: "{{ state_attr('sensor.str_selected_mob', 'mob_id') }}"
+          to_location: >
+            {% set sel = states('input_select.str_move_destination') %}
+            {% set paddocks = state_attr('sensor.str_mobs', 'paddock_names') or [] %}
+            {% for p in paddocks if p.name == sel %}{{ p.id }}{% endfor %}
+          note: "{{ states('input_text.str_move_note') }}"
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.str_mobs
+
+  str_adjust_count_submit:
+    alias: "STR Adjust Count Submit"
+    icon: mdi:plus-minus
+    sequence:
+      - service: shell_command.str_adjust_count
+        data:
+          mob_id: "{{ state_attr('sensor.str_selected_mob', 'mob_id') }}"
+          delta: "{{ states('input_number.str_adjust_delta') | int }}"
+          reason: "{{ states('input_select.str_adjust_reason') }}"
+          note: "{{ states('input_text.str_move_note') }}"
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.str_mobs
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.str_adjust_delta
+        data:
+          value: 0
+
+  str_toggle_attribute:
+    alias: "STR Toggle Attribute"
+    icon: mdi:toggle-switch
+    fields:
+      attribute:
+        description: "Attribute ID to toggle"
+    sequence:
+      - service: shell_command.str_toggle_attribute
+        data:
+          mob_id: "{{ state_attr('sensor.str_selected_mob', 'mob_id') }}"
+          attribute: "{{ attribute }}"
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.str_mobs
+
+  str_init_system:
+    alias: "STR Initialize System"
+    icon: mdi:cog
+    sequence:
+      - service: shell_command.str_init
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.str_mobs
+
+  str_export_data:
+    alias: "STR Export Data"
+    icon: mdi:export
+    sequence:
+      - service: shell_command.str_export
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.str_mobs
+
+  str_import_backup_submit:
+    alias: "STR Import Backup Submit"
+    icon: mdi:import
+    sequence:
+      - service: shell_command.str_import_backup
+        data:
+          filename: "{{ states('input_select.str_backup_file') }}"
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.str_mobs
+
+  str_reset_data:
+    alias: "STR Reset Data"
+    icon: mdi:delete-forever
+    sequence:
+      - service: shell_command.str_reset
+        data:
+          token: "CONFIRM_RESET"
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.str_mobs
+
+  str_add_age_class_submit:
+    alias: "STR Add Age Class"
+    icon: mdi:plus
+    sequence:
+      - service: shell_command.str_add_age_class
+        data:
+          name: "{{ states('input_text.str_new_age_class') }}"
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.str_mobs
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.str_new_age_class
+        data:
+          value: ""
+
+  str_remove_age_class_submit:
+    alias: "STR Remove Age Class"
+    icon: mdi:minus
+    sequence:
+      - service: shell_command.str_remove_age_class
+        data:
+          name: "{{ states('input_select.str_age_class') }}"
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.str_mobs
+
+  str_add_cross_submit:
+    alias: "STR Add Cross"
+    icon: mdi:plus
+    sequence:
+      - service: shell_command.str_add_cross
+        data:
+          name: "{{ states('input_text.str_new_cross') }}"
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.str_mobs
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.str_new_cross
+        data:
+          value: ""
+
+  str_remove_cross_submit:
+    alias: "STR Remove Cross"
+    icon: mdi:minus
+    sequence:
+      - service: shell_command.str_remove_cross
+        data:
+          name: "{{ states('input_select.str_cross') }}"
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.str_mobs
+
+  str_add_attribute_submit:
+    alias: "STR Add Attribute"
+    icon: mdi:plus
+    sequence:
+      - service: shell_command.str_add_attribute_type
+        data:
+          attr_id: "{{ states('input_text.str_new_attr_id') }}"
+          name: "{{ states('input_text.str_new_attr_name') }}"
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.str_mobs
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.str_new_attr_id
+        data:
+          value: ""
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.str_new_attr_name
+        data:
+          value: ""
+
+  str_add_off_farm_location_submit:
+    alias: "STR Add Off-Farm Location"
+    icon: mdi:plus
+    sequence:
+      - service: shell_command.str_add_off_farm_location
+        data:
+          name: "{{ states('input_text.str_new_off_farm') }}"
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.str_mobs
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.str_new_off_farm
+        data:
+          value: ""
+
+  str_remove_off_farm_location_submit:
+    alias: "STR Remove Off-Farm Location"
+    icon: mdi:minus
+    sequence:
+      - service: shell_command.str_remove_off_farm_location
+        data:
+          name: "{{ states('input_select.str_off_farm_reason') }}"
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.str_mobs
+
+# -----------------------------------------------------------------------------
+# AUTOMATIONS - Dynamic dropdown updates
+# -----------------------------------------------------------------------------
+automation:
+  # Update mob selector options
+  - id: str_update_mob_options
+    alias: "STR Update Mob Options"
+    trigger:
+      - platform: state
+        entity_id: sensor.str_mobs
+    action:
+      - service: input_select.set_options
+        target:
+          entity_id: input_select.str_mob
+        data:
+          options: >
+            {% set names = state_attr('sensor.str_mobs', 'mob_names') or [] %}
+            {% if names | length > 0 %}
+              {{ ['Select Mob'] + names }}
+            {% else %}
+              {{ ['Select Mob'] }}
+            {% endif %}
+
+  # Update paddock selectors from registry
+  - id: str_update_paddock_options
+    alias: "STR Update Paddock Options"
+    trigger:
+      - platform: state
+        entity_id: sensor.str_mobs
+    action:
+      - service: input_select.set_options
+        target:
+          entity_id:
+            - input_select.str_paddock
+            - input_select.str_move_destination
+        data:
+          options: >
+            {% set paddocks = state_attr('sensor.str_mobs', 'paddock_names') or [] %}
+            {% set names = paddocks | map(attribute='name') | list %}
+            {% if names | length > 0 %}
+              {{ ['Select Paddock'] + names }}
+            {% else %}
+              {{ ['Select Paddock'] }}
+            {% endif %}
+
+  # Update age class selector
+  - id: str_update_age_class_options
+    alias: "STR Update Age Class Options"
+    trigger:
+      - platform: state
+        entity_id: sensor.str_mobs
+    action:
+      - service: input_select.set_options
+        target:
+          entity_id: input_select.str_age_class
+        data:
+          options: >
+            {% set classes = state_attr('sensor.str_mobs', 'age_classes') or [] %}
+            {% if classes | length > 0 %}
+              {{ classes }}
+            {% else %}
+              {{ ['Weaners'] }}
+            {% endif %}
+
+  # Update cross selector
+  - id: str_update_cross_options
+    alias: "STR Update Cross Options"
+    trigger:
+      - platform: state
+        entity_id: sensor.str_mobs
+    action:
+      - service: input_select.set_options
+        target:
+          entity_id: input_select.str_cross
+        data:
+          options: >
+            {% set crosses = state_attr('sensor.str_mobs', 'crosses') or [] %}
+            {% if crosses | length > 0 %}
+              {{ crosses }}
+            {% else %}
+              {{ ['Angus'] }}
+            {% endif %}
+
+  # Update off-farm reason selector
+  - id: str_update_off_farm_options
+    alias: "STR Update Off-Farm Options"
+    trigger:
+      - platform: state
+        entity_id: sensor.str_mobs
+    action:
+      - service: input_select.set_options
+        target:
+          entity_id: input_select.str_off_farm_reason
+        data:
+          options: >
+            {% set locs = state_attr('sensor.str_mobs', 'off_farm_locations') or [] %}
+            {% if locs | length > 0 %}
+              {{ locs }}
+            {% else %}
+              {{ ['Agistment'] }}
+            {% endif %}
+
+  # Update backup file selector
+  - id: str_update_backup_options
+    alias: "STR Update Backup Options"
+    trigger:
+      - platform: state
+        entity_id: sensor.str_mobs
+    action:
+      - service: input_select.set_options
+        target:
+          entity_id: input_select.str_backup_file
+        data:
+          options: >
+            {% set files = state_attr('sensor.str_mobs', 'backup_filenames') or [] %}
+            {% if files | length > 0 %}
+              {{ ['Select Backup'] + files }}
+            {% else %}
+              {{ ['Select Backup'] }}
+            {% endif %}

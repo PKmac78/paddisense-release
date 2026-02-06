@@ -53,7 +53,7 @@
       "dashboard_slug": "str-stock",
       "dashboard_title": "Stock Tracker",
       "dashboard_file": "str/dashboards/views.yaml",
-      "status": "placeholder"
+      "status": "stable"
     },
     "wss": {
       "name": "Worker Safety",
