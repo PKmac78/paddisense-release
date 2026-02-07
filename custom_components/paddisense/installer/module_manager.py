@@ -161,6 +161,57 @@ class ModuleManager:
         # Check if there are any files in the data directory
         return any(data_path.iterdir())
 
+    def get_module_dependencies(self, module_id: str) -> list[str]:
+        """Get list of module dependencies."""
+        metadata = self.get_modules_metadata()
+        meta = metadata.get(module_id, MODULE_METADATA.get(module_id, {}))
+        return meta.get("dependencies", [])
+
+    def check_dependencies(self, module_id: str) -> dict[str, Any]:
+        """Check if all dependencies for a module are installed.
+
+        Returns:
+            dict with 'satisfied' bool, 'missing' list, and 'installed' list
+        """
+        dependencies = self.get_module_dependencies(module_id)
+        if not dependencies:
+            return {
+                "satisfied": True,
+                "missing": [],
+                "installed": [],
+                "dependencies": [],
+            }
+
+        installed_ids = [m["id"] for m in self.get_installed_modules()]
+        missing = [dep for dep in dependencies if dep not in installed_ids]
+        installed = [dep for dep in dependencies if dep in installed_ids]
+
+        return {
+            "satisfied": len(missing) == 0,
+            "missing": missing,
+            "installed": installed,
+            "dependencies": dependencies,
+        }
+
+    def get_dependents(self, module_id: str) -> list[str]:
+        """Get list of modules that depend on this module.
+
+        Used to warn before removing a module that others depend on.
+        """
+        dependents = []
+        installed_ids = [m["id"] for m in self.get_installed_modules()]
+        metadata = self.get_modules_metadata()
+
+        for mid in installed_ids:
+            if mid == module_id:
+                continue
+            meta = metadata.get(mid, MODULE_METADATA.get(mid, {}))
+            deps = meta.get("dependencies", [])
+            if module_id in deps:
+                dependents.append(mid)
+
+        return dependents
+
     # =========================================================================
     # YAML VALIDATION
     # =========================================================================
@@ -345,6 +396,7 @@ class ModuleManager:
             "version_file": False,
             "package_yaml_valid": False,
             "dashboard_yaml_valid": False,
+            "dependencies_satisfied": True,
             "no_conflicts": True,
         }
         errors = []
@@ -364,6 +416,18 @@ class ModuleManager:
         else:
             warnings.append(f"VERSION file missing (will use 'unknown')")
 
+        # Check dependencies
+        dep_result = self.check_dependencies(module_id)
+        checks["dependencies_satisfied"] = dep_result["satisfied"]
+        if not dep_result["satisfied"]:
+            missing_names = []
+            metadata = self.get_modules_metadata()
+            for dep_id in dep_result["missing"]:
+                meta = metadata.get(dep_id, MODULE_METADATA.get(dep_id, {}))
+                dep_name = meta.get("name", dep_id)
+                missing_names.append(f"{dep_name} ({dep_id})")
+            errors.append(f"Missing required modules: {', '.join(missing_names)}")
+
         # Validate package.yaml
         pkg_result = self.validate_package_yaml(module_id)
         checks["package_yaml_valid"] = pkg_result["valid"]
@@ -381,7 +445,9 @@ class ModuleManager:
         if symlink_path.exists() and symlink_path.is_symlink():
             warnings.append(f"Module already installed (will be reinstalled)")
 
-        ready = checks["module_exists"] and checks["package_yaml_valid"]
+        ready = (checks["module_exists"] and
+                 checks["package_yaml_valid"] and
+                 checks["dependencies_satisfied"])
 
         return {
             "ready": ready,
@@ -389,6 +455,7 @@ class ModuleManager:
             "errors": errors,
             "warnings": warnings,
             "module_id": module_id,
+            "dependencies": dep_result,
         }
 
     # =========================================================================
@@ -568,8 +635,13 @@ class ModuleManager:
                 "rollback_performed": True,
             }
 
-    def remove_module(self, module_id: str) -> dict[str, Any]:
-        """Remove a module by deleting symlink and dashboard entry."""
+    def remove_module(self, module_id: str, force: bool = False) -> dict[str, Any]:
+        """Remove a module by deleting symlink and dashboard entry.
+
+        Args:
+            module_id: The module to remove
+            force: If True, remove even if other modules depend on this one
+        """
         if module_id not in AVAILABLE_MODULES:
             return {
                 "success": False,
@@ -584,6 +656,27 @@ class ModuleManager:
                 "error": f"Module not installed: {module_id}",
             }
 
+        # Check for dependent modules
+        dependents = self.get_dependents(module_id)
+        if dependents and not force:
+            metadata = self.get_modules_metadata()
+            dependent_names = []
+            for dep_id in dependents:
+                meta = metadata.get(dep_id, MODULE_METADATA.get(dep_id, {}))
+                dependent_names.append(meta.get("name", dep_id))
+
+            _LOGGER.warning(
+                "Module %s is required by: %s",
+                module_id,
+                ", ".join(dependent_names)
+            )
+            return {
+                "success": False,
+                "error": f"Cannot remove: required by {', '.join(dependent_names)}",
+                "dependents": dependents,
+                "hint": "Remove dependent modules first, or use force=True",
+            }
+
         try:
             # Remove symlink
             if symlink_path.exists() or symlink_path.is_symlink():
@@ -596,12 +689,18 @@ class ModuleManager:
 
             _LOGGER.info("Removed module %s (data preserved)", module_id)
 
-            return {
+            result = {
                 "success": True,
                 "module_id": module_id,
                 "message": f"Removed {module_id} (local data preserved)",
                 "restart_required": True,
             }
+
+            # Warn if dependents were force-removed
+            if dependents:
+                result["warning"] = f"Modules that may be affected: {', '.join(dependents)}"
+
+            return result
 
         except OSError as e:
             _LOGGER.error("Failed to remove module %s: %s", module_id, e)

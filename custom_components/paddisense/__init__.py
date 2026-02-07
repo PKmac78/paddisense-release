@@ -154,6 +154,7 @@ INSTALL_MODULE_SCHEMA = vol.Schema({
 
 REMOVE_MODULE_SCHEMA = vol.Schema({
     vol.Required("module_id"): vol.In(AVAILABLE_MODULES),
+    vol.Optional("force", default=False): cv.boolean,
 })
 
 UPDATE_PADDISENSE_SCHEMA = vol.Schema({
@@ -583,6 +584,7 @@ async def _async_register_installer_services(hass: HomeAssistant) -> None:
         result = await hass.async_add_executor_job(
             module_manager.remove_module,
             call.data["module_id"],
+            call.data.get("force", False),
         )
         _log_service_result("remove_module", result)
 

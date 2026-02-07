@@ -79,6 +79,7 @@
       "dashboard_slug": "hfm-heyfarm",
       "dashboard_title": "Hey Farmer",
       "dashboard_file": "hfm/dashboards/views.yaml",
+      "dependencies": ["ipm"],
       "status": "rc",
       "version": "1.0.0-rc.1"
     },

@@ -319,7 +319,7 @@ update_paddisense:
 
 install_module:
   name: Install Module
-  description: Install a PaddiSense module
+  description: Install a PaddiSense module. Validates YAML and checks dependencies before install.
   fields:
     module_id:
       name: Module ID
@@ -332,10 +332,14 @@ install_module:
             - "asm"
             - "weather"
             - "pwm"
+            - "rtr"
+            - "str"
+            - "wss"
+            - "hfm"
 
 remove_module:
   name: Remove Module
-  description: Remove a PaddiSense module (preserves data)
+  description: Remove a PaddiSense module (preserves local data). Will fail if other modules depend on it unless force is set.
   fields:
     module_id:
       name: Module ID
@@ -348,6 +352,16 @@ remove_module:
             - "asm"
             - "weather"
             - "pwm"
+            - "rtr"
+            - "str"
+            - "wss"
+            - "hfm"
+    force:
+      name: Force
+      description: Remove even if other modules depend on this one
+      default: false
+      selector:
+        boolean:
 
 create_backup:
   name: Create Backup
