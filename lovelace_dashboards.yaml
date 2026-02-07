@@ -44,3 +44,15 @@ hfm-heyfarm:
   icon: mdi:microphone
   show_in_sidebar: true
   filename: PaddiSense/hfm/dashboards/views.yaml
+asm-service:
+  mode: yaml
+  title: Asset Service Manager
+  icon: mdi:tractor
+  show_in_sidebar: true
+  filename: PaddiSense/asm/dashboards/views.yaml
+wss-safety:
+  mode: yaml
+  title: Worker Safety
+  icon: mdi:account-hard-hat
+  show_in_sidebar: true
+  filename: PaddiSense/wss/dashboards/views.yaml
