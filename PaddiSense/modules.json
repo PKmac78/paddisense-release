@@ -85,13 +85,18 @@
     },
     "wss": {
       "name": "Worker Safety",
-      "description": "Worker check-in/check-out safety system",
+      "description": "Worker safety monitoring with stationary detection and escalation alerts",
       "icon": "mdi:account-hard-hat",
       "dashboard_slug": "wss-safety",
       "dashboard_title": "Worker Safety",
       "dashboard_file": "wss/dashboards/views.yaml",
+      "hacs_frontend": [
+        "lovelace-auto-entities",
+        "button-card",
+        "lovelace-card-mod"
+      ],
       "status": "dev",
-      "version": "0.1.0-dev"
+      "version": "1.1.0-dev"
     }
   }
 }

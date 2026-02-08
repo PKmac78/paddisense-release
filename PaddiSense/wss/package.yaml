@@ -1,14 +1,53 @@
 # =============================================================================
-# WSS (Worker Safety System) Package - PLACEHOLDER
+# WSS (Worker Safety System) Package
 # =============================================================================
-# Worker check-in/check-out system for farm safety monitoring.
-# This is a placeholder for future development.
+# Monitor worker safety via Home Assistant Companion App.
+# Detects stationary workers in monitored zones and provides configurable
+# escalation alerts to primary and secondary contacts.
+#
+# Features:
+#   - Auto-discover users from HA Person entities
+#   - Zone-based monitoring (monitored vs away zones)
+#   - Configurable timing thresholds
+#   - Multi-stage escalation (User -> Primary -> Secondary)
+#   - Timer-based escalation survives HA restarts
+#   - Arrival/departure notifications
+#   - Daily summary at end of working hours
 # =============================================================================
 
 # -----------------------------------------------------------------------------
 # COMMAND LINE SENSORS
 # -----------------------------------------------------------------------------
 command_line:
+  # Main WSS data sensor - provides all config and user data
+  - sensor:
+      name: WSS Data
+      unique_id: wss_data
+      command: 'python3 /config/PaddiSense/wss/python/wss_sensor.py'
+      command_timeout: 30
+      scan_interval: 300
+      value_template: '{{ value_json.enabled_count | default(0) }}'
+      json_attributes:
+        - system_status
+        - version
+        - enabled_count
+        - alert_count
+        - users
+        - user_list
+        - user_names
+        - enabled_users
+        - zones
+        - zone_list
+        - monitored_zones
+        - away_zones
+        - roles
+        - primary_username
+        - secondary_username
+        - timing
+        - working_hours
+        - config_exists
+        - users_file_exists
+
   # WSS module version from VERSION file
   - sensor:
       name: "WSS Module Version"
@@ -17,17 +56,1488 @@ command_line:
       scan_interval: 86400
 
 # -----------------------------------------------------------------------------
+# SHELL COMMANDS - Python backend calls
+# -----------------------------------------------------------------------------
+shell_command:
+  # ----- System Commands -----
+  wss_init: >-
+    python3 /config/PaddiSense/wss/python/wss_backend.py init
+
+  wss_status: >-
+    python3 /config/PaddiSense/wss/python/wss_backend.py status
+
+  # ----- User Management Commands -----
+  # Add a single user (called repeatedly from wss_discover_users script)
+  wss_add_user: >-
+    python3 /config/PaddiSense/wss/python/wss_backend.py add_user
+    --person_id "{{ person_id }}"
+    --username "{{ username }}"
+    --tracker_id "{{ tracker_id }}"
+    --activity_id "{{ activity_id }}"
+    --notify_id "{{ notify_id }}"
+
+  wss_set_user_enabled: >-
+    python3 /config/PaddiSense/wss/python/wss_backend.py set_user_enabled
+    --user_id "{{ user_id }}"
+    --enabled "{{ enabled }}"
+
+  wss_set_user_track_external: >-
+    python3 /config/PaddiSense/wss/python/wss_backend.py set_user_track_external
+    --user_id "{{ user_id }}"
+    --track_external "{{ track_external }}"
+
+  # ----- Zone Configuration Commands -----
+  wss_set_zone_config: >-
+    python3 /config/PaddiSense/wss/python/wss_backend.py set_zone_config
+    --zone_id "{{ zone_id }}"
+    --monitored "{{ monitored | default('') }}"
+    --away "{{ away | default('') }}"
+    --name "{{ name | default('') }}"
+
+  wss_toggle_zone_monitored: >-
+    python3 /config/PaddiSense/wss/python/wss_backend.py toggle_zone_monitored
+    --zone_id "{{ zone_id }}"
+
+  wss_toggle_zone_away: >-
+    python3 /config/PaddiSense/wss/python/wss_backend.py toggle_zone_away
+    --zone_id "{{ zone_id }}"
+
+  wss_add_zone: >-
+    python3 /config/PaddiSense/wss/python/wss_backend.py add_zone
+    --zone_id "{{ zone_id }}"
+    --zone_name "{{ zone_name }}"
+
+  # ----- Role Commands -----
+  wss_set_role: >-
+    python3 /config/PaddiSense/wss/python/wss_backend.py set_role
+    --role "{{ role }}"
+    --user_id "{{ user_id }}"
+
+  wss_remove_admin: >-
+    python3 /config/PaddiSense/wss/python/wss_backend.py remove_admin
+    --user_id "{{ user_id }}"
+
+  # ----- Timing Commands -----
+  wss_set_timing: >-
+    python3 /config/PaddiSense/wss/python/wss_backend.py set_timing
+    --stationary_threshold "{{ stationary_threshold | default('') }}"
+    --first_reminder "{{ first_reminder | default('') }}"
+    --primary_escalation "{{ primary_escalation | default('') }}"
+    --secondary_escalation "{{ secondary_escalation | default('') }}"
+
+  wss_set_working_hours: >-
+    python3 /config/PaddiSense/wss/python/wss_backend.py set_working_hours
+    --start_time "{{ start_time | default('') }}"
+    --end_time "{{ end_time | default('') }}"
+    --workdays "{{ workdays | default('') }}"
+
+  # ----- Data Management Commands -----
+  wss_export: >-
+    python3 /config/PaddiSense/wss/python/wss_backend.py export
+
+  wss_import_legacy: >-
+    python3 /config/PaddiSense/wss/python/wss_backend.py import_legacy
+    --users_file "{{ users_file | default('') }}"
+    --zones_file "{{ zones_file | default('') }}"
+
+  wss_reset: >-
+    python3 /config/PaddiSense/wss/python/wss_backend.py reset
+    --token "{{ token }}"
+
+# -----------------------------------------------------------------------------
+# INPUT HELPERS - User interface controls
+# -----------------------------------------------------------------------------
+input_boolean:
+  # System enable/disable
+  wss_enabled:
+    name: "WSS System Enabled"
+    icon: mdi:shield-check
+
+  # Confirm dangerous actions
+  wss_confirm_reset:
+    name: "WSS Confirm Reset"
+    icon: mdi:alert
+
+input_select:
+  # Primary contact selector
+  wss_primary_user:
+    name: "WSS Primary Contact"
+    icon: mdi:account-alert
+    options:
+      - Select User
+
+  # Secondary contact selector
+  wss_secondary_user:
+    name: "WSS Secondary Contact"
+    icon: mdi:account-multiple
+    options:
+      - Select User
+
+  # Workdays selection
+  wss_workdays:
+    name: "WSS Workdays"
+    icon: mdi:calendar-week
+    options:
+      - "Mon-Fri"
+      - "Mon-Sat"
+      - "Every Day"
+      - "Custom"
+
+  # Zone selector for configuration
+  wss_selected_zone:
+    name: "WSS Selected Zone"
+    icon: mdi:map-marker
+    options:
+      - Select Zone
+
+input_number:
+  # Stationary threshold (minutes before first alert)
+  wss_stationary_threshold:
+    name: "WSS Stationary Threshold"
+    icon: mdi:timer-alert
+    min: 5
+    max: 60
+    step: 1
+    unit_of_measurement: "min"
+    mode: slider
+
+  # First reminder delay (minutes after initial alert)
+  wss_first_reminder:
+    name: "WSS First Reminder"
+    icon: mdi:bell-ring
+    min: 1
+    max: 30
+    step: 1
+    unit_of_measurement: "min"
+    mode: slider
+
+  # Primary escalation delay (minutes to escalate to primary)
+  wss_primary_escalation:
+    name: "WSS Primary Escalation"
+    icon: mdi:phone-alert
+    min: 1
+    max: 30
+    step: 1
+    unit_of_measurement: "min"
+    mode: slider
+
+  # Secondary escalation delay (minutes to escalate to secondary)
+  wss_secondary_escalation:
+    name: "WSS Secondary Escalation"
+    icon: mdi:phone-ring
+    min: 5
+    max: 60
+    step: 1
+    unit_of_measurement: "min"
+    mode: slider
+
+  # Internal: current escalation stage (1-4)
+  wss_escalation_stage:
+    name: "WSS Escalation Stage"
+    icon: mdi:stairs
+    min: 0
+    max: 4
+    step: 1
+    mode: box
+
+input_datetime:
+  # Working hours start time
+  wss_working_hours_start:
+    name: "WSS Working Hours Start"
+    icon: mdi:clock-start
+    has_date: false
+    has_time: true
+
+  # Working hours end time (for daily summary)
+  wss_working_hours_end:
+    name: "WSS Working Hours End"
+    icon: mdi:clock-end
+    has_date: false
+    has_time: true
+
+input_text:
+  # Internal: user currently in escalation
+  wss_escalation_user:
+    name: "WSS Escalation User"
+    icon: mdi:account-alert
+    max: 100
+
+  # Internal: escalation user's person entity
+  wss_escalation_person:
+    name: "WSS Escalation Person"
+    icon: mdi:account
+    max: 100
+
+# -----------------------------------------------------------------------------
+# TIMER - Escalation timer with restore
+# -----------------------------------------------------------------------------
+timer:
+  wss_escalation_timer:
+    name: "WSS Escalation Timer"
+    icon: mdi:timer-sand
+    restore: true
+
+# -----------------------------------------------------------------------------
 # TEMPLATE SENSORS
 # -----------------------------------------------------------------------------
 template:
   - sensor:
-      # Placeholder status sensor
+      # Status display sensor for dashboard
       - name: "PaddiSense Worker Safety"
         unique_id: paddisense_wss_status
         icon: mdi:account-hard-hat
-        state: "Coming Soon"
+        state: >
+          {% set data = state_attr('sensor.wss_data', 'system_status') %}
+          {% set stage = states('input_number.wss_escalation_stage') | int(0) %}
+          {% if not is_state('input_boolean.wss_enabled', 'on') %}
+            Disabled
+          {% elif stage > 0 %}
+            Alert Active
+          {% elif data == 'ready' %}
+            All Clear
+          {% elif data == 'not_initialized' %}
+            Not Initialized
+          {% else %}
+            {{ data | default('Unknown') }}
+          {% endif %}
         attributes:
           module: "wss"
-          module_name: "Worker Safety System"
-          status: "placeholder"
-          description: "Worker check-in/check-out system for farm safety monitoring"
+          module_name: "Worker Safety"
+          status: "{{ state_attr('sensor.wss_data', 'system_status') | default('unknown') }}"
+          enabled_count: "{{ state_attr('sensor.wss_data', 'enabled_count') | default(0) }}"
+          alert_count: "{{ states('input_number.wss_escalation_stage') | int(0) > 0 }}"
+          escalation_stage: "{{ states('input_number.wss_escalation_stage') | int(0) }}"
+          escalation_user: "{{ states('input_text.wss_escalation_user') }}"
+
+      # Movement trigger sensor - tracks person state changes
+      - name: "WSS Movement Trigger"
+        unique_id: wss_movement_trigger
+        state: >
+          {% set users = state_attr('sensor.wss_data', 'enabled_users') or [] %}
+          {% set now_ts = now().timestamp() %}
+          {% set recent = namespace(person='null') %}
+          {% for u in users %}
+            {% set person = u.person_id %}
+            {% if states[person] is defined %}
+              {% set changed = states[person].last_changed.timestamp() %}
+              {% if now_ts - changed < 60 %}
+                {% set recent.person = person %}
+              {% endif %}
+            {% endif %}
+          {% endfor %}
+          {{ recent.person }}
+        attributes:
+          trigger_time: "{{ now().isoformat() }}"
+
+# -----------------------------------------------------------------------------
+# SCRIPTS
+# -----------------------------------------------------------------------------
+script:
+  # ----- System Scripts -----
+  wss_init_system:
+    alias: "WSS Initialize System"
+    icon: mdi:cog
+    sequence:
+      - service: shell_command.wss_init
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.wss_data
+
+  wss_refresh_data:
+    alias: "WSS Refresh Data"
+    icon: mdi:refresh
+    sequence:
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.wss_data
+      - delay: 2
+      # Update user selector options
+      - variables:
+          user_names: "{{ state_attr('sensor.wss_data', 'user_names') or [] }}"
+          user_options: "{{ ['Select User'] + user_names }}"
+          zone_names: "{{ (state_attr('sensor.wss_data', 'zone_list') or []) | map(attribute='name') | list }}"
+          zone_options: "{{ ['Select Zone'] + zone_names }}"
+      - service: input_select.set_options
+        target:
+          entity_id:
+            - input_select.wss_primary_user
+            - input_select.wss_secondary_user
+        data:
+          options: "{{ user_options }}"
+      - service: input_select.set_options
+        target:
+          entity_id: input_select.wss_selected_zone
+        data:
+          options: "{{ zone_options }}"
+      # Restore primary/secondary selections
+      - variables:
+          primary_username: "{{ state_attr('sensor.wss_data', 'primary_username') or '' }}"
+          secondary_username: "{{ state_attr('sensor.wss_data', 'secondary_username') or '' }}"
+      - if:
+          - condition: template
+            value_template: "{{ primary_username != '' }}"
+        then:
+          - service: input_select.select_option
+            target:
+              entity_id: input_select.wss_primary_user
+            data:
+              option: "{{ primary_username }}"
+      - if:
+          - condition: template
+            value_template: "{{ secondary_username != '' }}"
+        then:
+          - service: input_select.select_option
+            target:
+              entity_id: input_select.wss_secondary_user
+            data:
+              option: "{{ secondary_username }}"
+
+  # ----- User Discovery Script -----
+  wss_discover_users:
+    alias: "WSS Discover Users"
+    icon: mdi:account-search
+    sequence:
+      - service: persistent_notification.create
+        data:
+          title: "WSS User Discovery"
+          message: "Starting user discovery..."
+          notification_id: wss_discovery
+      # Build list of discovered person entities with device trackers
+      - variables:
+          discovered: >
+            {% set result = namespace(users=[]) %}
+            {% for person in states.person %}
+              {% set trackers = state_attr(person.entity_id, 'source') %}
+              {% if trackers %}
+                {% set tracker_list = trackers if trackers is iterable and trackers is not string else [trackers] %}
+                {% set tracker = tracker_list | first | default('') %}
+                {% if tracker and tracker.startswith('device_tracker.') %}
+                  {% set device_name = tracker | replace('device_tracker.', '') %}
+                  {% set activity = 'sensor.' ~ device_name ~ '_activity' %}
+                  {% set notify = 'notify.mobile_app_' ~ device_name %}
+                  {% set entry = {
+                    'person_id': person.entity_id,
+                    'username': state_attr(person.entity_id, 'friendly_name') | default(person.entity_id),
+                    'tracker_id': tracker,
+                    'activity_id': activity if states[activity] is defined else '',
+                    'notify_id': notify
+                  } %}
+                  {% set result.users = result.users + [entry] %}
+                {% endif %}
+              {% endif %}
+            {% endfor %}
+            {{ result.users }}
+          count: "{{ discovered | length }}"
+      # Log what we found
+      - service: system_log.write
+        data:
+          message: "WSS Discovery found {{ count }} person entities: {{ discovered }}"
+          level: info
+      # Process each discovered user individually to avoid JSON escaping issues
+      - repeat:
+          count: "{{ count | int }}"
+          sequence:
+            - variables:
+                idx: "{{ repeat.index - 1 }}"
+                user: "{{ discovered[idx | int] }}"
+            - service: shell_command.wss_add_user
+              data:
+                person_id: "{{ user.person_id }}"
+                username: "{{ user.username }}"
+                tracker_id: "{{ user.tracker_id }}"
+                activity_id: "{{ user.activity_id | default('') }}"
+                notify_id: "{{ user.notify_id }}"
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.wss_data
+      - service: persistent_notification.create
+        data:
+          title: "WSS User Discovery"
+          message: "Complete! Processed {{ count }} person entities."
+          notification_id: wss_discovery
+
+  # ----- User Management Scripts -----
+  wss_toggle_user:
+    alias: "WSS Toggle User Enabled"
+    icon: mdi:account-check
+    fields:
+      user_id:
+        description: "User ID to toggle"
+      enabled:
+        description: "Enable (true) or disable (false)"
+    sequence:
+      - service: shell_command.wss_set_user_enabled
+        data:
+          user_id: "{{ user_id }}"
+          enabled: "{{ enabled }}"
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.wss_data
+
+  wss_toggle_user_external:
+    alias: "WSS Toggle User External Tracking"
+    icon: mdi:car
+    fields:
+      user_id:
+        description: "User ID to toggle"
+      track_external:
+        description: "Enable (true) or disable (false) external tracking"
+    sequence:
+      - service: shell_command.wss_set_user_track_external
+        data:
+          user_id: "{{ user_id }}"
+          track_external: "{{ track_external }}"
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.wss_data
+
+  wss_enable_external_tracking:
+    alias: "WSS Enable External Tracking"
+    icon: mdi:car-connected
+    sequence:
+      - variables:
+          users: "{{ state_attr('sensor.wss_data', 'enabled_users') or [] }}"
+          first_user: "{{ users[0] if users | length > 0 else {} }}"
+          user_id: "{{ first_user.id | default('') }}"
+      - condition: template
+        value_template: "{{ user_id != '' }}"
+      - service: shell_command.wss_set_user_track_external
+        data:
+          user_id: "{{ user_id }}"
+          track_external: "true"
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.wss_data
+
+  wss_disable_external_tracking:
+    alias: "WSS Disable External Tracking"
+    icon: mdi:car-off
+    sequence:
+      - variables:
+          users: "{{ state_attr('sensor.wss_data', 'enabled_users') or [] }}"
+          first_user: "{{ users[0] if users | length > 0 else {} }}"
+          user_id: "{{ first_user.id | default('') }}"
+      - condition: template
+        value_template: "{{ user_id != '' }}"
+      - service: shell_command.wss_set_user_track_external
+        data:
+          user_id: "{{ user_id }}"
+          track_external: "false"
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.wss_data
+
+  wss_enable_first_user:
+    alias: "WSS Enable First Disabled User"
+    icon: mdi:shield-check
+    sequence:
+      - variables:
+          users: "{{ state_attr('sensor.wss_data', 'user_list') or [] }}"
+          user_id: >
+            {% for u in users %}
+              {% if not u.enabled %}{{ u.id }}{% endif %}
+            {% endfor %}
+      - condition: template
+        value_template: "{{ user_id | trim != '' }}"
+      - service: shell_command.wss_set_user_enabled
+        data:
+          user_id: "{{ user_id | trim }}"
+          enabled: "true"
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.wss_data
+
+  wss_disable_first_user:
+    alias: "WSS Disable First Enabled User"
+    icon: mdi:shield-off
+    sequence:
+      - variables:
+          users: "{{ state_attr('sensor.wss_data', 'user_list') or [] }}"
+          user_id: >
+            {% for u in users %}
+              {% if u.enabled %}{{ u.id }}{% endif %}
+            {% endfor %}
+      - condition: template
+        value_template: "{{ user_id | trim != '' }}"
+      - service: shell_command.wss_set_user_enabled
+        data:
+          user_id: "{{ user_id | trim }}"
+          enabled: "false"
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.wss_data
+
+  # ----- Zone Configuration Scripts -----
+  wss_discover_zones:
+    alias: "WSS Discover Zones"
+    icon: mdi:map-search
+    sequence:
+      - service: persistent_notification.create
+        data:
+          title: "WSS Zone Discovery"
+          message: "Starting zone discovery..."
+          notification_id: wss_zone_discovery
+      - variables:
+          discovered: >
+            {% set result = namespace(zones=[]) %}
+            {% for zone in states.zone %}
+              {% set entry = {
+                'id': zone.entity_id,
+                'name': state_attr(zone.entity_id, 'friendly_name') | default(zone.entity_id)
+              } %}
+              {% set result.zones = result.zones + [entry] %}
+            {% endfor %}
+            {{ result.zones }}
+          count: "{{ discovered | length }}"
+      # Process each zone individually
+      - repeat:
+          count: "{{ count | int }}"
+          sequence:
+            - variables:
+                idx: "{{ repeat.index - 1 }}"
+                zone: "{{ discovered[idx | int] }}"
+            - service: shell_command.wss_add_zone
+              data:
+                zone_id: "{{ zone.id }}"
+                zone_name: "{{ zone.name }}"
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.wss_data
+      - service: persistent_notification.create
+        data:
+          title: "WSS Zone Discovery"
+          message: "Complete! Processed {{ count }} zones."
+          notification_id: wss_zone_discovery
+
+  wss_toggle_zone_monitored:
+    alias: "WSS Toggle Zone Monitored"
+    icon: mdi:map-marker-check
+    fields:
+      zone_id:
+        description: "Zone entity ID"
+    sequence:
+      - service: shell_command.wss_toggle_zone_monitored
+        data:
+          zone_id: "{{ zone_id }}"
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.wss_data
+
+  wss_toggle_zone_away:
+    alias: "WSS Toggle Zone Away"
+    icon: mdi:map-marker-off
+    fields:
+      zone_id:
+        description: "Zone entity ID"
+    sequence:
+      - service: shell_command.wss_toggle_zone_away
+        data:
+          zone_id: "{{ zone_id }}"
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.wss_data
+
+  wss_toggle_selected_zone_monitored:
+    alias: "WSS Toggle Selected Zone Monitored"
+    icon: mdi:bell-ring
+    sequence:
+      - variables:
+          selected_name: "{{ states('input_select.wss_selected_zone') }}"
+          zones: "{{ state_attr('sensor.wss_data', 'zone_list') or [] }}"
+          zone_id: >
+            {% for z in zones %}
+              {% if z.name == selected_name %}{{ z.id }}{% endif %}
+            {% endfor %}
+      - condition: template
+        value_template: "{{ zone_id | trim != '' and selected_name != 'Select Zone' }}"
+      - service: shell_command.wss_toggle_zone_monitored
+        data:
+          zone_id: "{{ zone_id | trim }}"
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.wss_data
+
+  wss_toggle_selected_zone_away:
+    alias: "WSS Toggle Selected Zone Away"
+    icon: mdi:home-export-outline
+    sequence:
+      - variables:
+          selected_name: "{{ states('input_select.wss_selected_zone') }}"
+          zones: "{{ state_attr('sensor.wss_data', 'zone_list') or [] }}"
+          zone_id: >
+            {% for z in zones %}
+              {% if z.name == selected_name %}{{ z.id }}{% endif %}
+            {% endfor %}
+      - condition: template
+        value_template: "{{ zone_id | trim != '' and selected_name != 'Select Zone' }}"
+      - service: shell_command.wss_toggle_zone_away
+        data:
+          zone_id: "{{ zone_id | trim }}"
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.wss_data
+
+  # ----- Role Assignment Scripts -----
+  wss_set_primary:
+    alias: "WSS Set Primary Contact"
+    icon: mdi:account-alert
+    fields:
+      user_id:
+        description: "User ID for primary contact"
+    sequence:
+      - service: shell_command.wss_set_role
+        data:
+          role: "primary"
+          user_id: "{{ user_id }}"
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.wss_data
+
+  wss_set_secondary:
+    alias: "WSS Set Secondary Contact"
+    icon: mdi:account-multiple
+    fields:
+      user_id:
+        description: "User ID for secondary contact"
+    sequence:
+      - service: shell_command.wss_set_role
+        data:
+          role: "secondary"
+          user_id: "{{ user_id }}"
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.wss_data
+
+  # ----- Escalation Scripts -----
+  wss_start_escalation:
+    alias: "WSS Start Escalation"
+    icon: mdi:alert
+    fields:
+      user_id:
+        description: "User ID in alert"
+      person_id:
+        description: "Person entity ID"
+    sequence:
+      # Set escalation state
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.wss_escalation_user
+        data:
+          value: "{{ user_id }}"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.wss_escalation_person
+        data:
+          value: "{{ person_id }}"
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.wss_escalation_stage
+        data:
+          value: 1
+      # Send Stage 1 notification to user
+      - variables:
+          users: "{{ state_attr('sensor.wss_data', 'users') or {} }}"
+          user: "{{ users.get(user_id, {}) }}"
+          notify_id: "{{ user.get('notify_id', '') }}"
+          username: "{{ user.get('username', 'Worker') }}"
+      - if:
+          - condition: template
+            value_template: "{{ notify_id != '' }}"
+        then:
+          - service: "{{ notify_id }}"
+            data:
+              title: "Safety Check Required"
+              message: "You have been stationary for a while. Please confirm you're okay."
+              data:
+                url: /wss-safety/status
+                push:
+                  sound:
+                    name: alarm.caf
+                    critical: 1
+                    volume: 1
+                actions:
+                  - action: wss_check_in
+                    title: "I'm Okay"
+                  - action: wss_need_help
+                    title: "Need Help"
+                    destructive: true
+      # Start timer for next stage
+      - variables:
+          reminder_mins: "{{ states('input_number.wss_first_reminder') | int(5) }}"
+      - service: timer.start
+        target:
+          entity_id: timer.wss_escalation_timer
+        data:
+          duration: "{{ reminder_mins * 60 }}"
+
+  wss_escalation_next_stage:
+    alias: "WSS Escalation Next Stage"
+    icon: mdi:arrow-up-bold
+    sequence:
+      - variables:
+          stage: "{{ states('input_number.wss_escalation_stage') | int(0) }}"
+          user_id: "{{ states('input_text.wss_escalation_user') }}"
+          person_id: "{{ states('input_text.wss_escalation_person') }}"
+          users: "{{ state_attr('sensor.wss_data', 'users') or {} }}"
+          user: "{{ users.get(user_id, {}) }}"
+          roles: "{{ state_attr('sensor.wss_data', 'roles') or {} }}"
+          primary_id: "{{ roles.get('primary', '') }}"
+          secondary_id: "{{ roles.get('secondary', '') }}"
+          primary: "{{ users.get(primary_id, {}) }}"
+          secondary: "{{ users.get(secondary_id, {}) }}"
+      - choose:
+          # Stage 1 -> 2: Second alert to user
+          - conditions:
+              - condition: template
+                value_template: "{{ stage == 1 }}"
+            sequence:
+              - service: input_number.set_value
+                target:
+                  entity_id: input_number.wss_escalation_stage
+                data:
+                  value: 2
+              - if:
+                  - condition: template
+                    value_template: "{{ user.get('notify_id', '') != '' }}"
+                then:
+                  - service: "{{ user.get('notify_id') }}"
+                    data:
+                      title: "URGENT: Safety Check Required"
+                      message: "No response received. Please confirm you're okay immediately."
+                      data:
+                        url: /wss-safety/status
+                        push:
+                          sound:
+                            name: alarm.caf
+                            critical: 1
+                            volume: 1
+                        actions:
+                          - action: wss_check_in
+                            title: "I'm Okay"
+                          - action: wss_need_help
+                            title: "Need Help"
+                            destructive: true
+              - variables:
+                  primary_mins: "{{ states('input_number.wss_primary_escalation') | int(5) }}"
+              - service: timer.start
+                target:
+                  entity_id: timer.wss_escalation_timer
+                data:
+                  duration: "{{ primary_mins * 60 }}"
+
+          # Stage 2 -> 3: Alert to primary
+          - conditions:
+              - condition: template
+                value_template: "{{ stage == 2 }}"
+            sequence:
+              - service: input_number.set_value
+                target:
+                  entity_id: input_number.wss_escalation_stage
+                data:
+                  value: 3
+              - if:
+                  - condition: template
+                    value_template: "{{ primary.get('notify_id', '') != '' }}"
+                then:
+                  - service: "{{ primary.get('notify_id') }}"
+                    data:
+                      title: "Worker Safety Alert"
+                      message: "{{ user.get('username', 'A worker') }} has not responded to safety checks."
+                      data:
+                        url: /wss-safety/status
+                        push:
+                          sound:
+                            name: alarm.caf
+                            critical: 1
+                            volume: 1
+                        action_data:
+                          latitude: "{{ state_attr(person_id, 'latitude') | default(0) }}"
+                          longitude: "{{ state_attr(person_id, 'longitude') | default(0) }}"
+                          shows_user_location: true
+                        actions:
+                          - action: wss_reset_alert
+                            title: "Alert Resolved"
+              - variables:
+                  secondary_mins: "{{ states('input_number.wss_secondary_escalation') | int(10) }}"
+              - service: timer.start
+                target:
+                  entity_id: timer.wss_escalation_timer
+                data:
+                  duration: "{{ secondary_mins * 60 }}"
+
+          # Stage 3 -> 4: Alert to secondary + repeat
+          - conditions:
+              - condition: template
+                value_template: "{{ stage >= 3 }}"
+            sequence:
+              - service: input_number.set_value
+                target:
+                  entity_id: input_number.wss_escalation_stage
+                data:
+                  value: 4
+              # Notify secondary
+              - if:
+                  - condition: template
+                    value_template: "{{ secondary.get('notify_id', '') != '' }}"
+                then:
+                  - service: "{{ secondary.get('notify_id') }}"
+                    data:
+                      title: "CRITICAL: Worker Safety Alert"
+                      message: "{{ user.get('username', 'A worker') }} has not responded. Primary contact notified. Location check required."
+                      data:
+                        url: /wss-safety/status
+                        push:
+                          sound:
+                            name: alarm.caf
+                            critical: 1
+                            volume: 1
+                        action_data:
+                          latitude: "{{ state_attr(person_id, 'latitude') | default(0) }}"
+                          longitude: "{{ state_attr(person_id, 'longitude') | default(0) }}"
+                          shows_user_location: true
+                        actions:
+                          - action: wss_reset_alert
+                            title: "Alert Resolved"
+              # Also re-notify primary
+              - if:
+                  - condition: template
+                    value_template: "{{ primary.get('notify_id', '') != '' }}"
+                then:
+                  - service: "{{ primary.get('notify_id') }}"
+                    data:
+                      title: "CRITICAL: Worker Safety Alert (Reminder)"
+                      message: "{{ user.get('username', 'A worker') }} still unresponsive. Secondary contact has been notified."
+                      data:
+                        url: /wss-safety/status
+                        push:
+                          sound:
+                            name: alarm.caf
+                            critical: 1
+                            volume: 1
+                        actions:
+                          - action: wss_reset_alert
+                            title: "Alert Resolved"
+              # Continue repeating every 5 minutes
+              - service: timer.start
+                target:
+                  entity_id: timer.wss_escalation_timer
+                data:
+                  duration: "300"
+
+  wss_reset_alert:
+    alias: "WSS Reset Alert"
+    icon: mdi:check-circle
+    sequence:
+      - service: timer.cancel
+        target:
+          entity_id: timer.wss_escalation_timer
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.wss_escalation_stage
+        data:
+          value: 0
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.wss_escalation_user
+        data:
+          value: ""
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.wss_escalation_person
+        data:
+          value: ""
+
+  # ----- Dashboard Action Scripts -----
+  wss_check_in_button:
+    alias: "WSS Check In Button"
+    icon: mdi:check
+    description: "Dashboard check-in button - clears any active alert for current user"
+    sequence:
+      - variables:
+          escalation_user: "{{ states('input_text.wss_escalation_user') }}"
+      - if:
+          - condition: template
+            value_template: "{{ escalation_user != '' }}"
+        then:
+          - service: script.wss_reset_alert
+
+  wss_help_button:
+    alias: "WSS Help Button"
+    icon: mdi:alert-octagon
+    description: "Dashboard help button - immediately escalates to all contacts"
+    fields:
+      user_id:
+        description: "User ID requesting help"
+      person_id:
+        description: "Person entity ID"
+    sequence:
+      - variables:
+          users: "{{ state_attr('sensor.wss_data', 'users') or {} }}"
+          user: "{{ users.get(user_id, {}) }}"
+          roles: "{{ state_attr('sensor.wss_data', 'roles') or {} }}"
+          primary_id: "{{ roles.get('primary', '') }}"
+          secondary_id: "{{ roles.get('secondary', '') }}"
+          primary: "{{ users.get(primary_id, {}) }}"
+          secondary: "{{ users.get(secondary_id, {}) }}"
+      # Notify primary
+      - if:
+          - condition: template
+            value_template: "{{ primary.get('notify_id', '') != '' }}"
+        then:
+          - service: "{{ primary.get('notify_id') }}"
+            data:
+              title: "HELP REQUESTED"
+              message: "{{ user.get('username', 'A worker') }} has requested assistance!"
+              data:
+                url: /wss-safety/status
+                push:
+                  sound:
+                    name: alarm.caf
+                    critical: 1
+                    volume: 1
+                action_data:
+                  latitude: "{{ state_attr(person_id, 'latitude') | default(0) }}"
+                  longitude: "{{ state_attr(person_id, 'longitude') | default(0) }}"
+                  shows_user_location: true
+      # Notify secondary
+      - if:
+          - condition: template
+            value_template: "{{ secondary.get('notify_id', '') != '' }}"
+        then:
+          - service: "{{ secondary.get('notify_id') }}"
+            data:
+              title: "HELP REQUESTED"
+              message: "{{ user.get('username', 'A worker') }} has requested assistance!"
+              data:
+                url: /wss-safety/status
+                push:
+                  sound:
+                    name: alarm.caf
+                    critical: 1
+                    volume: 1
+                action_data:
+                  latitude: "{{ state_attr(person_id, 'latitude') | default(0) }}"
+                  longitude: "{{ state_attr(person_id, 'longitude') | default(0) }}"
+                  shows_user_location: true
+
+  # ----- Config Sync Scripts -----
+  wss_sync_timing_to_config:
+    alias: "WSS Sync Timing to Config"
+    icon: mdi:sync
+    description: "Sync input_number values to config.json"
+    sequence:
+      - service: shell_command.wss_set_timing
+        data:
+          stationary_threshold: "{{ states('input_number.wss_stationary_threshold') | int }}"
+          first_reminder: "{{ states('input_number.wss_first_reminder') | int }}"
+          primary_escalation: "{{ states('input_number.wss_primary_escalation') | int }}"
+          secondary_escalation: "{{ states('input_number.wss_secondary_escalation') | int }}"
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.wss_data
+
+  wss_sync_working_hours_to_config:
+    alias: "WSS Sync Working Hours to Config"
+    icon: mdi:sync
+    sequence:
+      - service: shell_command.wss_set_working_hours
+        data:
+          start_time: "{{ states('input_datetime.wss_working_hours_start') }}"
+          end_time: "{{ states('input_datetime.wss_working_hours_end') }}"
+          workdays: "{{ states('input_select.wss_workdays') }}"
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.wss_data
+
+  # ----- Data Management Scripts -----
+  wss_export_data:
+    alias: "WSS Export Data"
+    icon: mdi:export
+    sequence:
+      - service: shell_command.wss_export
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.wss_data
+
+  wss_import_legacy:
+    alias: "WSS Import Legacy Data"
+    icon: mdi:import
+    sequence:
+      - service: shell_command.wss_import_legacy
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.wss_data
+
+  wss_reset_data:
+    alias: "WSS Reset Data"
+    icon: mdi:delete-forever
+    sequence:
+      - condition: state
+        entity_id: input_boolean.wss_confirm_reset
+        state: "on"
+      - service: shell_command.wss_reset
+        data:
+          token: "CONFIRM_RESET"
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.wss_data
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.wss_confirm_reset
+
+# -----------------------------------------------------------------------------
+# AUTOMATIONS
+# -----------------------------------------------------------------------------
+automation:
+  # ----- Stationary Detection -----
+  - id: wss_stationary_detection
+    alias: "WSS Stationary Detection"
+    description: "Detect when enabled user is stationary in monitored zone"
+    trigger:
+      - platform: template
+        value_template: >
+          {% set users = state_attr('sensor.wss_data', 'enabled_users') or [] %}
+          {% set zones = state_attr('sensor.wss_data', 'zones') or {} %}
+          {% set monitored = zones.values() | selectattr('monitored', 'eq', true) | map(attribute='name') | list %}
+          {% set threshold_mins = states('input_number.wss_stationary_threshold') | int(15) %}
+          {% set threshold_secs = threshold_mins * 60 %}
+          {% set now_ts = now().timestamp() %}
+          {% set alert = namespace(found=false) %}
+          {% for u in users %}
+            {% set activity = u.activity_id %}
+            {% set person = u.person_id %}
+            {% if states[activity] is defined and states[person] is defined %}
+              {% set is_stationary = states(activity) == 'Stationary' %}
+              {% set in_monitored = states(person) in monitored %}
+              {% set activity_changed = states[activity].last_changed.timestamp() %}
+              {% set stationary_duration = now_ts - activity_changed %}
+              {% if is_stationary and in_monitored and stationary_duration > threshold_secs %}
+                {% set alert.found = true %}
+              {% endif %}
+            {% endif %}
+          {% endfor %}
+          {{ alert.found }}
+        for:
+          seconds: 30
+    condition:
+      - condition: state
+        entity_id: input_boolean.wss_enabled
+        state: "on"
+      - condition: template
+        value_template: "{{ states('input_number.wss_escalation_stage') | int(0) == 0 }}"
+    action:
+      - variables:
+          users: "{{ state_attr('sensor.wss_data', 'enabled_users') or [] }}"
+          zones: "{{ state_attr('sensor.wss_data', 'zones') or {} }}"
+          monitored: "{{ zones.values() | selectattr('monitored', 'eq', true) | map(attribute='name') | list }}"
+          threshold_mins: "{{ states('input_number.wss_stationary_threshold') | int(15) }}"
+          threshold_secs: "{{ threshold_mins * 60 }}"
+          now_ts: "{{ now().timestamp() }}"
+          alert_user: >
+            {% for u in users %}
+              {% set activity = u.activity_id %}
+              {% set person = u.person_id %}
+              {% if states[activity] is defined and states[person] is defined %}
+                {% set is_stationary = states(activity) == 'Stationary' %}
+                {% set in_monitored = states(person) in monitored %}
+                {% set activity_changed = states[activity].last_changed.timestamp() %}
+                {% set stationary_duration = now_ts - activity_changed %}
+                {% if is_stationary and in_monitored and stationary_duration > threshold_secs %}
+                  {{ u.id }}
+                {% endif %}
+              {% endif %}
+            {% endfor %}
+          alert_person: >
+            {% for u in users %}
+              {% set activity = u.activity_id %}
+              {% set person = u.person_id %}
+              {% if states[activity] is defined and states[person] is defined %}
+                {% set is_stationary = states(activity) == 'Stationary' %}
+                {% set in_monitored = states(person) in monitored %}
+                {% set activity_changed = states[activity].last_changed.timestamp() %}
+                {% set stationary_duration = now_ts - activity_changed %}
+                {% if is_stationary and in_monitored and stationary_duration > threshold_secs %}
+                  {{ u.person_id }}
+                {% endif %}
+              {% endif %}
+            {% endfor %}
+      - if:
+          - condition: template
+            value_template: "{{ alert_user | trim != '' }}"
+        then:
+          - service: script.wss_start_escalation
+            data:
+              user_id: "{{ alert_user | trim }}"
+              person_id: "{{ alert_person | trim }}"
+
+  # ----- Movement Clears Alert -----
+  - id: wss_movement_clears_alert
+    alias: "WSS Movement Clears Alert"
+    description: "Clear escalation when user moves or leaves monitored zone"
+    trigger:
+      - platform: state
+        entity_id: sensor.wss_movement_trigger
+    condition:
+      - condition: template
+        value_template: "{{ states('input_number.wss_escalation_stage') | int(0) > 0 }}"
+      - condition: template
+        value_template: >
+          {% set person_id = states('input_text.wss_escalation_person') %}
+          {% set zones = state_attr('sensor.wss_data', 'zones') or {} %}
+          {% set monitored = zones.values() | selectattr('monitored', 'eq', true) | map(attribute='name') | list %}
+          {% set current_zone = states(person_id) %}
+          {{ current_zone not in monitored }}
+    action:
+      - service: script.wss_reset_alert
+
+  # ----- Escalation Timer Finished -----
+  - id: wss_escalation_timer_finished
+    alias: "WSS Escalation Timer Finished"
+    description: "Progress to next escalation stage when timer expires"
+    trigger:
+      - platform: event
+        event_type: timer.finished
+        event_data:
+          entity_id: timer.wss_escalation_timer
+    condition:
+      - condition: template
+        value_template: "{{ states('input_number.wss_escalation_stage') | int(0) > 0 }}"
+    action:
+      - service: script.wss_escalation_next_stage
+
+  # ----- Notification Actions -----
+  - id: wss_notification_actions
+    alias: "WSS Notification Actions"
+    description: "Handle check-in, help, and reset actions from notifications"
+    trigger:
+      - platform: event
+        event_type: mobile_app_notification_action
+        event_data:
+          action: wss_check_in
+      - platform: event
+        event_type: mobile_app_notification_action
+        event_data:
+          action: wss_need_help
+      - platform: event
+        event_type: mobile_app_notification_action
+        event_data:
+          action: wss_reset_alert
+    action:
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ trigger.event.data.action == 'wss_check_in' }}"
+            sequence:
+              - service: script.wss_reset_alert
+
+          - conditions:
+              - condition: template
+                value_template: "{{ trigger.event.data.action == 'wss_need_help' }}"
+            sequence:
+              - variables:
+                  user_id: "{{ states('input_text.wss_escalation_user') }}"
+                  person_id: "{{ states('input_text.wss_escalation_person') }}"
+              - service: script.wss_help_button
+                data:
+                  user_id: "{{ user_id }}"
+                  person_id: "{{ person_id }}"
+              - service: script.wss_reset_alert
+
+          - conditions:
+              - condition: template
+                value_template: "{{ trigger.event.data.action == 'wss_reset_alert' }}"
+            sequence:
+              - service: script.wss_reset_alert
+
+  # ----- Worker Arrival/Departure -----
+  - id: wss_worker_arrival_departure
+    alias: "WSS Worker Arrival/Departure"
+    description: "Notify primary when workers arrive or depart"
+    trigger:
+      - platform: state
+        entity_id: sensor.wss_movement_trigger
+        from: 'null'
+    condition:
+      - condition: state
+        entity_id: input_boolean.wss_enabled
+        state: "on"
+      - condition: template
+        value_template: "{{ trigger.to_state.state != 'null' and trigger.to_state.state != '' }}"
+    action:
+      - variables:
+          person_id: "{{ trigger.to_state.state }}"
+          users: "{{ state_attr('sensor.wss_data', 'enabled_users') or [] }}"
+          zones: "{{ state_attr('sensor.wss_data', 'zones') or {} }}"
+          away_zones: "{{ ['home', 'away', 'not_home'] + (zones.values() | selectattr('away', 'eq', true) | map(attribute='name') | list) }}"
+          roles: "{{ state_attr('sensor.wss_data', 'roles') or {} }}"
+          primary_id: "{{ roles.get('primary', '') }}"
+          all_users: "{{ state_attr('sensor.wss_data', 'users') or {} }}"
+          primary: "{{ all_users.get(primary_id, {}) }}"
+          trigger_user: "{{ users | selectattr('person_id', 'eq', person_id) | list | first | default({}) }}"
+          current_zone: "{{ states(person_id) }}"
+          is_away: "{{ current_zone in away_zones }}"
+          friendly_name: "{{ state_attr(person_id, 'friendly_name') | default('Someone') }}"
+      - choose:
+          # Worker arrived (not in away zone, not primary)
+          - conditions:
+              - condition: template
+                value_template: >
+                  {{ not is_away
+                     and trigger_user
+                     and primary.get('notify_id', '') != ''
+                     and trigger_user.get('person_id') != primary.get('person_id') }}
+            sequence:
+              - service: "{{ primary.get('notify_id') }}"
+                data:
+                  title: "Worker Arrived"
+                  message: "{{ friendly_name }} has arrived."
+
+          # Worker departed (in away zone, not primary)
+          - conditions:
+              - condition: template
+                value_template: >
+                  {{ is_away
+                     and trigger_user
+                     and primary.get('notify_id', '') != ''
+                     and trigger_user.get('person_id') != primary.get('person_id') }}
+            sequence:
+              - service: "{{ primary.get('notify_id') }}"
+                data:
+                  title: "Worker Departed"
+                  message: "{{ friendly_name }} has left work."
+
+  # ----- Daily Summary -----
+  - id: wss_daily_summary
+    alias: "WSS Daily Summary"
+    description: "Send daily summary to primary at end of working hours"
+    trigger:
+      - platform: time
+        at: input_datetime.wss_working_hours_end
+    condition:
+      - condition: state
+        entity_id: input_boolean.wss_enabled
+        state: "on"
+      - condition: template
+        value_template: >
+          {% set workdays = state_attr('sensor.wss_data', 'working_hours').workdays | default(['mon','tue','wed','thu','fri']) %}
+          {% set today = now().strftime('%a').lower() %}
+          {{ today[:3] in workdays }}
+    action:
+      - variables:
+          roles: "{{ state_attr('sensor.wss_data', 'roles') or {} }}"
+          primary_id: "{{ roles.get('primary', '') }}"
+          users: "{{ state_attr('sensor.wss_data', 'users') or {} }}"
+          primary: "{{ users.get(primary_id, {}) }}"
+          enabled_count: "{{ state_attr('sensor.wss_data', 'enabled_count') | int(0) }}"
+      - if:
+          - condition: template
+            value_template: "{{ primary.get('notify_id', '') != '' }}"
+        then:
+          - service: "{{ primary.get('notify_id') }}"
+            data:
+              title: "End of Day Summary"
+              message: "Worker safety system monitoring {{ enabled_count }} workers. All clear for today."
+
+  # ----- Sync Config on HA Start -----
+  - id: wss_sync_on_start
+    alias: "WSS Sync on Start"
+    description: "Sync input helpers with config on HA restart"
+    trigger:
+      - platform: homeassistant
+        event: start
+    action:
+      - delay: 30
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.wss_data
+      - delay: 5
+      - variables:
+          timing: "{{ state_attr('sensor.wss_data', 'timing') or {} }}"
+          working_hours: "{{ state_attr('sensor.wss_data', 'working_hours') or {} }}"
+          primary_username: "{{ state_attr('sensor.wss_data', 'primary_username') or '' }}"
+          secondary_username: "{{ state_attr('sensor.wss_data', 'secondary_username') or '' }}"
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.wss_stationary_threshold
+        data:
+          value: "{{ timing.get('stationary_threshold_minutes', 15) }}"
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.wss_first_reminder
+        data:
+          value: "{{ timing.get('first_reminder_minutes', 5) }}"
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.wss_primary_escalation
+        data:
+          value: "{{ timing.get('primary_escalation_minutes', 5) }}"
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.wss_secondary_escalation
+        data:
+          value: "{{ timing.get('secondary_escalation_minutes', 10) }}"
+      # Restore primary/secondary contact selections
+      - if:
+          - condition: template
+            value_template: "{{ primary_username != '' }}"
+        then:
+          - service: input_select.select_option
+            target:
+              entity_id: input_select.wss_primary_user
+            data:
+              option: "{{ primary_username }}"
+      - if:
+          - condition: template
+            value_template: "{{ secondary_username != '' }}"
+        then:
+          - service: input_select.select_option
+            target:
+              entity_id: input_select.wss_secondary_user
+            data:
+              option: "{{ secondary_username }}"
+
+  # ----- Update User Selector Options -----
+  - id: wss_update_user_options
+    alias: "WSS Update User Options"
+    description: "Update primary/secondary user selectors when data changes"
+    trigger:
+      - platform: state
+        entity_id: sensor.wss_data
+    action:
+      - variables:
+          user_names: "{{ state_attr('sensor.wss_data', 'user_names') or [] }}"
+          options: "{{ ['Select User'] + user_names }}"
+          primary_username: "{{ state_attr('sensor.wss_data', 'primary_username') or '' }}"
+          secondary_username: "{{ state_attr('sensor.wss_data', 'secondary_username') or '' }}"
+      - service: input_select.set_options
+        target:
+          entity_id:
+            - input_select.wss_primary_user
+            - input_select.wss_secondary_user
+        data:
+          options: "{{ options }}"
+      # Restore selections after updating options
+      - if:
+          - condition: template
+            value_template: "{{ primary_username != '' and primary_username in options }}"
+        then:
+          - service: input_select.select_option
+            target:
+              entity_id: input_select.wss_primary_user
+            data:
+              option: "{{ primary_username }}"
+      - if:
+          - condition: template
+            value_template: "{{ secondary_username != '' and secondary_username in options }}"
+        then:
+          - service: input_select.select_option
+            target:
+              entity_id: input_select.wss_secondary_user
+            data:
+              option: "{{ secondary_username }}"
+
+  # ----- Update Zone Selector Options -----
+  - id: wss_update_zone_options
+    alias: "WSS Update Zone Options"
+    description: "Update zone selector when data changes"
+    trigger:
+      - platform: state
+        entity_id: sensor.wss_data
+      - platform: homeassistant
+        event: start
+    action:
+      - delay: 5
+      - variables:
+          zone_names: "{{ (state_attr('sensor.wss_data', 'zone_list') or []) | map(attribute='name') | list }}"
+          zone_options: "{{ ['Select Zone'] + zone_names }}"
+      - service: input_select.set_options
+        target:
+          entity_id: input_select.wss_selected_zone
+        data:
+          options: "{{ zone_options }}"
+
+  # ----- Save Primary Contact Selection -----
+  - id: wss_save_primary_selection
+    alias: "WSS Save Primary Selection"
+    description: "Save primary contact to config when changed"
+    trigger:
+      - platform: state
+        entity_id: input_select.wss_primary_user
+    condition:
+      - condition: template
+        value_template: "{{ trigger.to_state.state != 'Select User' and trigger.from_state.state != trigger.to_state.state }}"
+    action:
+      - variables:
+          selected_name: "{{ states('input_select.wss_primary_user') }}"
+          users: "{{ state_attr('sensor.wss_data', 'users') or {} }}"
+          user_id: >
+            {% for uid, u in users.items() %}
+              {% if u.get('username') == selected_name %}
+                {{ uid }}
+              {% endif %}
+            {% endfor %}
+      - if:
+          - condition: template
+            value_template: "{{ user_id | trim != '' }}"
+        then:
+          - service: shell_command.wss_set_role
+            data:
+              role: "primary"
+              user_id: "{{ user_id | trim }}"
+          - delay: 1
+          - service: homeassistant.update_entity
+            target:
+              entity_id: sensor.wss_data
+
+  # ----- Save Secondary Contact Selection -----
+  - id: wss_save_secondary_selection
+    alias: "WSS Save Secondary Selection"
+    description: "Save secondary contact to config when changed"
+    trigger:
+      - platform: state
+        entity_id: input_select.wss_secondary_user
+    condition:
+      - condition: template
+        value_template: "{{ trigger.to_state.state != 'Select User' and trigger.from_state.state != trigger.to_state.state }}"
+    action:
+      - variables:
+          selected_name: "{{ states('input_select.wss_secondary_user') }}"
+          users: "{{ state_attr('sensor.wss_data', 'users') or {} }}"
+          user_id: >
+            {% for uid, u in users.items() %}
+              {% if u.get('username') == selected_name %}
+                {{ uid }}
+              {% endif %}
+            {% endfor %}
+      - if:
+          - condition: template
+            value_template: "{{ user_id | trim != '' }}"
+        then:
+          - service: shell_command.wss_set_role
+            data:
+              role: "secondary"
+              user_id: "{{ user_id | trim }}"
+          - delay: 1
+          - service: homeassistant.update_entity
+            target:
+              entity_id: sensor.wss_data

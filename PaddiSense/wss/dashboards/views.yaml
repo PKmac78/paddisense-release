@@ -1,36 +1,1044 @@
 # =============================================================================
-# WORKER SAFETY SYSTEM (WSS) DASHBOARD - PLACEHOLDER
+# WSS Dashboard Views
 # =============================================================================
-# Placeholder dashboard for Worker Safety System module.
+# Worker Safety System dashboard with Status and Config views.
+# Follows PaddiSense UI Style Guide (see registry/dashboards/manager.yaml)
+# Requires HACS: button-card, card-mod, auto-entities
 # =============================================================================
 
-title: Worker Safety
+button_card_templates:
+  #---------------------------------------------------------------------------
+  # Section title bar
+  #---------------------------------------------------------------------------
+  template_titleblock:
+    variables:
+      var_name: Name
+    color_type: card
+    color: "#1e1e1e"
+    show_icon: false
+    show_state: false
+    name: '[[[ return variables.var_name ]]]'
+    tap_action:
+      action: none
+    hold_action:
+      action: none
+    styles:
+      card:
+        - height: 50px
+        - border-radius: 12px
+        - padding: 8px
+      name:
+        - font-size: 18px
+        - font-weight: 700
+        - text-align: center
+        - color: white
+
+  #---------------------------------------------------------------------------
+  # Action button (primary blue)
+  #---------------------------------------------------------------------------
+  template_action:
+    color_type: card
+    color: "#0066cc"
+    show_icon: true
+    show_name: true
+    show_state: false
+    styles:
+      card:
+        - height: 70px
+        - border-radius: 12px
+      name:
+        - font-size: 16px
+        - font-weight: 700
+        - color: white
+      icon:
+        - color: white
+        - width: 28px
+
+  #---------------------------------------------------------------------------
+  # Secondary action button (muted)
+  #---------------------------------------------------------------------------
+  template_secondary:
+    color_type: card
+    color: "#555555"
+    show_icon: true
+    show_name: true
+    show_state: false
+    styles:
+      card:
+        - height: 60px
+        - border-radius: 12px
+      name:
+        - font-size: 14px
+        - font-weight: 600
+        - color: white
+      icon:
+        - color: white
+        - width: 24px
+
+  #---------------------------------------------------------------------------
+  # Success button (green)
+  #---------------------------------------------------------------------------
+  template_success:
+    color_type: card
+    color: "#28a745"
+    show_icon: true
+    show_name: true
+    show_state: false
+    styles:
+      card:
+        - height: 70px
+        - border-radius: 12px
+      name:
+        - font-size: 16px
+        - font-weight: 700
+        - color: white
+      icon:
+        - color: white
+        - width: 28px
+
+  #---------------------------------------------------------------------------
+  # Danger button (red)
+  #---------------------------------------------------------------------------
+  template_danger:
+    color_type: card
+    color: "#dc3545"
+    show_icon: true
+    show_name: true
+    show_state: false
+    styles:
+      card:
+        - height: 70px
+        - border-radius: 12px
+      name:
+        - font-size: 16px
+        - font-weight: 700
+        - color: white
+      icon:
+        - color: white
+        - width: 28px
+
+  #---------------------------------------------------------------------------
+  # Warning button (orange)
+  #---------------------------------------------------------------------------
+  template_warning:
+    color_type: card
+    color: "#fd7e14"
+    show_icon: true
+    show_name: true
+    show_state: false
+    styles:
+      card:
+        - height: 70px
+        - border-radius: 12px
+      name:
+        - font-size: 16px
+        - font-weight: 700
+        - color: white
+      icon:
+        - color: white
+        - width: 28px
+
+  #---------------------------------------------------------------------------
+  # Info display card
+  #---------------------------------------------------------------------------
+  template_info:
+    color_type: card
+    color: "#546e7a"
+    show_icon: true
+    show_name: true
+    show_state: false
+    tap_action:
+      action: none
+    styles:
+      card:
+        - height: 80px
+        - border-radius: 12px
+      name:
+        - font-size: 14px
+        - font-weight: 600
+        - color: white
+      icon:
+        - color: white
+        - width: 32px
+
 views:
-  - title: Overview
-    path: overview
+  # ===========================================================================
+  # STATUS VIEW - All Users
+  # ===========================================================================
+  - title: Worker Status
+    path: status
+    type: sections
     icon: mdi:account-hard-hat
-    cards:
-      # Coming Soon notice
-      - type: markdown
-        content: |
-          ## Worker Safety System
+    max_columns: 1
+    sections:
+      - type: grid
+        cards:
+          - type: vertical-stack
+            cards:
+              - type: custom:button-card
+                template: template_titleblock
+                variables:
+                  var_name: WORKER SAFETY
 
-          ### Coming Soon
+              # Quick action buttons
+              - type: horizontal-stack
+                cards:
+                  - type: custom:button-card
+                    template: template_success
+                    name: Check In
+                    icon: mdi:check-circle
+                    tap_action:
+                      action: call-service
+                      service: script.turn_on
+                      service_data:
+                        entity_id: script.wss_check_in_button
+                    hold_action:
+                      action: none
 
-          This module will provide:
+                  - type: custom:button-card
+                    template: template_danger
+                    name: Need Help
+                    icon: mdi:alert-octagon
+                    tap_action:
+                      action: call-service
+                      service: script.turn_on
+                      service_data:
+                        entity_id: script.wss_help_button
+                    hold_action:
+                      action: none
+                    confirmation:
+                      text: Are you sure you need help? This will alert all contacts immediately.
 
-          - **Check-In/Check-Out** - Track worker presence on farm
-          - **Lone Worker Alerts** - Automated safety check-ins
-          - **Location Tracking** - GPS-based worker locations
-          - **Emergency Alerts** - SOS and duress capabilities
-          - **Activity Logging** - Work activity records
+              # External tracking buttons - show state and action
+              - type: custom:button-card
+                entity: sensor.wss_data
+                show_icon: true
+                show_name: true
+                name: |
+                  [[[
+                    try {
+                      const users = entity.attributes.enabled_users || [];
+                      const hasExternal = users.some(u => u.track_external);
+                      return hasExternal ? 'External Tracking ON' : 'Turn On External Tracking';
+                    } catch(e) { return 'External Tracking'; }
+                  ]]]
+                icon: |
+                  [[[
+                    try {
+                      const users = entity.attributes.enabled_users || [];
+                      const hasExternal = users.some(u => u.track_external);
+                      return hasExternal ? 'mdi:car-connected' : 'mdi:car';
+                    } catch(e) { return 'mdi:car'; }
+                  ]]]
+                styles:
+                  card:
+                    - height: 70px
+                    - border-radius: 12px
+                    - margin-top: 8px
+                    - background: |
+                        [[[
+                          try {
+                            const users = entity.attributes.enabled_users || [];
+                            const hasExternal = users.some(u => u.track_external);
+                            return hasExternal ? '#28a745' : '#0066cc';
+                          } catch(e) { return '#0066cc'; }
+                        ]]]
+                  name:
+                    - font-size: 16px
+                    - font-weight: 700
+                    - color: white
+                  icon:
+                    - color: white
+                    - width: 28px
+                tap_action:
+                  action: call-service
+                  service: script.turn_on
+                  service_data:
+                    entity_id: script.wss_enable_external_tracking
 
-          ---
+              - type: custom:button-card
+                entity: sensor.wss_data
+                show_icon: true
+                show_name: true
+                name: |
+                  [[[
+                    try {
+                      const users = entity.attributes.enabled_users || [];
+                      const hasExternal = users.some(u => u.track_external);
+                      return hasExternal ? 'Turn Off External Tracking' : 'External Tracking OFF';
+                    } catch(e) { return 'External Off'; }
+                  ]]]
+                icon: mdi:car-off
+                styles:
+                  card:
+                    - height: 70px
+                    - border-radius: 12px
+                    - margin-top: 8px
+                    - background: |
+                        [[[
+                          try {
+                            const users = entity.attributes.enabled_users || [];
+                            const hasExternal = users.some(u => u.track_external);
+                            return hasExternal ? '#dc3545' : '#6c757d';
+                          } catch(e) { return '#6c757d'; }
+                        ]]]
+                  name:
+                    - font-size: 16px
+                    - font-weight: 700
+                    - color: white
+                  icon:
+                    - color: white
+                    - width: 28px
+                tap_action:
+                  action: call-service
+                  service: script.turn_on
+                  service_data:
+                    entity_id: script.wss_disable_external_tracking
 
-          *Module is under development*
-        card_mod:
-          style: |
-            ha-card {
-              background: rgba(255, 152, 0, 0.1);
-              border-left: 4px solid #ff9800;
-            }
+              - type: custom:button-card
+                template: template_titleblock
+                variables:
+                  var_name: WORKER STATUS
+
+              # Worker status cards - dynamic display
+              - type: custom:button-card
+                entity: sensor.wss_data
+                show_icon: false
+                show_name: false
+                show_state: false
+                tap_action:
+                  action: none
+                hold_action:
+                  action: none
+                styles:
+                  card:
+                    - background: transparent
+                    - box-shadow: none
+                    - padding: 0
+                  grid:
+                    - display: block
+                custom_fields:
+                  workers: |
+                    [[[
+                      try {
+                        if (!entity || !entity.attributes) {
+                          return `<div style="text-align:center;padding:30px;color:var(--secondary-text-color);">Loading worker data...</div>`;
+                        }
+
+                        const users = entity.attributes.enabled_users || [];
+                        const zones = entity.attributes.zones || {};
+                        const escalationUser = states['input_text.wss_escalation_user']?.state || '';
+
+                        if (users.length === 0) {
+                          return `<div style="text-align:center;padding:40px;color:var(--secondary-text-color);">
+                                    <ha-icon icon="mdi:account-hard-hat" style="--mdc-icon-size:48px;margin-bottom:12px;opacity:0.5;"></ha-icon>
+                                    <div style="font-size:16px;">No workers enabled</div>
+                                    <div style="font-size:14px;margin-top:8px;">Go to Config to discover and enable users</div>
+                                  </div>`;
+                        }
+
+                        // Get zone categories
+                        const monitoredZones = Object.values(zones).filter(z => z.monitored).map(z => z.name);
+                        const awayZones = Object.values(zones).filter(z => z.away).map(z => z.name);
+
+                        let html = `<style>
+                          @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+                        </style>`;
+                        html += `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;padding:4px;">`;
+
+                        for (const u of users) {
+                          const personState = states[u.person_id]?.state || 'unknown';
+                          const activityState = u.activity_id ? (states[u.activity_id]?.state || '') : '';
+                          const isStationary = activityState === 'Stationary';
+                          const inAlert = u.id === escalationUser && escalationUser !== '';
+                          const inMonitored = monitoredZones.includes(personState);
+                          // "Away" only if in an away zone (like Home) or unknown location
+                          const isAway = awayZones.includes(personState) || personState === 'not_home' || personState === 'unknown';
+
+                          let cardBg, textColor, icon, statusText, animation;
+                          if (inAlert) {
+                            cardBg = '#dc3545'; textColor = 'white';
+                            icon = 'mdi:alert'; statusText = 'ALERT';
+                            animation = 'animation:blink 1s ease infinite;';
+                          } else if (isAway) {
+                            cardBg = '#6c757d'; textColor = 'white';
+                            icon = 'mdi:home-export-outline'; statusText = 'Away';
+                            animation = '';
+                          } else if (isStationary && inMonitored) {
+                            // Only show stationary warning if in a monitored zone
+                            cardBg = '#fd7e14'; textColor = 'white';
+                            icon = 'mdi:timer-sand'; statusText = 'Stationary';
+                            animation = '';
+                          } else {
+                            // At work (green) - in office or other non-away zone
+                            cardBg = '#28a745'; textColor = 'white';
+                            icon = 'mdi:account-hard-hat'; statusText = 'Active';
+                            animation = '';
+                          }
+
+                          html += `
+                            <div style="background:${cardBg};border-radius:12px;padding:16px;text-align:center;${animation}">
+                              <ha-icon icon="${icon}" style="--mdc-icon-size:32px;color:${textColor};margin-bottom:8px;"></ha-icon>
+                              <div style="font-size:15px;font-weight:700;color:${textColor};margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${u.username}</div>
+                              <div style="font-size:13px;font-weight:600;color:${textColor};opacity:0.9;">${statusText}</div>
+                              <div style="font-size:11px;color:${textColor};opacity:0.7;margin-top:4px;">${personState}</div>
+                            </div>`;
+                        }
+
+                        html += `</div>`;
+                        return html;
+                      } catch (e) {
+                        return `<div style="padding:14px;border-radius:12px;background:rgba(244,67,54,0.12);">Error: ${e}</div>`;
+                      }
+                    ]]]
+
+              - type: custom:button-card
+                template: template_titleblock
+                variables:
+                  var_name: LOCATION MAP
+
+              # Map showing farm zone and workers (auto-fits to show all)
+              - type: custom:auto-entities
+                card:
+                  type: map
+                  hours_to_show: 0
+                  dark_mode: true
+                  auto_fit: true
+                  fit_zones: true
+                card_mod:
+                  style: |
+                    ha-card {
+                      border-radius: 12px;
+                      height: 300px;
+                    }
+                entities:
+                  - zone.on_farm
+                filter:
+                  include:
+                    - domain: person
+
+  # ===========================================================================
+  # CONFIG VIEW - Admins Only
+  # ===========================================================================
+  - title: Safety Config
+    path: config
+    type: sections
+    icon: mdi:cog
+    max_columns: 1
+    sections:
+      - type: grid
+        cards:
+          - type: vertical-stack
+            cards:
+              - type: custom:button-card
+                template: template_titleblock
+                variables:
+                  var_name: SYSTEM CONTROLS
+
+              # System status and init button (conditional)
+              - type: custom:button-card
+                entity: sensor.wss_data
+                show_icon: false
+                show_name: false
+                show_state: false
+                tap_action:
+                  action: none
+                styles:
+                  card:
+                    - background: var(--card-background-color)
+                    - border-radius: 12px
+                    - padding: 16px
+                  grid:
+                    - display: block
+                custom_fields:
+                  init_status: |
+                    [[[
+                      const configExists = entity?.attributes?.config_exists || false;
+                      const usersExists = entity?.attributes?.users_file_exists || false;
+                      const userCount = entity?.attributes?.user_list?.length || 0;
+                      const enabledCount = entity?.attributes?.enabled_count || 0;
+                      const zoneCount = entity?.attributes?.zone_list?.length || 0;
+                      const monitoredCount = entity?.attributes?.monitored_zones?.length || 0;
+
+                      if (configExists && usersExists) {
+                        return `
+                          <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+                            <ha-icon icon="mdi:check-circle" style="--mdc-icon-size:24px;color:#28a745;"></ha-icon>
+                            <div>
+                              <div style="font-size:16px;font-weight:700;color:#28a745;">System Initialized</div>
+                              <div style="font-size:12px;color:var(--secondary-text-color);">${userCount} users (${enabledCount} enabled) · ${zoneCount} zones (${monitoredCount} monitored)</div>
+                            </div>
+                          </div>
+                        `;
+                      } else {
+                        return `
+                          <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+                            <ha-icon icon="mdi:alert-circle" style="--mdc-icon-size:24px;color:#fd7e14;"></ha-icon>
+                            <div>
+                              <div style="font-size:16px;font-weight:700;color:#fd7e14;">System Not Initialized</div>
+                              <div style="font-size:12px;color:var(--secondary-text-color);">Click Initialize to set up the worker safety system</div>
+                            </div>
+                          </div>
+                        `;
+                      }
+                    ]]]
+
+              # System toggle - always show (removed conditional as it was unreliable)
+              - type: entities
+                entities:
+                  - entity: input_boolean.wss_enabled
+                    name: Enable Safety System
+                card_mod:
+                  style: |
+                    ha-card {
+                      border-radius: 12px;
+                      padding: 4px;
+                    }
+
+              # System action buttons
+              - type: horizontal-stack
+                cards:
+                  - type: custom:button-card
+                    template: template_action
+                    name: Initialize
+                    icon: mdi:play-circle
+                    tap_action:
+                      action: call-service
+                      service: script.turn_on
+                      service_data:
+                        entity_id: script.wss_init_system
+                    hold_action:
+                      action: none
+
+                  - type: custom:button-card
+                    template: template_action
+                    name: Discover Users
+                    icon: mdi:account-search
+                    tap_action:
+                      action: call-service
+                      service: script.turn_on
+                      service_data:
+                        entity_id: script.wss_discover_users
+                    hold_action:
+                      action: none
+
+                  - type: custom:button-card
+                    template: template_action
+                    name: Refresh
+                    icon: mdi:refresh
+                    tap_action:
+                      action: call-service
+                      service: homeassistant.update_entity
+                      service_data:
+                        entity_id: sensor.wss_data
+                    hold_action:
+                      action: none
+
+              - type: custom:button-card
+                template: template_titleblock
+                variables:
+                  var_name: CONTACTS
+
+              # Contact selectors
+              - type: entities
+                entities:
+                  - entity: input_select.wss_primary_user
+                    name: Primary Contact
+                  - entity: input_select.wss_secondary_user
+                    name: Secondary Contact
+                card_mod:
+                  style: |
+                    ha-card {
+                      border-radius: 12px;
+                      padding: 4px;
+                    }
+
+              - type: custom:button-card
+                template: template_titleblock
+                variables:
+                  var_name: TIMING THRESHOLDS
+
+              # Timing configuration
+              - type: entities
+                entities:
+                  - entity: input_number.wss_stationary_threshold
+                    name: Stationary Alert (minutes)
+                  - entity: input_number.wss_first_reminder
+                    name: First Reminder (minutes)
+                  - entity: input_number.wss_primary_escalation
+                    name: Escalate to Primary (minutes)
+                  - entity: input_number.wss_secondary_escalation
+                    name: Escalate to Secondary (minutes)
+                card_mod:
+                  style: |
+                    ha-card {
+                      border-radius: 12px;
+                      padding: 4px;
+                    }
+
+              - type: custom:button-card
+                template: template_success
+                name: Save Timing Settings
+                icon: mdi:content-save
+                tap_action:
+                  action: call-service
+                  service: script.turn_on
+                  service_data:
+                    entity_id: script.wss_sync_timing_to_config
+                hold_action:
+                  action: none
+
+              - type: custom:button-card
+                template: template_titleblock
+                variables:
+                  var_name: WORKING HOURS
+
+              - type: entities
+                entities:
+                  - entity: input_datetime.wss_working_hours_start
+                    name: Start Time
+                  - entity: input_datetime.wss_working_hours_end
+                    name: End Time
+                  - entity: input_select.wss_workdays
+                    name: Workdays
+                card_mod:
+                  style: |
+                    ha-card {
+                      border-radius: 12px;
+                      padding: 4px;
+                    }
+
+              - type: custom:button-card
+                template: template_success
+                name: Save Working Hours
+                icon: mdi:content-save
+                tap_action:
+                  action: call-service
+                  service: script.turn_on
+                  service_data:
+                    entity_id: script.wss_sync_working_hours_to_config
+                hold_action:
+                  action: none
+
+              - type: custom:button-card
+                template: template_titleblock
+                variables:
+                  var_name: ZONE CONFIGURATION
+
+              # Refresh zones button
+              - type: custom:button-card
+                template: template_action
+                name: Refresh Zones from HA
+                icon: mdi:map-search
+                tap_action:
+                  action: call-service
+                  service: script.turn_on
+                  service_data:
+                    entity_id: script.wss_discover_zones
+                hold_action:
+                  action: none
+
+              # Zone selector dropdown
+              - type: entities
+                entities:
+                  - entity: input_select.wss_selected_zone
+                    name: Select Zone to Configure
+                card_mod:
+                  style: |
+                    ha-card {
+                      border-radius: 12px;
+                      padding: 4px;
+                    }
+
+              # Selected zone status display
+              - type: custom:button-card
+                entity: sensor.wss_data
+                show_icon: false
+                show_name: false
+                show_state: false
+                tap_action:
+                  action: none
+                styles:
+                  card:
+                    - background: var(--card-background-color)
+                    - border-radius: 12px
+                    - padding: 16px
+                  grid:
+                    - display: block
+                custom_fields:
+                  zone_status: |
+                    [[[
+                      try {
+                        const selected = states['input_select.wss_selected_zone']?.state || 'Select Zone';
+                        if (selected === 'Select Zone') {
+                          return '<div style="text-align:center;color:var(--secondary-text-color);">Select a zone above to configure</div>';
+                        }
+                        const zones = entity.attributes.zone_list || [];
+                        const zone = zones.find(z => z.name === selected);
+                        if (!zone) {
+                          return '<div style="text-align:center;color:var(--secondary-text-color);">Zone not found</div>';
+                        }
+                        const monitoredBg = zone.monitored ? '#28a745' : '#9e9e9e';
+                        const monitoredText = zone.monitored ? 'MONITORED' : 'NOT MONITORED';
+                        const awayBg = zone.away ? '#0066cc' : '#fd7e14';
+                        const awayText = zone.away ? 'AWAY ZONE' : 'WORK ZONE';
+                        return `
+                          <div style="text-align:center;">
+                            <div style="font-size:18px;font-weight:700;margin-bottom:8px;">${zone.name}</div>
+                            <div style="font-size:12px;color:var(--secondary-text-color);margin-bottom:12px;">${zone.id}</div>
+                            <div style="display:flex;justify-content:center;gap:12px;">
+                              <div style="padding:10px 16px;border-radius:8px;font-weight:700;font-size:12px;background:${monitoredBg};color:white;">${monitoredText}</div>
+                              <div style="padding:10px 16px;border-radius:8px;font-weight:700;font-size:12px;background:${awayBg};color:white;">${awayText}</div>
+                            </div>
+                          </div>`;
+                      } catch (e) {
+                        return '<div style="color:red;">Error: ' + e.message + '</div>';
+                      }
+                    ]]]
+
+              # Toggle buttons for selected zone
+              - type: horizontal-stack
+                cards:
+                  - type: custom:button-card
+                    color_type: card
+                    color: "#28a745"
+                    name: Toggle Monitored
+                    icon: mdi:bell-ring
+                    styles:
+                      card:
+                        - height: 60px
+                        - border-radius: 12px
+                      name:
+                        - font-size: 14px
+                        - font-weight: 700
+                        - color: white
+                      icon:
+                        - color: white
+                        - width: 24px
+                    tap_action:
+                      action: call-service
+                      service: script.turn_on
+                      service_data:
+                        entity_id: script.wss_toggle_selected_zone_monitored
+
+                  - type: custom:button-card
+                    color_type: card
+                    color: "#0066cc"
+                    name: Toggle Away
+                    icon: mdi:home-export-outline
+                    styles:
+                      card:
+                        - height: 60px
+                        - border-radius: 12px
+                      name:
+                        - font-size: 14px
+                        - font-weight: 700
+                        - color: white
+                      icon:
+                        - color: white
+                        - width: 24px
+                    tap_action:
+                      action: call-service
+                      service: script.turn_on
+                      service_data:
+                        entity_id: script.wss_toggle_selected_zone_away
+
+              # All zones summary list
+              - type: custom:button-card
+                entity: sensor.wss_data
+                show_icon: false
+                show_name: false
+                show_state: false
+                tap_action:
+                  action: none
+                styles:
+                  card:
+                    - background: var(--card-background-color)
+                    - border-radius: 12px
+                    - padding: 12px
+                    - margin-top: 8px
+                  grid:
+                    - display: block
+                custom_fields:
+                  zones: |
+                    [[[
+                      try {
+                        if (!entity || !entity.attributes) {
+                          return '<div style="text-align:center;color:var(--secondary-text-color);">Loading zones...</div>';
+                        }
+                        const zones = entity.attributes.zone_list || [];
+                        if (zones.length === 0) {
+                          return '<div style="text-align:center;color:var(--secondary-text-color);">No zones - click Discover Zones above</div>';
+                        }
+                        let html = '<div style="font-size:13px;font-weight:600;color:var(--secondary-text-color);margin-bottom:8px;">All Zones:</div>';
+                        for (const z of zones) {
+                          const monitoredBg = z.monitored ? '#28a745' : '#9e9e9e';
+                          const monitoredText = z.monitored ? 'MON' : 'OFF';
+                          const awayBg = z.away ? '#0066cc' : '#fd7e14';
+                          const awayText = z.away ? 'AWAY' : 'WORK';
+                          html += '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--divider-color);">';
+                          html += '<div style="flex:1;font-size:14px;font-weight:500;">' + z.name + '</div>';
+                          html += '<div style="padding:4px 8px;border-radius:6px;font-weight:600;font-size:10px;background:' + monitoredBg + ';color:white;">' + monitoredText + '</div>';
+                          html += '<div style="padding:4px 8px;border-radius:6px;font-weight:600;font-size:10px;background:' + awayBg + ';color:white;">' + awayText + '</div>';
+                          html += '</div>';
+                        }
+                        return html;
+                      } catch (e) {
+                        return '<div style="color:red;">Error: ' + e.message + '</div>';
+                      }
+                    ]]]
+
+              - type: custom:button-card
+                template: template_titleblock
+                variables:
+                  var_name: USER MANAGEMENT
+
+              # Refresh users button
+              - type: custom:button-card
+                template: template_action
+                name: Discover Users from HA
+                icon: mdi:account-search
+                tap_action:
+                  action: call-service
+                  service: script.turn_on
+                  service_data:
+                    entity_id: script.wss_discover_users
+                hold_action:
+                  action: none
+
+              # Users display - simple info card
+              - type: custom:button-card
+                entity: sensor.wss_data
+                show_icon: false
+                show_name: false
+                show_state: false
+                tap_action:
+                  action: none
+                styles:
+                  card:
+                    - background: var(--card-background-color)
+                    - border-radius: 12px
+                    - padding: 16px
+                  grid:
+                    - display: block
+                custom_fields:
+                  users: |
+                    [[[
+                      try {
+                        if (!entity || !entity.attributes || !entity.attributes.user_list) {
+                          return '<div style="text-align:center;color:var(--secondary-text-color);">Loading users...</div>';
+                        }
+                        const users = entity.attributes.user_list;
+                        if (users.length === 0) {
+                          return '<div style="text-align:center;color:var(--secondary-text-color);">No users - click Discover Users above</div>';
+                        }
+                        let html = '';
+                        for (let i = 0; i < users.length; i++) {
+                          const u = users[i];
+                          const statusBg = u.enabled ? '#28a745' : '#9e9e9e';
+                          const statusText = u.enabled ? 'ENABLED' : 'DISABLED';
+                          const extBg = u.track_external ? '#0066cc' : '#6c757d';
+                          const extText = u.track_external ? 'EXTERNAL' : 'FARM';
+                          const name = u.username || 'Unknown';
+                          const person = u.person_id || '';
+                          html += '<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--divider-color);">';
+                          html += '<ha-icon icon="mdi:account" style="--mdc-icon-size:32px;color:var(--primary-text-color);"></ha-icon>';
+                          html += '<div style="flex:1;">';
+                          html += '<div style="font-size:16px;font-weight:600;">' + name + '</div>';
+                          html += '<div style="font-size:12px;color:var(--secondary-text-color);">' + person + '</div>';
+                          html += '</div>';
+                          html += '<div style="display:flex;gap:8px;">';
+                          html += '<div style="padding:8px 12px;border-radius:8px;font-weight:700;font-size:11px;background:' + statusBg + ';color:white;">' + statusText + '</div>';
+                          html += '<div style="padding:8px 12px;border-radius:8px;font-weight:700;font-size:11px;background:' + extBg + ';color:white;">' + extText + '</div>';
+                          html += '</div>';
+                          html += '</div>';
+                        }
+                        return html;
+                      } catch (e) {
+                        return '<div style="color:red;">Error: ' + e.message + '</div>';
+                      }
+                    ]]]
+
+              # Toggle button - Enable or Disable based on current state
+              - type: horizontal-stack
+                cards:
+                  - type: custom:button-card
+                    color_type: card
+                    color: "#28a745"
+                    name: Enable User
+                    icon: mdi:shield-check
+                    styles:
+                      card:
+                        - height: 60px
+                        - border-radius: 12px
+                      name:
+                        - font-size: 14px
+                        - font-weight: 700
+                        - color: white
+                      icon:
+                        - color: white
+                        - width: 24px
+                    tap_action:
+                      action: call-service
+                      service: script.turn_on
+                      service_data:
+                        entity_id: script.wss_enable_first_user
+
+                  - type: custom:button-card
+                    color_type: card
+                    color: "#dc3545"
+                    name: Disable User
+                    icon: mdi:shield-off
+                    styles:
+                      card:
+                        - height: 60px
+                        - border-radius: 12px
+                      name:
+                        - font-size: 14px
+                        - font-weight: 700
+                        - color: white
+                      icon:
+                        - color: white
+                        - width: 24px
+                    tap_action:
+                      action: call-service
+                      service: script.turn_on
+                      service_data:
+                        entity_id: script.wss_disable_first_user
+
+              - type: custom:button-card
+                template: template_titleblock
+                variables:
+                  var_name: DATA MANAGEMENT
+
+              - type: horizontal-stack
+                cards:
+                  - type: custom:button-card
+                    template: template_action
+                    name: Export
+                    icon: mdi:export
+                    tap_action:
+                      action: call-service
+                      service: script.turn_on
+                      service_data:
+                        entity_id: script.wss_export_data
+                    hold_action:
+                      action: none
+
+                  - type: custom:button-card
+                    template: template_action
+                    name: Import Legacy
+                    icon: mdi:import
+                    tap_action:
+                      action: call-service
+                      service: script.turn_on
+                      service_data:
+                        entity_id: script.wss_import_legacy
+                    hold_action:
+                      action: none
+
+              - type: entities
+                entities:
+                  - entity: input_boolean.wss_confirm_reset
+                    name: Confirm Reset (toggle before reset)
+                card_mod:
+                  style: |
+                    ha-card {
+                      border-radius: 12px;
+                      padding: 4px;
+                      margin-top: 8px;
+                    }
+
+              - type: custom:button-card
+                template: template_danger
+                name: Reset All Data
+                icon: mdi:delete-forever
+                tap_action:
+                  action: call-service
+                  service: script.turn_on
+                  service_data:
+                    entity_id: script.wss_reset_data
+                hold_action:
+                  action: none
+                confirmation:
+                  text: This will delete all WSS configuration data. Are you sure?
+
+              - type: custom:button-card
+                template: template_titleblock
+                variables:
+                  var_name: DEBUG INFO
+
+              - type: custom:button-card
+                entity: sensor.wss_data
+                show_icon: false
+                show_name: false
+                show_state: false
+                tap_action:
+                  action: call-service
+                  service: homeassistant.update_entity
+                  service_data:
+                    entity_id: sensor.wss_data
+                styles:
+                  card:
+                    - background: var(--card-background-color)
+                    - border-radius: 12px
+                    - padding: 16px
+                    - cursor: pointer
+                  grid:
+                    - display: block
+                custom_fields:
+                  debug: |
+                    [[[
+                      try {
+                        const sensorState = entity?.state || 'unavailable';
+                        const configExists = entity?.attributes?.config_exists || false;
+                        const usersExists = entity?.attributes?.users_file_exists || false;
+                        const systemStatus = entity?.attributes?.system_status || 'unknown';
+                        const version = entity?.attributes?.version || 'unknown';
+                        const userCount = entity?.attributes?.user_list?.length || 0;
+                        const enabledCount = entity?.attributes?.enabled_count || 0;
+                        const zoneCount = entity?.attributes?.zone_list?.length || 0;
+                        const wssEnabled = states['input_boolean.wss_enabled']?.state || 'unknown';
+                        const escStage = states['input_number.wss_escalation_stage']?.state || '0';
+                        const escUser = states['input_text.wss_escalation_user']?.state || '';
+
+                        return `
+                          <div style="font-family:monospace;font-size:12px;line-height:1.8;">
+                            <div><strong>Tap to refresh sensor data</strong></div>
+                            <div style="margin-top:8px;border-top:1px solid var(--divider-color);padding-top:8px;">
+                              <div>sensor.wss_data state: <strong>${sensorState}</strong></div>
+                              <div>system_status: <strong>${systemStatus}</strong></div>
+                              <div>version: <strong>${version}</strong></div>
+                              <div>config_exists: <strong>${configExists}</strong></div>
+                              <div>users_file_exists: <strong>${usersExists}</strong></div>
+                              <div>user_count: <strong>${userCount}</strong> (enabled: ${enabledCount})</div>
+                              <div>zone_count: <strong>${zoneCount}</strong></div>
+                              <div>wss_enabled: <strong>${wssEnabled}</strong></div>
+                              <div>escalation_stage: <strong>${escStage}</strong></div>
+                              <div>escalation_user: <strong>${escUser || '(none)'}</strong></div>
+                            </div>
+                          </div>
+                        `;
+                      } catch (e) {
+                        return `<div style="color:red;">Debug Error: ${e}</div>`;
+                      }
+                    ]]]
+
+              - type: entities
+                entities:
+                  - entity: sensor.wss_data
+                    name: WSS Data Sensor
+                  - entity: sensor.wss_module_version
+                    name: Module Version
+                  - entity: timer.wss_escalation_timer
+                    name: Escalation Timer
+                  - entity: input_number.wss_escalation_stage
+                    name: Escalation Stage
+                  - entity: input_text.wss_escalation_user
+                    name: Escalation User
+                card_mod:
+                  style: |
+                    ha-card {
+                      border-radius: 12px;
+                      padding: 4px;
+                    }

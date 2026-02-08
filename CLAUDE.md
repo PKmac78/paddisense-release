@@ -39,5 +39,5 @@ Each module is **self-contained**:
 This file stays minimal. Put implementation details in repo docs, e.g.:
 - `docs/ARCHITECTURE.md`
 - `docs/DEPLOYMENT.md`
-- `docs/IPM.md`, `docs/ASM.md`, `docs/WEATHER.md`, `docs/PWM.md`
+- `docs/IPM.md`, `docs/ASM.md`, `docs/WEATHER.md`, `docs/PWM.md`, `docs/WSS.md`
 - `reference/` for schemas and command docs
