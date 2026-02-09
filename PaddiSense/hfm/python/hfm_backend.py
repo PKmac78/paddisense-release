@@ -14,6 +14,13 @@ Commands:
   add_device        Add/update a device-to-user mapping
   delete_device     Remove a device mapping
   export            Export events to backup file
+
+Draft Commands (Multi-user support):
+  load_draft        Load or create a draft for a device
+  update_draft      Update draft fields for a device
+  clear_draft       Clear/delete a draft for a device
+  submit_draft      Submit draft as event(s)
+  cleanup_drafts    Remove drafts older than specified hours
 """
 
 import argparse
@@ -30,10 +37,18 @@ import string
 DATA_DIR = Path("/config/local_data/hfm")
 CONFIG_FILE = DATA_DIR / "config.json"
 EVENTS_FILE = DATA_DIR / "events.json"
+APPLICATORS_FILE = DATA_DIR / "applicators.json"
 BACKUPS_DIR = DATA_DIR / "backups"
+DRAFTS_DIR = DATA_DIR / "drafts"
 VERSION_FILE = Path("/config/PaddiSense/hfm/VERSION")
 REGISTRY_FILE = Path("/config/local_data/registry/config.json")
 IPM_CONFIG_FILE = Path("/config/local_data/ipm/config.json")
+
+# Draft schema version
+DRAFT_SCHEMA_VERSION = "2.0.0"
+
+# Valid applicator types (must match application_methods in config)
+VALID_APPLICATOR_TYPES = ["boom_spray", "broadcast", "aerial", "fertigation", "seed_treatment", "foliar"]
 
 
 def get_version() -> str:
@@ -116,6 +131,158 @@ def load_ipm_config() -> dict:
     return load_json(IPM_CONFIG_FILE, {})
 
 
+# =============================================================================
+# Draft Management Functions
+# =============================================================================
+
+def get_draft_path(device_id: str) -> Path:
+    """Get the file path for a device's draft."""
+    # Sanitize device_id to prevent path traversal
+    safe_id = "".join(c for c in device_id if c.isalnum() or c in "-_")
+    if not safe_id:
+        safe_id = "unknown"
+    return DRAFTS_DIR / f"{safe_id}.json"
+
+
+def get_default_draft(device_id: str) -> dict:
+    """Return default empty draft structure."""
+    return {
+        "schema_version": DRAFT_SCHEMA_VERSION,
+        "device_id": device_id,
+        "user_name": "",
+        "wizard_step": 1,
+        "started_at": now_iso(),
+        "updated_at": now_iso(),
+        "data": {
+            "event_type": None,
+            "date": None,
+            "start_time": None,
+            "duration_minutes": None,
+            "farm_id": None,
+            "paddocks": [],
+            "products": [],
+            "applicator_id": None,
+            "application_method": None,
+            "crop_stage": None,
+            "irrigation_type": None,
+            "notes": "",
+            "weather": None
+        }
+    }
+
+
+def load_draft(device_id: str) -> Optional[dict]:
+    """Load a draft for a device, returns None if not found."""
+    draft_path = get_draft_path(device_id)
+    if not draft_path.exists():
+        return None
+    return load_json(draft_path, None)
+
+
+def save_draft(draft: dict) -> bool:
+    """Save a draft to file."""
+    device_id = draft.get("device_id", "unknown")
+    draft_path = get_draft_path(device_id)
+    draft["updated_at"] = now_iso()
+    return save_json(draft_path, draft)
+
+
+def delete_draft(device_id: str) -> bool:
+    """Delete a draft file."""
+    draft_path = get_draft_path(device_id)
+    try:
+        if draft_path.exists():
+            draft_path.unlink()
+        return True
+    except IOError as e:
+        print(f"ERROR: Failed to delete draft: {e}", file=sys.stderr)
+        return False
+
+
+def list_all_drafts() -> list:
+    """List all drafts with metadata."""
+    drafts = []
+    if not DRAFTS_DIR.exists():
+        return drafts
+
+    for draft_file in DRAFTS_DIR.glob("*.json"):
+        draft_data = load_json(draft_file, None)
+        if draft_data:
+            drafts.append({
+                "device_id": draft_data.get("device_id", draft_file.stem),
+                "user_name": draft_data.get("user_name", ""),
+                "wizard_step": draft_data.get("wizard_step", 1),
+                "started_at": draft_data.get("started_at"),
+                "updated_at": draft_data.get("updated_at"),
+                "event_type": draft_data.get("data", {}).get("event_type")
+            })
+    return drafts
+
+
+def generate_batch_id() -> str:
+    """Generate a unique batch ID for multi-paddock submissions."""
+    chars = string.ascii_lowercase + string.digits
+    suffix = ''.join(secrets.choice(chars) for _ in range(8))
+    return f"batch_{suffix}"
+
+
+# =============================================================================
+# Applicator Management Functions
+# =============================================================================
+
+def generate_applicator_id(name: str) -> str:
+    """Generate a unique applicator ID from name."""
+    # Create slug from name
+    slug = name.lower().replace(" ", "_")
+    slug = "".join(c for c in slug if c.isalnum() or c == "_")
+    # Add random suffix for uniqueness
+    chars = string.ascii_lowercase + string.digits
+    suffix = ''.join(secrets.choice(chars) for _ in range(4))
+    return f"app_{slug}_{suffix}"
+
+
+def load_applicators() -> dict:
+    """Load applicators data."""
+    default = {
+        "version": "1.0.0",
+        "applicators": [],
+        "attribute_templates": {},
+        "created": now_iso(),
+        "modified": now_iso()
+    }
+    return load_json(APPLICATORS_FILE, default)
+
+
+def save_applicators(data: dict) -> bool:
+    """Save applicators data."""
+    data["modified"] = now_iso()
+    return save_json(APPLICATORS_FILE, data)
+
+
+def get_applicator_by_id(applicator_id: str) -> Optional[dict]:
+    """Get an applicator by ID."""
+    data = load_applicators()
+    for app in data.get("applicators", []):
+        if app.get("id") == applicator_id:
+            return app
+    return None
+
+
+def get_applicator_snapshot(applicator_id: str) -> Optional[dict]:
+    """Get a snapshot of applicator for embedding in events."""
+    app = get_applicator_by_id(applicator_id)
+    if not app:
+        return None
+
+    return {
+        "id": app["id"],
+        "name": app["name"],
+        "type": app["type"],
+        "snapshot_at": now_iso(),
+        "attributes": app.get("attributes", {})
+    }
+
+
 def get_default_config() -> dict:
     """Return default HFM configuration."""
     return {
@@ -152,6 +319,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     # Create directories
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     BACKUPS_DIR.mkdir(parents=True, exist_ok=True)
+    DRAFTS_DIR.mkdir(parents=True, exist_ok=True)
 
     # Create config if not exists
     if not CONFIG_FILE.exists():
@@ -171,6 +339,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     else:
         print("OK:events_exists")
 
+    print("OK:drafts_dir_ready")
     return 0
 
 
@@ -521,6 +690,505 @@ def cmd_export(args: argparse.Namespace) -> int:
     return 0
 
 
+# =============================================================================
+# Draft Commands
+# =============================================================================
+
+def cmd_load_draft(args: argparse.Namespace) -> int:
+    """Load or create a draft for a device."""
+    device_id = args.device_id
+    if not device_id:
+        print("ERROR: device_id is required.", file=sys.stderr)
+        return 1
+
+    # Ensure drafts directory exists
+    DRAFTS_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Try to load existing draft
+    draft = load_draft(device_id)
+
+    if draft is None:
+        # Create new draft
+        draft = get_default_draft(device_id)
+
+        # Look up user name from device mapping if available
+        config = load_config()
+        devices = config.get("devices", {})
+        if device_id in devices:
+            draft["user_name"] = devices[device_id].get("user_name", "")
+
+        if not save_draft(draft):
+            return 1
+        print(f"OK:draft_created:{device_id}")
+    else:
+        print(f"OK:draft_loaded:{device_id}")
+
+    # Output draft as JSON for parsing
+    print(json.dumps(draft, ensure_ascii=False))
+    return 0
+
+
+def cmd_update_draft(args: argparse.Namespace) -> int:
+    """Update draft fields for a device."""
+    device_id = args.device_id
+    if not device_id:
+        print("ERROR: device_id is required.", file=sys.stderr)
+        return 1
+
+    # Load existing draft or create new one
+    draft = load_draft(device_id)
+    if draft is None:
+        draft = get_default_draft(device_id)
+
+    # Parse updates JSON
+    try:
+        updates = json.loads(args.data) if args.data else {}
+    except json.JSONDecodeError as e:
+        print(f"ERROR: Invalid JSON in data: {e}", file=sys.stderr)
+        return 1
+
+    # Apply updates
+    # Top-level fields
+    if "wizard_step" in updates:
+        draft["wizard_step"] = int(updates["wizard_step"])
+    if "user_name" in updates:
+        draft["user_name"] = updates["user_name"]
+
+    # Data fields (nested under "data")
+    data_updates = updates.get("data", {})
+    for key, value in data_updates.items():
+        if key in draft["data"]:
+            draft["data"][key] = value
+        else:
+            # Allow adding new keys for future extensibility
+            draft["data"][key] = value
+
+    # Handle direct data field updates (for convenience)
+    direct_data_keys = ["event_type", "date", "start_time", "duration_minutes",
+                        "farm_id", "paddocks", "products", "applicator_id",
+                        "application_method", "crop_stage", "irrigation_type", "notes"]
+    for key in direct_data_keys:
+        if key in updates and key not in ["wizard_step", "user_name", "data"]:
+            draft["data"][key] = updates[key]
+
+    if not save_draft(draft):
+        return 1
+
+    print(f"OK:draft_updated:{device_id}")
+    print(json.dumps(draft, ensure_ascii=False))
+    return 0
+
+
+def cmd_clear_draft(args: argparse.Namespace) -> int:
+    """Clear/delete a draft for a device."""
+    device_id = args.device_id
+    if not device_id:
+        print("ERROR: device_id is required.", file=sys.stderr)
+        return 1
+
+    if delete_draft(device_id):
+        print(f"OK:draft_cleared:{device_id}")
+        return 0
+    return 1
+
+
+def cmd_submit_draft(args: argparse.Namespace) -> int:
+    """Submit draft as event(s). Expands multi-paddock to multiple records."""
+    device_id = args.device_id
+    if not device_id:
+        print("ERROR: device_id is required.", file=sys.stderr)
+        return 1
+
+    # Load draft
+    draft = load_draft(device_id)
+    if draft is None:
+        print(f"ERROR: No draft found for device '{device_id}'.", file=sys.stderr)
+        return 1
+
+    data = draft.get("data", {})
+    config = load_config()
+    registry = load_registry()
+
+    # Validate required fields
+    event_type = data.get("event_type")
+    if not event_type:
+        print("ERROR: event_type is required.", file=sys.stderr)
+        return 1
+
+    valid_types = ["nutrient", "chemical", "irrigation", "crop_stage"]
+    if event_type not in valid_types:
+        print(f"ERROR: Invalid event_type '{event_type}'.", file=sys.stderr)
+        return 1
+
+    # Get paddocks
+    paddocks = data.get("paddocks", [])
+    if not paddocks:
+        print("ERROR: At least one paddock is required.", file=sys.stderr)
+        return 1
+
+    # Validate paddocks
+    reg_paddocks = registry.get("paddocks", {})
+    reg_farms = registry.get("farms", {})
+    for pid in paddocks:
+        if pid not in reg_paddocks:
+            print(f"ERROR: Unknown paddock '{pid}'.", file=sys.stderr)
+            return 1
+
+    # Validate products for nutrient/chemical
+    products = data.get("products", [])
+    if event_type in ["nutrient", "chemical"] and not products:
+        print("ERROR: Products required for nutrient/chemical events.", file=sys.stderr)
+        return 1
+
+    # Validate irrigation type
+    if event_type == "irrigation":
+        irrigation_type = data.get("irrigation_type")
+        if not irrigation_type:
+            print("ERROR: irrigation_type required for irrigation events.", file=sys.stderr)
+            return 1
+        valid_irrigation = [it["id"] for it in config.get("irrigation_types", [])]
+        if irrigation_type not in valid_irrigation:
+            print(f"ERROR: Invalid irrigation_type '{irrigation_type}'.", file=sys.stderr)
+            return 1
+
+    # Determine event date
+    event_date = data.get("date") or today_date()
+
+    # Generate batch ID if multiple paddocks
+    batch_id = generate_batch_id() if len(paddocks) > 1 else None
+    batch_total = len(paddocks)
+
+    # Get farm info
+    farm_id = data.get("farm_id")
+    farm_name = ""
+    if farm_id and farm_id in reg_farms:
+        farm_name = reg_farms[farm_id].get("name", farm_id)
+
+    # Get user info
+    user_name = draft.get("user_name", "")
+
+    # Get applicator snapshot if specified
+    applicator_id = data.get("applicator_id")
+    applicator_snapshot = None
+    if applicator_id:
+        applicator_snapshot = get_applicator_snapshot(applicator_id)
+        if not applicator_snapshot:
+            print(f"WARNING: Applicator '{applicator_id}' not found, continuing without.", file=sys.stderr)
+
+    # Get weather data from draft
+    weather_data = data.get("weather")
+
+    # Calculate end_time if start_time and duration provided
+    start_time = data.get("start_time")
+    duration_minutes = data.get("duration_minutes")
+    end_time = None
+    if start_time and duration_minutes:
+        try:
+            start_parts = start_time.split(":")
+            start_hour = int(start_parts[0])
+            start_min = int(start_parts[1]) if len(start_parts) > 1 else 0
+            total_minutes = start_hour * 60 + start_min + int(duration_minutes)
+            end_hour = (total_minutes // 60) % 24
+            end_min = total_minutes % 60
+            end_time = f"{end_hour:02d}:{end_min:02d}"
+        except (ValueError, IndexError):
+            pass
+
+    # Load events file
+    events_data = load_events()
+    created_ids = []
+
+    # Create one event per paddock
+    for idx, paddock_id in enumerate(paddocks, start=1):
+        paddock_info = reg_paddocks.get(paddock_id, {})
+        paddock_name = paddock_info.get("name", paddock_id)
+        paddock_area = paddock_info.get("area_ha")
+
+        event_id = generate_event_id()
+
+        event = {
+            "id": event_id,
+            "schema_version": DRAFT_SCHEMA_VERSION,
+            "batch_id": batch_id,
+            "batch_index": idx if batch_id else None,
+            "batch_total": batch_total if batch_id else None,
+            "event_type": event_type,
+            "farm": {
+                "id": farm_id,
+                "name": farm_name
+            } if farm_id else None,
+            "paddock": {
+                "id": paddock_id,
+                "name": paddock_name,
+                "area_ha": paddock_area
+            },
+            "application_timing": {
+                "date": event_date,
+                "start_time": start_time,
+                "duration_minutes": int(duration_minutes) if duration_minutes else None,
+                "end_time": end_time
+            } if start_time else {"date": event_date},
+            "products": products,
+            "applicator": applicator_snapshot,
+            "application_method": data.get("application_method"),
+            "crop_stage": data.get("crop_stage"),
+            "irrigation_type": data.get("irrigation_type"),
+            "weather": weather_data,
+            "operator": {
+                "device_id": device_id,
+                "user_name": user_name
+            },
+            "notes": data.get("notes", ""),
+            "confirmation_status": "confirmed",
+            "recorded_at": now_iso(),
+            "modified_at": None
+        }
+
+        events_data["events"].append(event)
+        created_ids.append(event_id)
+
+    # Save events
+    if not save_events(events_data):
+        return 1
+
+    # Delete the draft after successful submission
+    delete_draft(device_id)
+
+    # Output result
+    if batch_id:
+        print(f"OK:events_created:{batch_id}:{len(created_ids)}")
+    else:
+        print(f"OK:event_created:{created_ids[0]}")
+
+    print(json.dumps({"event_ids": created_ids, "batch_id": batch_id}, ensure_ascii=False))
+    return 0
+
+
+def cmd_cleanup_drafts(args: argparse.Namespace) -> int:
+    """Remove drafts older than specified hours."""
+    max_age_hours = args.max_age_hours or 24
+
+    if not DRAFTS_DIR.exists():
+        print("OK:no_drafts_dir")
+        return 0
+
+    now = datetime.now()
+    deleted_count = 0
+    kept_count = 0
+
+    for draft_file in DRAFTS_DIR.glob("*.json"):
+        draft_data = load_json(draft_file, None)
+        if draft_data:
+            updated_at = draft_data.get("updated_at") or draft_data.get("started_at")
+            if updated_at:
+                try:
+                    draft_time = datetime.fromisoformat(updated_at)
+                    age_hours = (now - draft_time).total_seconds() / 3600
+                    if age_hours > max_age_hours:
+                        draft_file.unlink()
+                        deleted_count += 1
+                        continue
+                except (ValueError, TypeError):
+                    pass
+        kept_count += 1
+
+    print(f"OK:cleanup_complete:deleted={deleted_count}:kept={kept_count}")
+    return 0
+
+
+# =============================================================================
+# Applicator Commands
+# =============================================================================
+
+def cmd_add_applicator(args: argparse.Namespace) -> int:
+    """Add a new applicator."""
+    name = args.name
+    app_type = args.type
+
+    if not name:
+        print("ERROR: name is required.", file=sys.stderr)
+        return 1
+
+    if not app_type:
+        print("ERROR: type is required.", file=sys.stderr)
+        return 1
+
+    if app_type not in VALID_APPLICATOR_TYPES:
+        print(f"ERROR: Invalid type '{app_type}'. Must be one of: {VALID_APPLICATOR_TYPES}", file=sys.stderr)
+        return 1
+
+    # Parse attributes JSON
+    attributes = {}
+    if args.attributes:
+        try:
+            attributes = json.loads(args.attributes)
+        except json.JSONDecodeError as e:
+            print(f"ERROR: Invalid attributes JSON: {e}", file=sys.stderr)
+            return 1
+
+    # Load existing data
+    data = load_applicators()
+    applicators = data.get("applicators", [])
+
+    # Check for duplicate name
+    for app in applicators:
+        if app.get("name", "").lower() == name.lower():
+            print(f"ERROR: Applicator with name '{name}' already exists.", file=sys.stderr)
+            return 1
+
+    # Generate ID
+    app_id = generate_applicator_id(name)
+
+    # Create applicator
+    applicator = {
+        "id": app_id,
+        "name": name,
+        "type": app_type,
+        "active": True,
+        "attributes": attributes,
+        "created": now_iso(),
+        "modified": now_iso()
+    }
+
+    applicators.append(applicator)
+    data["applicators"] = applicators
+
+    if not save_applicators(data):
+        return 1
+
+    print(f"OK:applicator_added:{app_id}")
+    print(json.dumps(applicator, ensure_ascii=False))
+    return 0
+
+
+def cmd_edit_applicator(args: argparse.Namespace) -> int:
+    """Edit an existing applicator."""
+    app_id = args.id
+
+    if not app_id:
+        print("ERROR: id is required.", file=sys.stderr)
+        return 1
+
+    data = load_applicators()
+    applicators = data.get("applicators", [])
+
+    # Find applicator
+    app_idx = None
+    for i, app in enumerate(applicators):
+        if app.get("id") == app_id:
+            app_idx = i
+            break
+
+    if app_idx is None:
+        print(f"ERROR: Applicator '{app_id}' not found.", file=sys.stderr)
+        return 1
+
+    applicator = applicators[app_idx]
+
+    # Update fields if provided
+    if args.name:
+        # Check for duplicate name (excluding self)
+        for app in applicators:
+            if app.get("id") != app_id and app.get("name", "").lower() == args.name.lower():
+                print(f"ERROR: Applicator with name '{args.name}' already exists.", file=sys.stderr)
+                return 1
+        applicator["name"] = args.name
+
+    if args.type:
+        if args.type not in VALID_APPLICATOR_TYPES:
+            print(f"ERROR: Invalid type '{args.type}'.", file=sys.stderr)
+            return 1
+        applicator["type"] = args.type
+
+    if args.active is not None:
+        applicator["active"] = args.active.lower() == "true"
+
+    if args.attributes:
+        try:
+            new_attrs = json.loads(args.attributes)
+            # Merge with existing attributes
+            existing_attrs = applicator.get("attributes", {})
+            existing_attrs.update(new_attrs)
+            applicator["attributes"] = existing_attrs
+        except json.JSONDecodeError as e:
+            print(f"ERROR: Invalid attributes JSON: {e}", file=sys.stderr)
+            return 1
+
+    applicator["modified"] = now_iso()
+    applicators[app_idx] = applicator
+    data["applicators"] = applicators
+
+    if not save_applicators(data):
+        return 1
+
+    print(f"OK:applicator_edited:{app_id}")
+    print(json.dumps(applicator, ensure_ascii=False))
+    return 0
+
+
+def cmd_delete_applicator(args: argparse.Namespace) -> int:
+    """Delete an applicator (soft delete by setting active=false, or hard delete)."""
+    app_id = args.id
+
+    if not app_id:
+        print("ERROR: id is required.", file=sys.stderr)
+        return 1
+
+    data = load_applicators()
+    applicators = data.get("applicators", [])
+
+    if args.hard:
+        # Hard delete - remove from list
+        new_applicators = [a for a in applicators if a.get("id") != app_id]
+        if len(new_applicators) == len(applicators):
+            print(f"ERROR: Applicator '{app_id}' not found.", file=sys.stderr)
+            return 1
+        data["applicators"] = new_applicators
+    else:
+        # Soft delete - set active=false
+        found = False
+        for app in applicators:
+            if app.get("id") == app_id:
+                app["active"] = False
+                app["modified"] = now_iso()
+                found = True
+                break
+
+        if not found:
+            print(f"ERROR: Applicator '{app_id}' not found.", file=sys.stderr)
+            return 1
+
+        data["applicators"] = applicators
+
+    if not save_applicators(data):
+        return 1
+
+    action = "deleted" if args.hard else "deactivated"
+    print(f"OK:applicator_{action}:{app_id}")
+    return 0
+
+
+def cmd_list_applicators(args: argparse.Namespace) -> int:
+    """List all applicators."""
+    data = load_applicators()
+    applicators = data.get("applicators", [])
+
+    if args.active_only:
+        applicators = [a for a in applicators if a.get("active", True)]
+
+    if args.type:
+        applicators = [a for a in applicators if a.get("type") == args.type]
+
+    output = {
+        "count": len(applicators),
+        "applicators": applicators,
+        "attribute_templates": data.get("attribute_templates", {})
+    }
+
+    print(json.dumps(output, ensure_ascii=False))
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(description="HFM Backend")
     subparsers = parser.add_subparsers(dest="command", help="Commands")
@@ -584,6 +1252,55 @@ def main():
     # export
     subparsers.add_parser("export", help="Export events to backup")
 
+    # --- Draft commands ---
+
+    # load_draft
+    load_draft_p = subparsers.add_parser("load_draft", help="Load or create a draft for a device")
+    load_draft_p.add_argument("--device-id", required=True, help="Unique device identifier")
+
+    # update_draft
+    update_draft_p = subparsers.add_parser("update_draft", help="Update draft fields")
+    update_draft_p.add_argument("--device-id", required=True, help="Unique device identifier")
+    update_draft_p.add_argument("--data", required=True, help="JSON object with fields to update")
+
+    # clear_draft
+    clear_draft_p = subparsers.add_parser("clear_draft", help="Clear/delete a draft")
+    clear_draft_p.add_argument("--device-id", required=True, help="Unique device identifier")
+
+    # submit_draft
+    submit_draft_p = subparsers.add_parser("submit_draft", help="Submit draft as event(s)")
+    submit_draft_p.add_argument("--device-id", required=True, help="Unique device identifier")
+
+    # cleanup_drafts
+    cleanup_drafts_p = subparsers.add_parser("cleanup_drafts", help="Remove old drafts")
+    cleanup_drafts_p.add_argument("--max-age-hours", type=int, default=24, help="Max age in hours (default: 24)")
+
+    # --- Applicator commands ---
+
+    # add_applicator
+    add_app_p = subparsers.add_parser("add_applicator", help="Add a new applicator")
+    add_app_p.add_argument("--name", required=True, help="Applicator name")
+    add_app_p.add_argument("--type", required=True, help="Applicator type (boom_spray, broadcast, aerial, fertigation, seed_treatment, foliar)")
+    add_app_p.add_argument("--attributes", help="JSON object with applicator attributes")
+
+    # edit_applicator
+    edit_app_p = subparsers.add_parser("edit_applicator", help="Edit an applicator")
+    edit_app_p.add_argument("--id", required=True, help="Applicator ID")
+    edit_app_p.add_argument("--name", help="New name")
+    edit_app_p.add_argument("--type", help="New type")
+    edit_app_p.add_argument("--active", help="Active status (true/false)")
+    edit_app_p.add_argument("--attributes", help="JSON object with attributes to update/add")
+
+    # delete_applicator
+    del_app_p = subparsers.add_parser("delete_applicator", help="Delete an applicator")
+    del_app_p.add_argument("--id", required=True, help="Applicator ID")
+    del_app_p.add_argument("--hard", action="store_true", help="Hard delete (remove completely)")
+
+    # list_applicators
+    list_app_p = subparsers.add_parser("list_applicators", help="List applicators")
+    list_app_p.add_argument("--active-only", action="store_true", help="Only show active applicators")
+    list_app_p.add_argument("--type", help="Filter by type")
+
     args = parser.parse_args()
 
     if not args.command:
@@ -601,6 +1318,15 @@ def main():
         "add_device": cmd_add_device,
         "delete_device": cmd_delete_device,
         "export": cmd_export,
+        "load_draft": cmd_load_draft,
+        "update_draft": cmd_update_draft,
+        "clear_draft": cmd_clear_draft,
+        "submit_draft": cmd_submit_draft,
+        "cleanup_drafts": cmd_cleanup_drafts,
+        "add_applicator": cmd_add_applicator,
+        "edit_applicator": cmd_edit_applicator,
+        "delete_applicator": cmd_delete_applicator,
+        "list_applicators": cmd_list_applicators,
     }
 
     return commands[args.command](args)

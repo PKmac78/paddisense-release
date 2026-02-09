@@ -14,6 +14,7 @@ from typing import Any
 DATA_DIR = Path("/config/local_data/hfm")
 CONFIG_FILE = DATA_DIR / "config.json"
 EVENTS_FILE = DATA_DIR / "events.json"
+APPLICATORS_FILE = DATA_DIR / "applicators.json"
 BACKUPS_DIR = DATA_DIR / "backups"
 VERSION_FILE = Path("/config/PaddiSense/hfm/VERSION")
 REGISTRY_FILE = Path("/config/local_data/registry/config.json")
@@ -82,6 +83,37 @@ def get_backup_info() -> dict:
     return {"last_backup": last_backup, "backup_count": len(backups)}
 
 
+def get_applicators() -> dict:
+    """Get applicator data for dropdowns and UI."""
+    data = load_json(APPLICATORS_FILE, {"applicators": [], "attribute_templates": {}})
+    applicators = data.get("applicators", [])
+    templates = data.get("attribute_templates", {})
+
+    # Active applicators only for dropdowns
+    active_applicators = [a for a in applicators if a.get("active", True)]
+
+    # Group by type for filtering
+    by_type = {}
+    for app in active_applicators:
+        app_type = app.get("type", "unknown")
+        if app_type not in by_type:
+            by_type[app_type] = []
+        by_type[app_type].append({
+            "id": app["id"],
+            "name": app["name"],
+            "type": app_type
+        })
+
+    return {
+        "applicators": applicators,
+        "active_applicators": active_applicators,
+        "applicators_by_type": by_type,
+        "applicator_names": [a["name"] for a in active_applicators],
+        "applicator_ids": [a["id"] for a in active_applicators],
+        "attribute_templates": templates
+    }
+
+
 def main():
     config = load_json(CONFIG_FILE, {})
     events_data = load_json(EVENTS_FILE, {"events": []})
@@ -131,6 +163,9 @@ def main():
 
     # Backup info
     backup_info = get_backup_info()
+
+    # Applicator info
+    applicator_info = get_applicators()
 
     # Determine system status
     if not CONFIG_FILE.exists():
@@ -182,11 +217,21 @@ def main():
         "system_status": system_status,
         "config_exists": CONFIG_FILE.exists(),
         "voice_enabled": config.get("voice_enabled", False),
+        "weather_enabled": config.get("weather_enabled", False),
+        "weather_entities": config.get("weather_entities", {}),
         "version": get_version(),
 
         # Backup info
         "last_backup": backup_info["last_backup"],
         "backup_count": backup_info["backup_count"],
+
+        # Applicator info
+        "applicators": applicator_info["applicators"],
+        "active_applicators": applicator_info["active_applicators"],
+        "applicators_by_type": applicator_info["applicators_by_type"],
+        "applicator_names": applicator_info["applicator_names"],
+        "applicator_ids": applicator_info["applicator_ids"],
+        "applicator_templates": applicator_info["attribute_templates"],
     }
 
     print(json.dumps(output))

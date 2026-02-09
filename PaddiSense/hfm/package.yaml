@@ -64,6 +64,53 @@ shell_command:
   hfm_export: >-
     python3 /config/PaddiSense/hfm/python/hfm_backend.py export
 
+  # --- Draft Commands (Multi-user support) ---
+  hfm_load_draft: >-
+    python3 /config/PaddiSense/hfm/python/hfm_backend.py load_draft
+    --device-id "{{ device_id }}"
+
+  hfm_update_draft: >-
+    python3 /config/PaddiSense/hfm/python/hfm_backend.py update_draft
+    --device-id "{{ device_id }}"
+    --data '{{ data }}'
+
+  hfm_clear_draft: >-
+    python3 /config/PaddiSense/hfm/python/hfm_backend.py clear_draft
+    --device-id "{{ device_id }}"
+
+  hfm_submit_draft: >-
+    python3 /config/PaddiSense/hfm/python/hfm_backend.py submit_draft
+    --device-id "{{ device_id }}"
+
+  hfm_cleanup_drafts: >-
+    python3 /config/PaddiSense/hfm/python/hfm_backend.py cleanup_drafts
+    --max-age-hours {{ max_age_hours | default(24) }}
+
+  # --- Applicator Commands ---
+  hfm_add_applicator: >-
+    python3 /config/PaddiSense/hfm/python/hfm_backend.py add_applicator
+    --name "{{ name }}"
+    --type "{{ type }}"
+    --attributes '{{ attributes | default("{}") }}'
+
+  hfm_edit_applicator: >-
+    python3 /config/PaddiSense/hfm/python/hfm_backend.py edit_applicator
+    --id "{{ id }}"
+    --name "{{ name | default("") }}"
+    --type "{{ type | default("") }}"
+    --active "{{ active | default("") }}"
+    --attributes '{{ attributes | default("") }}'
+
+  hfm_delete_applicator: >-
+    python3 /config/PaddiSense/hfm/python/hfm_backend.py delete_applicator
+    --id "{{ id }}"
+    {{ "--hard" if hard | default(false) else "" }}
+
+  hfm_list_applicators: >-
+    python3 /config/PaddiSense/hfm/python/hfm_backend.py list_applicators
+    {{ "--active-only" if active_only | default(false) else "" }}
+    {{ "--type " ~ type if type | default("") else "" }}
+
 
 # -----------------------------------------------------------------------------
 # Command-line Sensor
@@ -102,9 +149,39 @@ command_line:
         - system_status
         - config_exists
         - voice_enabled
+        - weather_enabled
+        - weather_entities
         - version
         - last_backup
         - backup_count
+        - applicators
+        - active_applicators
+        - applicators_by_type
+        - applicator_names
+        - applicator_ids
+        - applicator_templates
+
+  - sensor:
+      name: HFM Drafts
+      unique_id: hfm_drafts
+      command: 'python3 /config/PaddiSense/hfm/python/hfm_drafts_sensor.py'
+      command_timeout: 15
+      scan_interval: 10
+      value_template: '{{ value_json.draft_count | default(0) }}'
+      json_attributes:
+        - draft_count
+        - drafts
+        - active_devices
+        - farms
+        - paddock_map
+        - paddocks_by_farm
+        - applicators
+        - applicators_by_type
+        - applicator_names
+        - applicator_ids
+        - registered_devices
+        - version
+        - last_updated
 
 
 # -----------------------------------------------------------------------------
@@ -326,6 +403,81 @@ input_boolean:
     name: HFM Edit Mode
     icon: mdi:pencil
 
+# -----------------------------------------------------------------------------
+# Input Helpers - Draft System (Multi-user)
+# -----------------------------------------------------------------------------
+input_text:
+  hfm_current_device:
+    name: HFM Current Device
+    icon: mdi:cellphone-link
+    max: 100
+
+# -----------------------------------------------------------------------------
+# Input Helpers - Applicator Management
+# -----------------------------------------------------------------------------
+  hfm_applicator_name:
+    name: HFM Applicator Name
+    icon: mdi:tractor
+    max: 100
+
+  hfm_applicator_id:
+    name: HFM Applicator ID
+    icon: mdi:identifier
+    max: 50
+
+  hfm_applicator_attributes:
+    name: HFM Applicator Attributes
+    icon: mdi:code-json
+    max: 1000
+
+input_select:
+  hfm_applicator_type:
+    name: HFM Applicator Type
+    icon: mdi:shape
+    options:
+      - Select Type
+      - boom_spray
+      - broadcast
+      - aerial
+      - fertigation
+      - seed_treatment
+      - foliar
+
+  hfm_selected_applicator:
+    name: HFM Selected Applicator
+    icon: mdi:tractor
+    options:
+      - Select Applicator
+
+# -----------------------------------------------------------------------------
+# Input Helpers - Application Timing
+# -----------------------------------------------------------------------------
+input_text:
+  hfm_start_time:
+    name: HFM Start Time
+    icon: mdi:clock-start
+    max: 5
+
+input_number:
+  hfm_duration_minutes:
+    name: HFM Duration (minutes)
+    icon: mdi:timer
+    min: 5
+    max: 720
+    step: 5
+    mode: box
+    unit_of_measurement: "min"
+
+# -----------------------------------------------------------------------------
+# Input Helpers - Farm & Paddock Selection (Multi-select)
+# -----------------------------------------------------------------------------
+input_select:
+  hfm_selected_farm:
+    name: HFM Selected Farm
+    icon: mdi:barn
+    options:
+      - Select Farm
+
 
 # -----------------------------------------------------------------------------
 # Template Sensors
@@ -376,6 +528,98 @@ template:
           {% else %}
             {{ states('input_text.hfm_specific_date') }}
           {% endif %}
+
+      # Weather sensors for display
+      - name: "HFM Current Wind Speed"
+        unique_id: hfm_current_wind_speed
+        icon: mdi:weather-windy
+        unit_of_measurement: "km/h"
+        state: "{{ states('sensor.bom_wind_speed_kilometre') | float(0) | round(1) }}"
+
+      - name: "HFM Current Wind Direction"
+        unique_id: hfm_current_wind_direction
+        icon: mdi:compass
+        state: >
+          {% set deg = states('sensor.bom_wind_direction') | float(0) %}
+          {% set dirs = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'] %}
+          {{ dirs[((deg + 11.25) % 360 / 22.5) | int] }}
+
+      - name: "HFM Current Wind Gust"
+        unique_id: hfm_current_wind_gust
+        icon: mdi:weather-windy-variant
+        unit_of_measurement: "km/h"
+        state: "{{ states('sensor.bom_gust_speed_kilometre') | float(0) | round(1) }}"
+
+      - name: "HFM Current Temperature"
+        unique_id: hfm_current_temperature
+        icon: mdi:thermometer
+        unit_of_measurement: "°C"
+        state: "{{ states('sensor.bom_temp') | float(0) | round(1) }}"
+
+      - name: "HFM Current Humidity"
+        unique_id: hfm_current_humidity
+        icon: mdi:water-percent
+        unit_of_measurement: "%"
+        state: "{{ states('sensor.bom_humidity') | float(0) | round(0) }}"
+
+      - name: "HFM Weather Summary"
+        unique_id: hfm_weather_summary
+        icon: mdi:weather-partly-cloudy
+        state: >
+          Wind: {{ states('sensor.hfm_current_wind_speed') }}km/h {{ states('sensor.hfm_current_wind_direction') }},
+          Gusts: {{ states('sensor.hfm_current_wind_gust') }}km/h,
+          {{ states('sensor.hfm_current_temperature') }}°C,
+          {{ states('sensor.hfm_current_humidity') }}%
+
+      # Farm & Paddock selection sensors
+      - name: "HFM Selected Farm ID"
+        unique_id: hfm_selected_farm_id
+        icon: mdi:barn
+        state: >
+          {% set farm_name = states('input_select.hfm_selected_farm') %}
+          {% set farms = state_attr('sensor.hfm_drafts', 'farms') or {} %}
+          {% for fid, fname in farms.items() if fname == farm_name %}{{ fid }}{% endfor %}
+
+      - name: "HFM Paddocks For Selected Farm"
+        unique_id: hfm_paddocks_for_selected_farm
+        icon: mdi:vector-square
+        state: >
+          {% set farm_id = states('sensor.hfm_selected_farm_id') %}
+          {% set by_farm = state_attr('sensor.hfm_drafts', 'paddocks_by_farm') or {} %}
+          {% set paddocks = by_farm.get(farm_id, []) %}
+          {{ paddocks | length }} paddocks
+        attributes:
+          paddocks: >
+            {% set farm_id = states('sensor.hfm_selected_farm_id') %}
+            {% set by_farm = state_attr('sensor.hfm_drafts', 'paddocks_by_farm') or {} %}
+            {{ by_farm.get(farm_id, []) }}
+
+      - name: "HFM Current Draft Paddocks"
+        unique_id: hfm_current_draft_paddocks
+        icon: mdi:checkbox-multiple-marked
+        state: >
+          {% set device_id = states('input_text.hfm_current_device') %}
+          {% set drafts = state_attr('sensor.hfm_drafts', 'drafts') or {} %}
+          {% set draft = drafts.get(device_id, {}) %}
+          {% set paddocks = draft.get('data', {}).get('paddocks', []) %}
+          {{ paddocks | length }} selected
+        attributes:
+          paddock_ids: >
+            {% set device_id = states('input_text.hfm_current_device') %}
+            {% set drafts = state_attr('sensor.hfm_drafts', 'drafts') or {} %}
+            {% set draft = drafts.get(device_id, {}) %}
+            {{ draft.get('data', {}).get('paddocks', []) }}
+          paddock_names: >
+            {% set device_id = states('input_text.hfm_current_device') %}
+            {% set drafts = state_attr('sensor.hfm_drafts', 'drafts') or {} %}
+            {% set draft = drafts.get(device_id, {}) %}
+            {% set selected_ids = draft.get('data', {}).get('paddocks', []) %}
+            {% set pmap = state_attr('sensor.hfm_drafts', 'paddock_map') or {} %}
+            {% set ns = namespace(names=[]) %}
+            {% for pid in selected_ids %}
+              {% set ns.names = ns.names + [pmap.get(pid, pid)] %}
+            {% endfor %}
+            {{ ns.names }}
 
 
 
@@ -649,6 +893,83 @@ automation:
             {% endfor %}
             {{ ns.opts }}
 
+  # --- Draft System Automations ---
+
+  - id: hfm_cleanup_old_drafts
+    alias: "HFM Cleanup Old Drafts"
+    description: "Remove drafts older than 24 hours"
+    trigger:
+      - platform: time
+        at: "03:00:00"
+      - platform: homeassistant
+        event: start
+    action:
+      - delay: 30
+      - service: shell_command.hfm_cleanup_drafts
+        data:
+          max_age_hours: 24
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.hfm_drafts
+
+  - id: hfm_update_applicator_options
+    alias: "HFM Update Applicator Options"
+    trigger:
+      - platform: state
+        entity_id: sensor.hfm_events
+      - platform: homeassistant
+        event: start
+    action:
+      - delay: 2
+      - service: input_select.set_options
+        target:
+          entity_id: input_select.hfm_selected_applicator
+        data:
+          options: >
+            {% set names = state_attr('sensor.hfm_events', 'applicator_names') or [] %}
+            {{ ['Select Applicator'] + names if names else ['Select Applicator'] }}
+
+  - id: hfm_update_farm_options
+    alias: "HFM Update Farm Options"
+    trigger:
+      - platform: state
+        entity_id: sensor.hfm_drafts
+      - platform: homeassistant
+        event: start
+    action:
+      - delay: 2
+      - service: input_select.set_options
+        target:
+          entity_id: input_select.hfm_selected_farm
+        data:
+          options: >
+            {% set farms = state_attr('sensor.hfm_drafts', 'farms') or {} %}
+            {% set names = farms.values() | list | sort %}
+            {{ ['Select Farm'] + names if names else ['Select Farm'] }}
+
+  - id: hfm_sync_farm_to_draft
+    alias: "HFM Sync Farm Selection to Draft"
+    trigger:
+      - platform: state
+        entity_id: input_select.hfm_selected_farm
+    condition:
+      - condition: template
+        value_template: "{{ states('input_text.hfm_current_device') != '' }}"
+      - condition: template
+        value_template: "{{ states('input_select.hfm_selected_farm') != 'Select Farm' }}"
+    action:
+      - variables:
+          farm_id: "{{ states('sensor.hfm_selected_farm_id') }}"
+          device_id: "{{ states('input_text.hfm_current_device') }}"
+      - service: shell_command.hfm_update_draft
+        data:
+          device_id: "{{ device_id }}"
+          data: '{"data": {"farm_id": "{{ farm_id }}", "paddocks": []}}'
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.hfm_drafts
+
 
 # -----------------------------------------------------------------------------
 # Scripts - Form Submissions
@@ -663,6 +984,229 @@ script:
       - service: homeassistant.update_entity
         target:
           entity_id: sensor.hfm_events
+
+  # --- Draft-Based Wizard Scripts ---
+
+  hfm_start_wizard:
+    alias: "HFM Start New Event Wizard"
+    icon: mdi:plus-circle
+    description: "Initialize draft and start the event wizard"
+    fields:
+      device_id:
+        description: "Device ID (optional - uses default if not provided)"
+        example: "browser_abc123"
+    sequence:
+      - variables:
+          # Use provided device_id or generate from timestamp
+          effective_device_id: >
+            {% if device_id is defined and device_id != '' %}
+              {{ device_id }}
+            {% elif states('input_text.hfm_current_device') != '' %}
+              {{ states('input_text.hfm_current_device') }}
+            {% else %}
+              device_{{ now().strftime('%Y%m%d%H%M%S') }}
+            {% endif %}
+      # Set current device
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.hfm_current_device
+        data:
+          value: "{{ effective_device_id }}"
+      # Initialize draft
+      - service: shell_command.hfm_load_draft
+        data:
+          device_id: "{{ effective_device_id }}"
+      # Clear draft to fresh state
+      - service: shell_command.hfm_update_draft
+        data:
+          device_id: "{{ effective_device_id }}"
+          data: '{"wizard_step": 1, "data": {"event_type": null, "date": null, "start_time": null, "duration_minutes": null, "farm_id": null, "paddocks": [], "products": [], "applicator_id": null, "application_method": null, "crop_stage": null, "irrigation_type": null, "notes": "", "weather": null}}'
+      # Reset UI helpers
+      - service: script.hfm_wizard_reset
+      # Update sensors
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.hfm_drafts
+
+  hfm_sync_wizard_to_draft:
+    alias: "HFM Sync Wizard State to Draft"
+    icon: mdi:sync
+    description: "Sync current input helper state to the draft"
+    sequence:
+      - variables:
+          device_id: "{{ states('input_text.hfm_current_device') }}"
+          event_type_raw: "{{ states('input_select.hfm_event_type') }}"
+          event_type: >
+            {% if event_type_raw == 'Nutrient Application' %}nutrient
+            {% elif event_type_raw == 'Chemical Application' %}chemical
+            {% elif event_type_raw == 'Irrigation' %}irrigation
+            {% elif event_type_raw == 'Crop Stage' %}crop_stage
+            {% else %}null{% endif %}
+          event_date: "{{ states('sensor.hfm_event_date') }}"
+          wizard_step: "{{ states('input_number.hfm_wizard_step') | int }}"
+          start_time: "{{ states('input_text.hfm_start_time') }}"
+          duration: "{{ states('input_number.hfm_duration_minutes') | int }}"
+          notes: "{{ states('input_text.hfm_notes') }}"
+          farm_id: "{{ states('sensor.hfm_selected_farm_id') }}"
+          # Build paddock from single select (legacy) or multi-select
+          paddock_id: >
+            {% set pname = states('input_select.hfm_selected_paddock') %}
+            {% set pmap = state_attr('sensor.hfm_events', 'paddock_map') or {} %}
+            {% for pid, name in pmap.items() if name == pname %}{{ pid }}{% endfor %}
+          # Get paddocks from draft (for multi-select)
+          drafts: "{{ state_attr('sensor.hfm_drafts', 'drafts') or {} }}"
+          draft: "{{ drafts.get(device_id, {}) }}"
+          current_paddocks: "{{ draft.get('data', {}).get('paddocks', []) }}"
+          # Use draft paddocks if available, otherwise single selection
+          paddocks: >
+            {% if current_paddocks | length > 0 %}
+              {{ current_paddocks }}
+            {% elif paddock_id %}
+              ["{{ paddock_id }}"]
+            {% else %}
+              []
+            {% endif %}
+          # Application method ID
+          method_name: "{{ states('input_select.hfm_application_method') }}"
+          method_id: >
+            {% set methods = state_attr('sensor.hfm_events', 'application_methods') or [] %}
+            {% for m in methods if m.name == method_name %}{{ m.id }}{% endfor %}
+          # Applicator ID from selection
+          app_name: "{{ states('input_select.hfm_selected_applicator') }}"
+          applicator_id: >
+            {% set apps = state_attr('sensor.hfm_events', 'active_applicators') or [] %}
+            {% for a in apps if a.name == app_name %}{{ a.id }}{% endfor %}
+          # Crop stage ID
+          stage_name: "{{ states('input_select.hfm_crop_stage') }}"
+          stage_id: >
+            {% set stages = state_attr('sensor.hfm_events', 'crop_stages') or [] %}
+            {% for s in stages if s.name == stage_name %}{{ s.id }}{% endfor %}
+          # Irrigation type ID
+          irrigation_name: "{{ states('input_select.hfm_irrigation_type') }}"
+          irrigation_id: >
+            {% set types = state_attr('sensor.hfm_events', 'irrigation_types') or [] %}
+            {% for t in types if t.name == irrigation_name %}{{ t.id }}{% endfor %}
+          # Build products array
+          product_count: "{{ states('input_number.hfm_product_count') | int }}"
+          products_json: >
+            {% set ns = namespace(products=[]) %}
+            {% set p1 = states('input_select.hfm_selected_product') %}
+            {% set r1 = states('input_text.hfm_product_rate') %}
+            {% set u1 = states('input_text.hfm_rate_unit') %}
+            {% if p1 != 'Select Product' and r1 != '' %}
+              {% set ns.products = ns.products + [{'product_name': p1, 'rate': r1 | float(0), 'rate_unit': u1}] %}
+            {% endif %}
+            {% if product_count >= 2 %}
+              {% set p2 = states('input_select.hfm_selected_product_2') %}
+              {% set r2 = states('input_text.hfm_product_rate_2') %}
+              {% set u2 = states('input_text.hfm_rate_unit_2') %}
+              {% if p2 != 'Select Product' and r2 != '' %}
+                {% set ns.products = ns.products + [{'product_name': p2, 'rate': r2 | float(0), 'rate_unit': u2}] %}
+              {% endif %}
+            {% endif %}
+            {% if product_count >= 3 %}
+              {% set p3 = states('input_select.hfm_selected_product_3') %}
+              {% set r3 = states('input_text.hfm_product_rate_3') %}
+              {% set u3 = states('input_text.hfm_rate_unit_3') %}
+              {% if p3 != 'Select Product' and r3 != '' %}
+                {% set ns.products = ns.products + [{'product_name': p3, 'rate': r3 | float(0), 'rate_unit': u3}] %}
+              {% endif %}
+            {% endif %}
+            {% if product_count >= 4 %}
+              {% set p4 = states('input_select.hfm_selected_product_4') %}
+              {% set r4 = states('input_text.hfm_product_rate_4') %}
+              {% set u4 = states('input_text.hfm_rate_unit_4') %}
+              {% if p4 != 'Select Product' and r4 != '' %}
+                {% set ns.products = ns.products + [{'product_name': p4, 'rate': r4 | float(0), 'rate_unit': u4}] %}
+              {% endif %}
+            {% endif %}
+            {% if product_count >= 5 %}
+              {% set p5 = states('input_select.hfm_selected_product_5') %}
+              {% set r5 = states('input_text.hfm_product_rate_5') %}
+              {% set u5 = states('input_text.hfm_rate_unit_5') %}
+              {% if p5 != 'Select Product' and r5 != '' %}
+                {% set ns.products = ns.products + [{'product_name': p5, 'rate': r5 | float(0), 'rate_unit': u5}] %}
+              {% endif %}
+            {% endif %}
+            {% if product_count >= 6 %}
+              {% set p6 = states('input_select.hfm_selected_product_6') %}
+              {% set r6 = states('input_text.hfm_product_rate_6') %}
+              {% set u6 = states('input_text.hfm_rate_unit_6') %}
+              {% if p6 != 'Select Product' and r6 != '' %}
+                {% set ns.products = ns.products + [{'product_name': p6, 'rate': r6 | float(0), 'rate_unit': u6}] %}
+              {% endif %}
+            {% endif %}
+            {{ ns.products }}
+      - condition: template
+        value_template: "{{ device_id != '' }}"
+      - service: shell_command.hfm_update_draft
+        data:
+          device_id: "{{ device_id }}"
+          data: >
+            {
+              "wizard_step": {{ wizard_step }},
+              "data": {
+                "event_type": {% if event_type != 'null' %}"{{ event_type }}"{% else %}null{% endif %},
+                "date": {% if event_date %}"{{ event_date }}"{% else %}null{% endif %},
+                "start_time": {% if start_time %}"{{ start_time }}"{% else %}null{% endif %},
+                "duration_minutes": {% if duration > 0 %}{{ duration }}{% else %}null{% endif %},
+                "farm_id": {% if farm_id %}"{{ farm_id }}"{% else %}null{% endif %},
+                "paddocks": {{ paddocks | to_json }},
+                "products": {{ products_json | to_json }},
+                "applicator_id": {% if applicator_id %}"{{ applicator_id }}"{% else %}null{% endif %},
+                "application_method": {% if method_id %}"{{ method_id }}"{% else %}null{% endif %},
+                "crop_stage": {% if stage_id %}"{{ stage_id }}"{% else %}null{% endif %},
+                "irrigation_type": {% if irrigation_id %}"{{ irrigation_id }}"{% else %}null{% endif %},
+                "notes": "{{ notes }}"
+              }
+            }
+
+  hfm_submit_from_draft:
+    alias: "HFM Submit Event from Draft"
+    icon: mdi:check-bold
+    description: "Submit the current draft as event(s)"
+    sequence:
+      - variables:
+          device_id: "{{ states('input_text.hfm_current_device') }}"
+      - condition: template
+        value_template: "{{ device_id != '' }}"
+      # Sync current state to draft first
+      - service: script.hfm_sync_wizard_to_draft
+      - delay: 1
+      # Capture weather if nutrient/chemical
+      - variables:
+          drafts: "{{ state_attr('sensor.hfm_drafts', 'drafts') or {} }}"
+          draft: "{{ drafts.get(device_id, {}) }}"
+          event_type: "{{ draft.get('data', {}).get('event_type') }}"
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ event_type in ['nutrient', 'chemical'] }}"
+            sequence:
+              - service: script.hfm_capture_weather
+                data:
+                  device_id: "{{ device_id }}"
+              - delay: 1
+      # Submit the draft
+      - service: shell_command.hfm_submit_draft
+        data:
+          device_id: "{{ device_id }}"
+      - delay: 1
+      # Update sensors
+      - service: homeassistant.update_entity
+        target:
+          entity_id:
+            - sensor.hfm_events
+            - sensor.hfm_drafts
+      # Notify success
+      - service: persistent_notification.create
+        data:
+          title: "Event Saved"
+          message: "Farm event has been recorded successfully."
+          notification_id: hfm_event_saved
+      # Reset wizard
+      - service: script.hfm_wizard_reset
 
   hfm_wizard_next:
     alias: "HFM Wizard Next Step"
@@ -806,124 +1350,137 @@ script:
   hfm_submit_event:
     alias: "HFM Submit Event"
     icon: mdi:check
+    description: "Submit event - uses draft system for multi-user support"
     sequence:
+      # Check if we have a device ID (draft mode)
       - variables:
-          event_type: >
-            {% set sel = states('input_select.hfm_event_type') %}
-            {% if sel == 'Nutrient Application' %}nutrient
-            {% elif sel == 'Chemical Application' %}chemical
-            {% elif sel == 'Irrigation' %}irrigation
-            {% elif sel == 'Crop Stage' %}crop_stage
-            {% else %}unknown{% endif %}
-          event_date: "{{ states('sensor.hfm_event_date') }}"
-          paddock_name: "{{ states('input_select.hfm_selected_paddock') }}"
-          paddock_id: >
-            {% set pmap = state_attr('sensor.hfm_events', 'paddock_map') or {} %}
-            {% for pid, pname in pmap.items() if pname == paddock_name %}{{ pid }}{% endfor %}
-          product_count: "{{ states('input_number.hfm_product_count') | int }}"
-          products_json: >
-            {% set ns = namespace(products=[]) %}
-            {% set p1 = states('input_select.hfm_selected_product') %}
-            {% set r1 = states('input_text.hfm_product_rate') %}
-            {% set u1 = states('input_text.hfm_rate_unit') %}
-            {% if p1 != 'Select Product' and r1 != '' %}
-              {% set ns.products = ns.products + [{'product_name': p1, 'rate': r1 | float(0), 'rate_unit': u1}] %}
-            {% endif %}
-            {% if product_count >= 2 %}
-              {% set p2 = states('input_select.hfm_selected_product_2') %}
-              {% set r2 = states('input_text.hfm_product_rate_2') %}
-              {% set u2 = states('input_text.hfm_rate_unit_2') %}
-              {% if p2 != 'Select Product' and r2 != '' %}
-                {% set ns.products = ns.products + [{'product_name': p2, 'rate': r2 | float(0), 'rate_unit': u2}] %}
-              {% endif %}
-            {% endif %}
-            {% if product_count >= 3 %}
-              {% set p3 = states('input_select.hfm_selected_product_3') %}
-              {% set r3 = states('input_text.hfm_product_rate_3') %}
-              {% set u3 = states('input_text.hfm_rate_unit_3') %}
-              {% if p3 != 'Select Product' and r3 != '' %}
-                {% set ns.products = ns.products + [{'product_name': p3, 'rate': r3 | float(0), 'rate_unit': u3}] %}
-              {% endif %}
-            {% endif %}
-            {% if product_count >= 4 %}
-              {% set p4 = states('input_select.hfm_selected_product_4') %}
-              {% set r4 = states('input_text.hfm_product_rate_4') %}
-              {% set u4 = states('input_text.hfm_rate_unit_4') %}
-              {% if p4 != 'Select Product' and r4 != '' %}
-                {% set ns.products = ns.products + [{'product_name': p4, 'rate': r4 | float(0), 'rate_unit': u4}] %}
-              {% endif %}
-            {% endif %}
-            {% if product_count >= 5 %}
-              {% set p5 = states('input_select.hfm_selected_product_5') %}
-              {% set r5 = states('input_text.hfm_product_rate_5') %}
-              {% set u5 = states('input_text.hfm_rate_unit_5') %}
-              {% if p5 != 'Select Product' and r5 != '' %}
-                {% set ns.products = ns.products + [{'product_name': p5, 'rate': r5 | float(0), 'rate_unit': u5}] %}
-              {% endif %}
-            {% endif %}
-            {% if product_count >= 6 %}
-              {% set p6 = states('input_select.hfm_selected_product_6') %}
-              {% set r6 = states('input_text.hfm_product_rate_6') %}
-              {% set u6 = states('input_text.hfm_rate_unit_6') %}
-              {% if p6 != 'Select Product' and r6 != '' %}
-                {% set ns.products = ns.products + [{'product_name': p6, 'rate': r6 | float(0), 'rate_unit': u6}] %}
-              {% endif %}
-            {% endif %}
-            {{ ns.products | to_json }}
-          method_name: "{{ states('input_select.hfm_application_method') }}"
-          method_id: >
-            {% set methods = state_attr('sensor.hfm_events', 'application_methods') or [] %}
-            {% for m in methods if m.name == method_name %}{{ m.id }}{% endfor %}
-          stage_name: "{{ states('input_select.hfm_crop_stage') }}"
-          stage_id: >
-            {% set stages = state_attr('sensor.hfm_events', 'crop_stages') or [] %}
-            {% for s in stages if s.name == stage_name %}{{ s.id }}{% endfor %}
-          irrigation_name: "{{ states('input_select.hfm_irrigation_type') }}"
-          irrigation_id: >
-            {% set types = state_attr('sensor.hfm_events', 'irrigation_types') or [] %}
-            {% for t in types if t.name == irrigation_name %}{{ t.id }}{% endfor %}
-          notes: "{{ states('input_text.hfm_notes') }}"
-          is_edit: "{{ is_state('input_boolean.hfm_edit_mode', 'on') }}"
-          edit_event_id: "{{ states('input_text.hfm_edit_event_id') }}"
-      # Choose between add or edit based on mode
+          device_id: "{{ states('input_text.hfm_current_device') }}"
       - choose:
+          # If device ID is set, use draft-based submission
           - conditions:
-              - condition: state
-                entity_id: input_boolean.hfm_edit_mode
-                state: "on"
+              - condition: template
+                value_template: "{{ device_id != '' }}"
             sequence:
-              - service: shell_command.hfm_edit_event
+              - service: script.hfm_submit_from_draft
+        # Otherwise fall back to legacy submission
+        default:
+          - variables:
+              event_type: >
+                {% set sel = states('input_select.hfm_event_type') %}
+                {% if sel == 'Nutrient Application' %}nutrient
+                {% elif sel == 'Chemical Application' %}chemical
+                {% elif sel == 'Irrigation' %}irrigation
+                {% elif sel == 'Crop Stage' %}crop_stage
+                {% else %}unknown{% endif %}
+              event_date: "{{ states('sensor.hfm_event_date') }}"
+              paddock_name: "{{ states('input_select.hfm_selected_paddock') }}"
+              paddock_id: >
+                {% set pmap = state_attr('sensor.hfm_events', 'paddock_map') or {} %}
+                {% for pid, pname in pmap.items() if pname == paddock_name %}{{ pid }}{% endfor %}
+              product_count: "{{ states('input_number.hfm_product_count') | int }}"
+              products_json: >
+                {% set ns = namespace(products=[]) %}
+                {% set p1 = states('input_select.hfm_selected_product') %}
+                {% set r1 = states('input_text.hfm_product_rate') %}
+                {% set u1 = states('input_text.hfm_rate_unit') %}
+                {% if p1 != 'Select Product' and r1 != '' %}
+                  {% set ns.products = ns.products + [{'product_name': p1, 'rate': r1 | float(0), 'rate_unit': u1}] %}
+                {% endif %}
+                {% if product_count >= 2 %}
+                  {% set p2 = states('input_select.hfm_selected_product_2') %}
+                  {% set r2 = states('input_text.hfm_product_rate_2') %}
+                  {% set u2 = states('input_text.hfm_rate_unit_2') %}
+                  {% if p2 != 'Select Product' and r2 != '' %}
+                    {% set ns.products = ns.products + [{'product_name': p2, 'rate': r2 | float(0), 'rate_unit': u2}] %}
+                  {% endif %}
+                {% endif %}
+                {% if product_count >= 3 %}
+                  {% set p3 = states('input_select.hfm_selected_product_3') %}
+                  {% set r3 = states('input_text.hfm_product_rate_3') %}
+                  {% set u3 = states('input_text.hfm_rate_unit_3') %}
+                  {% if p3 != 'Select Product' and r3 != '' %}
+                    {% set ns.products = ns.products + [{'product_name': p3, 'rate': r3 | float(0), 'rate_unit': u3}] %}
+                  {% endif %}
+                {% endif %}
+                {% if product_count >= 4 %}
+                  {% set p4 = states('input_select.hfm_selected_product_4') %}
+                  {% set r4 = states('input_text.hfm_product_rate_4') %}
+                  {% set u4 = states('input_text.hfm_rate_unit_4') %}
+                  {% if p4 != 'Select Product' and r4 != '' %}
+                    {% set ns.products = ns.products + [{'product_name': p4, 'rate': r4 | float(0), 'rate_unit': u4}] %}
+                  {% endif %}
+                {% endif %}
+                {% if product_count >= 5 %}
+                  {% set p5 = states('input_select.hfm_selected_product_5') %}
+                  {% set r5 = states('input_text.hfm_product_rate_5') %}
+                  {% set u5 = states('input_text.hfm_rate_unit_5') %}
+                  {% if p5 != 'Select Product' and r5 != '' %}
+                    {% set ns.products = ns.products + [{'product_name': p5, 'rate': r5 | float(0), 'rate_unit': u5}] %}
+                  {% endif %}
+                {% endif %}
+                {% if product_count >= 6 %}
+                  {% set p6 = states('input_select.hfm_selected_product_6') %}
+                  {% set r6 = states('input_text.hfm_product_rate_6') %}
+                  {% set u6 = states('input_text.hfm_rate_unit_6') %}
+                  {% if p6 != 'Select Product' and r6 != '' %}
+                    {% set ns.products = ns.products + [{'product_name': p6, 'rate': r6 | float(0), 'rate_unit': u6}] %}
+                  {% endif %}
+                {% endif %}
+                {{ ns.products | to_json }}
+              method_name: "{{ states('input_select.hfm_application_method') }}"
+              method_id: >
+                {% set methods = state_attr('sensor.hfm_events', 'application_methods') or [] %}
+                {% for m in methods if m.name == method_name %}{{ m.id }}{% endfor %}
+              stage_name: "{{ states('input_select.hfm_crop_stage') }}"
+              stage_id: >
+                {% set stages = state_attr('sensor.hfm_events', 'crop_stages') or [] %}
+                {% for s in stages if s.name == stage_name %}{{ s.id }}{% endfor %}
+              irrigation_name: "{{ states('input_select.hfm_irrigation_type') }}"
+              irrigation_id: >
+                {% set types = state_attr('sensor.hfm_events', 'irrigation_types') or [] %}
+                {% for t in types if t.name == irrigation_name %}{{ t.id }}{% endfor %}
+              notes: "{{ states('input_text.hfm_notes') }}"
+              is_edit: "{{ is_state('input_boolean.hfm_edit_mode', 'on') }}"
+              edit_event_id: "{{ states('input_text.hfm_edit_event_id') }}"
+          # Choose between add or edit based on mode
+          - choose:
+              - conditions:
+                  - condition: state
+                    entity_id: input_boolean.hfm_edit_mode
+                    state: "on"
+                sequence:
+                  - service: shell_command.hfm_edit_event
+                    data:
+                      event_id: "{{ edit_event_id }}"
+                      event_date: "{{ event_date }}"
+                      paddocks: '["{{ paddock_id }}"]'
+                      products: "{{ products_json }}"
+                      application_method: "{{ method_id }}"
+                      crop_stage: "{{ stage_id }}"
+                      irrigation_type: "{{ irrigation_id }}"
+                      notes: "{{ notes }}"
+            default:
+              - service: shell_command.hfm_add_event
                 data:
-                  event_id: "{{ edit_event_id }}"
-                  event_date: "{{ event_date }}"
+                  event_type: "{{ event_type }}"
                   paddocks: '["{{ paddock_id }}"]'
                   products: "{{ products_json }}"
                   application_method: "{{ method_id }}"
                   crop_stage: "{{ stage_id }}"
                   irrigation_type: "{{ irrigation_id }}"
+                  event_date: "{{ event_date }}"
                   notes: "{{ notes }}"
-        default:
-          - service: shell_command.hfm_add_event
+                  device_id: ""
+          - delay: 1
+          - service: homeassistant.update_entity
+            target:
+              entity_id: sensor.hfm_events
+          - service: persistent_notification.create
             data:
-              event_type: "{{ event_type }}"
-              paddocks: '["{{ paddock_id }}"]'
-              products: "{{ products_json }}"
-              application_method: "{{ method_id }}"
-              crop_stage: "{{ stage_id }}"
-              irrigation_type: "{{ irrigation_id }}"
-              event_date: "{{ event_date }}"
-              notes: "{{ notes }}"
-              device_id: ""
-      - delay: 1
-      - service: homeassistant.update_entity
-        target:
-          entity_id: sensor.hfm_events
-      - service: persistent_notification.create
-        data:
-          title: "{{ 'Event Updated' if is_edit else 'Event Saved' }}"
-          message: "{{ event_type | title }} event {{ 'updated' if is_edit else 'recorded' }} for {{ states('input_select.hfm_selected_paddock') }} on {{ event_date }}"
-          notification_id: hfm_event_saved
-      - service: script.hfm_wizard_reset
+              title: "{{ 'Event Updated' if is_edit else 'Event Saved' }}"
+              message: "{{ event_type | title }} event {{ 'updated' if is_edit else 'recorded' }} for {{ states('input_select.hfm_selected_paddock') }} on {{ event_date }}"
+              notification_id: hfm_event_saved
+          - service: script.hfm_wizard_reset
 
   hfm_delete_event:
     alias: "HFM Delete Event"
@@ -1286,3 +1843,289 @@ script:
           entity_id: input_text.hfm_user_name
         data:
           value: ""
+
+  # --- Applicator Management Scripts ---
+
+  hfm_add_applicator:
+    alias: "HFM Add Applicator"
+    icon: mdi:tractor-variant
+    sequence:
+      - condition: template
+        value_template: >
+          {{ states('input_text.hfm_applicator_name') != '' and
+             states('input_select.hfm_applicator_type') != 'Select Type' }}
+      - service: shell_command.hfm_add_applicator
+        data:
+          name: "{{ states('input_text.hfm_applicator_name') }}"
+          type: "{{ states('input_select.hfm_applicator_type') }}"
+          attributes: "{{ states('input_text.hfm_applicator_attributes') | default('{}') }}"
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.hfm_events
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.hfm_applicator_name
+        data:
+          value: ""
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.hfm_applicator_type
+        data:
+          option: "Select Type"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.hfm_applicator_attributes
+        data:
+          value: ""
+      - service: persistent_notification.create
+        data:
+          title: "Applicator Added"
+          message: "New applicator has been added successfully."
+          notification_id: hfm_applicator_added
+
+  hfm_delete_applicator:
+    alias: "HFM Delete Applicator"
+    icon: mdi:delete
+    sequence:
+      - variables:
+          selected_name: "{{ states('input_select.hfm_selected_applicator') }}"
+          applicators: "{{ state_attr('sensor.hfm_events', 'active_applicators') or [] }}"
+          applicator_id: >
+            {% for a in applicators if a.name == selected_name %}{{ a.id }}{% endfor %}
+      - condition: template
+        value_template: "{{ applicator_id | trim != '' }}"
+      - service: shell_command.hfm_delete_applicator
+        data:
+          id: "{{ applicator_id | trim }}"
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.hfm_events
+      - service: persistent_notification.create
+        data:
+          title: "Applicator Deactivated"
+          message: "{{ selected_name }} has been deactivated."
+          notification_id: hfm_applicator_deleted
+
+  # --- Weather Capture Scripts ---
+
+  hfm_capture_weather:
+    alias: "HFM Capture Current Weather"
+    icon: mdi:weather-partly-cloudy
+    description: "Capture current weather conditions and update draft"
+    fields:
+      device_id:
+        description: "Device ID for the draft"
+        example: "browser_abc123"
+    sequence:
+      - variables:
+          wind_speed: "{{ states('sensor.bom_wind_speed_kilometre') | float(0) | round(1) }}"
+          wind_direction_deg: "{{ states('sensor.bom_wind_direction') | float(0) | round(0) }}"
+          wind_direction: >
+            {% set deg = wind_direction_deg | float(0) %}
+            {% set dirs = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'] %}
+            {{ dirs[((deg + 11.25) % 360 / 22.5) | int] }}
+          wind_gust: "{{ states('sensor.bom_gust_speed_kilometre') | float(0) | round(1) }}"
+          temperature: "{{ states('sensor.bom_temp') | float(0) | round(1) }}"
+          humidity: "{{ states('sensor.bom_humidity') | float(0) | round(0) }}"
+          captured_at: "{{ now().isoformat() }}"
+          weather_json: >
+            {
+              "source": "bom",
+              "captured_at": "{{ captured_at }}",
+              "wind_speed_kmh": {{ wind_speed }},
+              "wind_direction_deg": {{ wind_direction_deg }},
+              "wind_direction": "{{ wind_direction }}",
+              "wind_gust_kmh": {{ wind_gust }},
+              "temperature_c": {{ temperature }},
+              "humidity_pct": {{ humidity }}
+            }
+      - service: shell_command.hfm_update_draft
+        data:
+          device_id: "{{ device_id }}"
+          data: '{"data": {"weather": {{ weather_json }}}}'
+
+  hfm_capture_weather_for_current_device:
+    alias: "HFM Capture Weather for Current Device"
+    icon: mdi:weather-partly-cloudy
+    description: "Capture weather for the current device from input helper"
+    sequence:
+      - variables:
+          device_id: "{{ states('input_text.hfm_current_device') }}"
+      - condition: template
+        value_template: "{{ device_id != '' }}"
+      - service: script.hfm_capture_weather
+        data:
+          device_id: "{{ device_id }}"
+      - delay: 1
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.hfm_drafts
+
+  # --- Paddock Multi-Select Scripts ---
+
+  hfm_toggle_paddock:
+    alias: "HFM Toggle Paddock Selection"
+    icon: mdi:checkbox-marked
+    description: "Toggle a paddock in/out of the current draft selection"
+    fields:
+      paddock_id:
+        description: "Paddock ID to toggle"
+        example: "sw5"
+    sequence:
+      - variables:
+          device_id: "{{ states('input_text.hfm_current_device') }}"
+          drafts: "{{ state_attr('sensor.hfm_drafts', 'drafts') or {} }}"
+          draft: "{{ drafts.get(device_id, {}) }}"
+          current_paddocks: "{{ draft.get('data', {}).get('paddocks', []) }}"
+          is_selected: "{{ paddock_id in current_paddocks }}"
+          new_paddocks: >
+            {% if is_selected %}
+              {{ current_paddocks | reject('eq', paddock_id) | list }}
+            {% else %}
+              {{ current_paddocks + [paddock_id] }}
+            {% endif %}
+      - condition: template
+        value_template: "{{ device_id != '' }}"
+      - service: shell_command.hfm_update_draft
+        data:
+          device_id: "{{ device_id }}"
+          data: '{"data": {"paddocks": {{ new_paddocks | to_json }}}}'
+      - delay:
+          milliseconds: 500
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.hfm_drafts
+
+  hfm_add_paddock:
+    alias: "HFM Add Paddock to Selection"
+    icon: mdi:plus-box
+    description: "Add a paddock to the current draft selection (if not already selected)"
+    fields:
+      paddock_id:
+        description: "Paddock ID to add"
+        example: "sw5"
+    sequence:
+      - variables:
+          device_id: "{{ states('input_text.hfm_current_device') }}"
+          drafts: "{{ state_attr('sensor.hfm_drafts', 'drafts') or {} }}"
+          draft: "{{ drafts.get(device_id, {}) }}"
+          current_paddocks: "{{ draft.get('data', {}).get('paddocks', []) }}"
+          is_selected: "{{ paddock_id in current_paddocks }}"
+      - condition: template
+        value_template: "{{ device_id != '' and not is_selected }}"
+      - variables:
+          new_paddocks: "{{ current_paddocks + [paddock_id] }}"
+      - service: shell_command.hfm_update_draft
+        data:
+          device_id: "{{ device_id }}"
+          data: '{"data": {"paddocks": {{ new_paddocks | to_json }}}}'
+      - delay:
+          milliseconds: 500
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.hfm_drafts
+
+  hfm_remove_paddock:
+    alias: "HFM Remove Paddock from Selection"
+    icon: mdi:minus-box
+    description: "Remove a paddock from the current draft selection"
+    fields:
+      paddock_id:
+        description: "Paddock ID to remove"
+        example: "sw5"
+    sequence:
+      - variables:
+          device_id: "{{ states('input_text.hfm_current_device') }}"
+          drafts: "{{ state_attr('sensor.hfm_drafts', 'drafts') or {} }}"
+          draft: "{{ drafts.get(device_id, {}) }}"
+          current_paddocks: "{{ draft.get('data', {}).get('paddocks', []) }}"
+      - condition: template
+        value_template: "{{ device_id != '' and paddock_id in current_paddocks }}"
+      - variables:
+          new_paddocks: "{{ current_paddocks | reject('eq', paddock_id) | list }}"
+      - service: shell_command.hfm_update_draft
+        data:
+          device_id: "{{ device_id }}"
+          data: '{"data": {"paddocks": {{ new_paddocks | to_json }}}}'
+      - delay:
+          milliseconds: 500
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.hfm_drafts
+
+  hfm_select_all_paddocks:
+    alias: "HFM Select All Paddocks"
+    icon: mdi:checkbox-multiple-marked
+    description: "Select all paddocks for the currently selected farm"
+    sequence:
+      - variables:
+          device_id: "{{ states('input_text.hfm_current_device') }}"
+          farm_id: "{{ states('sensor.hfm_selected_farm_id') }}"
+          by_farm: "{{ state_attr('sensor.hfm_drafts', 'paddocks_by_farm') or {} }}"
+          farm_paddocks: "{{ by_farm.get(farm_id, []) }}"
+          all_paddock_ids: >
+            {% set ns = namespace(ids=[]) %}
+            {% for p in farm_paddocks %}
+              {% set ns.ids = ns.ids + [p.id] %}
+            {% endfor %}
+            {{ ns.ids }}
+      - condition: template
+        value_template: "{{ device_id != '' and all_paddock_ids | length > 0 }}"
+      - service: shell_command.hfm_update_draft
+        data:
+          device_id: "{{ device_id }}"
+          data: '{"data": {"paddocks": {{ all_paddock_ids | to_json }}}}'
+      - delay:
+          milliseconds: 500
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.hfm_drafts
+
+  hfm_clear_paddock_selection:
+    alias: "HFM Clear Paddock Selection"
+    icon: mdi:checkbox-multiple-blank-outline
+    description: "Clear all selected paddocks"
+    sequence:
+      - variables:
+          device_id: "{{ states('input_text.hfm_current_device') }}"
+      - condition: template
+        value_template: "{{ device_id != '' }}"
+      - service: shell_command.hfm_update_draft
+        data:
+          device_id: "{{ device_id }}"
+          data: '{"data": {"paddocks": []}}'
+      - delay:
+          milliseconds: 500
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.hfm_drafts
+
+  hfm_select_current_season_paddocks:
+    alias: "HFM Select Current Season Paddocks"
+    icon: mdi:calendar-check
+    description: "Select only paddocks marked as current season for the selected farm"
+    sequence:
+      - variables:
+          device_id: "{{ states('input_text.hfm_current_device') }}"
+          farm_id: "{{ states('sensor.hfm_selected_farm_id') }}"
+          by_farm: "{{ state_attr('sensor.hfm_drafts', 'paddocks_by_farm') or {} }}"
+          farm_paddocks: "{{ by_farm.get(farm_id, []) }}"
+          season_paddock_ids: >
+            {% set ns = namespace(ids=[]) %}
+            {% for p in farm_paddocks if p.current_season %}
+              {% set ns.ids = ns.ids + [p.id] %}
+            {% endfor %}
+            {{ ns.ids }}
+      - condition: template
+        value_template: "{{ device_id != '' and season_paddock_ids | length > 0 }}"
+      - service: shell_command.hfm_update_draft
+        data:
+          device_id: "{{ device_id }}"
+          data: '{"data": {"paddocks": {{ season_paddock_ids | to_json }}}}'
+      - delay:
+          milliseconds: 500
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.hfm_drafts

@@ -947,7 +947,7 @@ views:
                           }
 
               #----------------------------------------------------------------
-              # STEP 3: PADDOCK SELECTION
+              # STEP 3: PADDOCK SELECTION (Multi-Farm, Multi-Paddock)
               #----------------------------------------------------------------
               - type: conditional
                 conditions:
@@ -958,29 +958,175 @@ views:
                   cards:
                     - type: custom:button-card
                       template: hfm_title
-                      name: SELECT PADDOCK
+                      name: SELECT PADDOCK(S)
 
-                    - type: entities
-                      entities:
-                        - entity: input_select.hfm_selected_paddock
-                          name: Paddock
-                      card_mod:
-                        style: |
-                          ha-card {
-                            border-radius: 12px;
-                          }
-                          .mdc-list-item__primary-text {
-                            font-size: 1.3rem !important;
-                            font-weight: 600;
-                          }
+                    # Farm Selection (only show if multiple farms)
+                    - type: conditional
+                      conditions:
+                        - condition: template
+                          value_template: >
+                            {% set farms = state_attr('sensor.hfm_drafts', 'farms') or {} %}
+                            {{ farms | length > 1 }}
+                      card:
+                        type: entities
+                        entities:
+                          - entity: input_select.hfm_selected_farm
+                            name: Farm
+                        card_mod:
+                          style: |
+                            ha-card {
+                              border-radius: 12px;
+                              margin-bottom: 12px;
+                            }
+                            .mdc-list-item__primary-text {
+                              font-size: 1.3rem !important;
+                              font-weight: 600;
+                            }
 
+                    # Legacy single paddock selector (fallback if no device_id)
+                    - type: conditional
+                      conditions:
+                        - condition: template
+                          value_template: "{{ states('input_text.hfm_current_device') == '' }}"
+                      card:
+                        type: entities
+                        entities:
+                          - entity: input_select.hfm_selected_paddock
+                            name: Paddock
+                        card_mod:
+                          style: |
+                            ha-card {
+                              border-radius: 12px;
+                            }
+                            .mdc-list-item__primary-text {
+                              font-size: 1.3rem !important;
+                              font-weight: 600;
+                            }
+
+                    # Multi-paddock selection (when device_id is set)
+                    - type: conditional
+                      conditions:
+                        - condition: template
+                          value_template: "{{ states('input_text.hfm_current_device') != '' }}"
+                      card:
+                        type: vertical-stack
+                        cards:
+                          # Quick actions row
+                          - type: horizontal-stack
+                            cards:
+                              - type: custom:button-card
+                                name: Select All
+                                icon: mdi:checkbox-multiple-marked
+                                template: hfm_secondary
+                                styles:
+                                  card:
+                                    - height: 50px
+                                tap_action:
+                                  action: call-service
+                                  service: script.hfm_select_all_paddocks
+
+                              - type: custom:button-card
+                                name: Clear
+                                icon: mdi:checkbox-multiple-blank-outline
+                                template: hfm_secondary
+                                styles:
+                                  card:
+                                    - height: 50px
+                                tap_action:
+                                  action: call-service
+                                  service: script.hfm_clear_paddock_selection
+
+                              - type: custom:button-card
+                                name: Current Season
+                                icon: mdi:calendar-check
+                                template: hfm_secondary
+                                styles:
+                                  card:
+                                    - height: 50px
+                                tap_action:
+                                  action: call-service
+                                  service: script.hfm_select_current_season_paddocks
+
+                          # Paddock toggle buttons (dynamic from draft sensor)
+                          - type: custom:button-card
+                            entity: sensor.hfm_drafts
+                            show_icon: false
+                            show_name: false
+                            show_state: false
+                            styles:
+                              card:
+                                - background: transparent
+                                - box-shadow: none
+                                - padding: 0
+                              grid:
+                                - display: block
+                              custom_fields:
+                                paddocks:
+                                  - width: 100%
+                            custom_fields:
+                              paddocks: |
+                                [[[
+                                  const deviceId = states['input_text.hfm_current_device']?.state || '';
+                                  const drafts = entity?.attributes?.drafts || {};
+                                  const draft = drafts[deviceId] || {};
+                                  const selectedPaddocks = draft.data?.paddocks || [];
+
+                                  const paddocksByFarm = entity?.attributes?.paddocks_by_farm || {};
+                                  const farmId = states['sensor.hfm_selected_farm_id']?.state || '';
+                                  const paddocks = paddocksByFarm[farmId] || [];
+
+                                  if (paddocks.length === 0) {
+                                    return `<div style="text-align:center;padding:20px;color:var(--secondary-text-color);">
+                                              No paddocks for selected farm
+                                            </div>`;
+                                  }
+
+                                  let html = `<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;padding:8px 0;">`;
+
+                                  for (const p of paddocks) {
+                                    const isSelected = selectedPaddocks.includes(p.id);
+                                    const bg = isSelected ? '#28a745' : '#424242';
+                                    const icon = isSelected ? 'mdi:checkbox-marked' : 'mdi:checkbox-blank-outline';
+                                    const seasonBadge = p.current_season ?
+                                      `<span style="font-size:10px;background:#ffc107;color:#000;padding:2px 6px;border-radius:4px;margin-left:4px;">Season</span>` : '';
+
+                                    html += `<div style="background:${bg};border-radius:12px;padding:12px;display:flex;align-items:center;gap:8px;cursor:pointer;"
+                                               data-paddock-id="${p.id}"
+                                               onclick="this.dispatchEvent(new CustomEvent('hass-action', {bubbles:true,composed:true,detail:{action:'call-service',service:'script.hfm_toggle_paddock',service_data:{paddock_id:'${p.id}'}}}))">
+                                              <ha-icon icon="${icon}" style="--mdc-icon-size:24px;color:white;"></ha-icon>
+                                              <div style="flex:1;">
+                                                <div style="font-size:14px;font-weight:600;color:white;">${p.name}</div>
+                                                ${p.area_ha ? `<div style="font-size:11px;color:rgba(255,255,255,0.7);">${p.area_ha} ha</div>` : ''}
+                                              </div>
+                                              ${seasonBadge}
+                                            </div>`;
+                                  }
+
+                                  html += `</div>`;
+                                  return html;
+                                ]]]
+
+                    # Selected paddocks summary
                     - type: markdown
                       content: |
-                        {% set paddock = states('input_select.hfm_selected_paddock') %}
-                        {% if paddock != 'Select Paddock' %}
-                        **Selected:** {{ paddock }}
+                        {% set device_id = states('input_text.hfm_current_device') %}
+                        {% if device_id %}
+                          {% set drafts = state_attr('sensor.hfm_drafts', 'drafts') or {} %}
+                          {% set draft = drafts.get(device_id, {}) %}
+                          {% set paddocks = draft.get('data', {}).get('paddocks', []) %}
+                          {% set pmap = state_attr('sensor.hfm_drafts', 'paddock_map') or {} %}
+                          {% if paddocks | length > 0 %}
+                          **Selected ({{ paddocks | length }}):** {{ paddocks | map('extract', pmap) | join(', ') }}
+                          {% else %}
+                          *Tap paddocks to select them*
+                          {% endif %}
                         {% else %}
-                        *Please select a paddock*
+                          {% set paddock = states('input_select.hfm_selected_paddock') %}
+                          {% if paddock != 'Select Paddock' %}
+                          **Selected:** {{ paddock }}
+                          {% else %}
+                          *Please select a paddock*
+                          {% endif %}
                         {% endif %}
                       card_mod:
                         style: |
@@ -1284,6 +1430,87 @@ views:
                                   margin-top: 8px;
                                 }
 
+                          # Applicator Selection
+                          - type: custom:button-card
+                            color_type: card
+                            color: "#0066cc"
+                            show_icon: false
+                            show_name: true
+                            name: "Equipment / Applicator"
+                            styles:
+                              card:
+                                - height: 36px
+                                - border-radius: 12px 12px 0 0
+                                - margin-top: 8px
+                              name:
+                                - font-size: 14px
+                                - font-weight: 600
+                                - color: white
+
+                          - type: entities
+                            entities:
+                              - entity: input_select.hfm_selected_applicator
+                                name: Applicator
+                            card_mod:
+                              style: |
+                                ha-card {
+                                  border-radius: 0 0 12px 12px;
+                                }
+                                .mdc-list-item__primary-text {
+                                  font-size: 1.2rem !important;
+                                }
+
+                          # Weather Capture - Start Time & Duration
+                          - type: custom:button-card
+                            color_type: card
+                            color: "#1565c0"
+                            show_icon: false
+                            show_name: true
+                            name: "Application Timing (for Weather)"
+                            styles:
+                              card:
+                                - height: 36px
+                                - border-radius: 12px 12px 0 0
+                                - margin-top: 8px
+                              name:
+                                - font-size: 14px
+                                - font-weight: 600
+                                - color: white
+
+                          - type: entities
+                            entities:
+                              - entity: input_text.hfm_start_time
+                                name: Start Time (HH:MM)
+                              - entity: input_number.hfm_duration_minutes
+                                name: Duration (minutes)
+                            card_mod:
+                              style: |
+                                ha-card {
+                                  border-radius: 0 0 12px 12px;
+                                }
+
+                          # Current Weather Preview
+                          - type: markdown
+                            content: |
+                              {% set ws = states('sensor.hfm_current_wind_speed') %}
+                              {% set wd = states('sensor.hfm_current_wind_direction') %}
+                              {% set wg = states('sensor.hfm_current_wind_gust') %}
+                              {% set temp = states('sensor.hfm_current_temperature') %}
+                              {% if ws and ws != 'unavailable' %}
+                              **Current Weather:** {{ temp }}°C | Wind: {{ ws }} km/h {{ wd }} (Gust: {{ wg }} km/h)
+                              {% else %}
+                              *Weather data will be captured at submission*
+                              {% endif %}
+                            card_mod:
+                              style: |
+                                ha-card {
+                                  border-radius: 12px;
+                                  text-align: center;
+                                  padding: 8px;
+                                  margin-top: 8px;
+                                  background: rgba(21, 101, 192, 0.1);
+                                }
+
                     # Irrigation: Type selection
                     - type: conditional
                       conditions:
@@ -1396,9 +1623,38 @@ views:
                               const cfg = typeConfig[eventType] || { icon: 'mdi:calendar', color: '#757575', bg: 'rgba(117,117,117,0.15)', label: eventType };
 
                               const eventDate = states['sensor.hfm_event_date']?.state || '';
-                              const paddock = states['input_select.hfm_selected_paddock']?.state || '';
                               const method = states['input_select.hfm_application_method']?.state || '';
                               const productCount = parseInt(states['input_number.hfm_product_count']?.state) || 1;
+
+                              // Get applicator
+                              const applicator = states['input_select.hfm_selected_applicator']?.state || '';
+
+                              // Get weather summary
+                              const weatherSummary = states['sensor.hfm_weather_summary']?.state || '';
+
+                              // Get start time and duration
+                              const startTime = states['input_text.hfm_start_time']?.state || '';
+                              const duration = states['input_number.hfm_duration_minutes']?.state || '';
+
+                              // Multi-paddock support - check draft first
+                              const deviceId = states['input_text.hfm_current_device']?.state || '';
+                              const draftsAttr = states['sensor.hfm_drafts']?.attributes || {};
+                              const drafts = draftsAttr.drafts || {};
+                              const draft = drafts[deviceId] || {};
+                              const draftPaddocks = draft.data?.paddocks || [];
+                              const paddockMap = draftsAttr.paddock_map || {};
+
+                              // Get paddock display
+                              let paddockDisplay = '';
+                              if (draftPaddocks.length > 0) {
+                                const paddockNames = draftPaddocks.map(pid => paddockMap[pid] || pid);
+                                paddockDisplay = paddockNames.length > 3 ?
+                                  paddockNames.slice(0, 3).join(', ') + ` +${paddockNames.length - 3} more` :
+                                  paddockNames.join(', ');
+                              } else {
+                                paddockDisplay = states['input_select.hfm_selected_paddock']?.state || '';
+                              }
+                              const paddockCount = draftPaddocks.length || (paddockDisplay && paddockDisplay !== 'Select Paddock' ? 1 : 0);
 
                               // Build products array from all slots
                               const products = [];
@@ -1467,10 +1723,10 @@ views:
                               // Details section
                               html += `<div style="display:grid;gap:8px;">`;
 
-                              // Paddock row
+                              // Paddock row (with count if multiple)
                               html += `<div style="display:flex;justify-content:space-between;padding:8px 12px;background:var(--secondary-background-color,#f5f5f5);border-radius:8px;">
-                                        <span style="font-size:14px;color:var(--secondary-text-color);">Paddock</span>
-                                        <span style="font-size:14px;font-weight:600;color:var(--primary-text-color);">${paddock}</span>
+                                        <span style="font-size:14px;color:var(--secondary-text-color);">Paddock${paddockCount > 1 ? 's (' + paddockCount + ')' : ''}</span>
+                                        <span style="font-size:14px;font-weight:600;color:var(--primary-text-color);">${paddockDisplay}</span>
                                       </div>`;
 
                               // Type-specific details
@@ -1491,6 +1747,29 @@ views:
                                   html += `<div style="display:flex;justify-content:space-between;padding:8px 12px;background:var(--secondary-background-color,#f5f5f5);border-radius:8px;">
                                             <span style="font-size:14px;color:var(--secondary-text-color);">Method</span>
                                             <span style="font-size:14px;font-weight:600;color:var(--primary-text-color);">${method}</span>
+                                          </div>`;
+                                }
+                                // Applicator
+                                if (applicator && applicator !== 'Select Applicator') {
+                                  html += `<div style="display:flex;justify-content:space-between;padding:8px 12px;background:var(--secondary-background-color,#f5f5f5);border-radius:8px;">
+                                            <span style="font-size:14px;color:var(--secondary-text-color);">Applicator</span>
+                                            <span style="font-size:14px;font-weight:600;color:var(--primary-text-color);">${applicator}</span>
+                                          </div>`;
+                                }
+                                // Start time and duration
+                                if (startTime) {
+                                  html += `<div style="display:flex;justify-content:space-between;padding:8px 12px;background:var(--secondary-background-color,#f5f5f5);border-radius:8px;">
+                                            <span style="font-size:14px;color:var(--secondary-text-color);">Time</span>
+                                            <span style="font-size:14px;font-weight:600;color:var(--primary-text-color);">${startTime}${duration ? ' (' + duration + ' min)' : ''}</span>
+                                          </div>`;
+                                }
+                                // Weather summary
+                                if (weatherSummary && weatherSummary !== 'unavailable') {
+                                  html += `<div style="padding:8px 12px;background:rgba(21,101,192,0.1);border-radius:8px;">
+                                            <div style="font-size:12px;color:var(--secondary-text-color);margin-bottom:4px;">
+                                              <ha-icon icon="mdi:weather-windy" style="--mdc-icon-size:14px;"></ha-icon> Weather Conditions
+                                            </div>
+                                            <div style="font-size:13px;color:var(--primary-text-color);">${weatherSummary}</div>
                                           </div>`;
                                 }
                               } else if (eventType === 'Irrigation') {
