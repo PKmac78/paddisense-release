@@ -46,6 +46,7 @@ from .helpers import (
     load_server_yaml,
 )
 from .installer import BackupManager, ConfigWriter, GitManager, ModuleManager
+from .license import LicenseError, track_activation, validate_license
 from .registration import register_locally
 from .registry.backend import RegistryBackend
 
@@ -200,11 +201,13 @@ class PaddiSenseConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 self._data[CONF_SELECTED_MODULES] = []
                 self._data[CONF_AGREEMENTS] = {}
 
-                # In dev mode, allow all modules
+                # In dev mode, allow all modules and skip license
                 if is_dev_mode:
                     self._data[CONF_LICENSE_MODULES] = list(AVAILABLE_MODULES)
+                    return await self.async_step_git_check()
 
-                return await self.async_step_git_check()
+                # Proceed to license key step
+                return await self.async_step_license()
 
         # Try to get defaults from server.yaml
         server_config = await self.hass.async_add_executor_job(load_server_yaml)
@@ -223,6 +226,69 @@ class PaddiSenseConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 ): str,
             }),
             errors=errors,
+        )
+
+    async def async_step_license(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Handle license key entry (optional)."""
+        errors = {}
+
+        if user_input is not None:
+            license_key = user_input.get("license_key", "").strip()
+
+            if license_key:
+                # Validate the license key
+                try:
+                    license_info = await self.hass.async_add_executor_job(
+                        validate_license, license_key
+                    )
+
+                    # Check email matches registration
+                    if license_info.email != self._data.get(CONF_GROWER_EMAIL):
+                        errors["license_key"] = "email_mismatch"
+                    else:
+                        # License valid - update modules and token
+                        self._data[CONF_LICENSE_MODULES] = license_info.modules
+                        if license_info.github_token:
+                            self._data[CONF_GITHUB_TOKEN] = license_info.github_token
+
+                        # Track activation (fire-and-forget)
+                        try:
+                            from homeassistant.helpers.instance_id import async_get
+                            ha_uuid = await async_get(self.hass)
+                        except Exception:
+                            ha_uuid = None
+                        await track_activation(license_info, ha_uuid)
+
+                        _LOGGER.info(
+                            "License activated for %s with modules: %s",
+                            license_info.email,
+                            license_info.modules,
+                        )
+
+                except LicenseError as err:
+                    error_code = str(err)
+                    if error_code == "expired":
+                        errors["license_key"] = "license_expired"
+                    elif error_code == "invalid_format":
+                        errors["license_key"] = "invalid_format"
+                    else:
+                        errors["license_key"] = "invalid_license"
+
+            # If no errors (either no key or valid key), proceed
+            if not errors:
+                return await self.async_step_git_check()
+
+        return self.async_show_form(
+            step_id="license",
+            data_schema=vol.Schema({
+                vol.Optional("license_key", default=""): str,
+            }),
+            errors=errors,
+            description_placeholders={
+                "email": self._data.get(CONF_GROWER_EMAIL, ""),
+            },
         )
 
     async def async_step_git_check(

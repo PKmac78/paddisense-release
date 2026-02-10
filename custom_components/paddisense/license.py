@@ -1,15 +1,28 @@
-"""PaddiSense license validation (offline-capable)."""
+"""PaddiSense license validation (offline-capable with optional tracking)."""
 from __future__ import annotations
 
 import base64
 import json
+import logging
 from datetime import date
 from pathlib import Path
 from typing import Any
 
+try:
+    import aiohttp
+except ImportError:
+    aiohttp = None
+
+_LOGGER = logging.getLogger(__name__)
 
 PUBLIC_KEY_PATH = Path(__file__).parent / "keys" / "public.pem"
 LICENSE_PREFIX = "PADDISENSE."
+
+# Tracking endpoint configuration
+# Set via environment variable or edit directly here
+# Example: export PADDISENSE_TRACKING_URL="http://your-server:5051/activations"
+import os
+TRACKING_URL: str | None = os.environ.get("PADDISENSE_TRACKING_URL")
 
 
 class LicenseError(Exception):
@@ -23,8 +36,7 @@ class LicenseInfo:
 
     def __init__(self, data: dict[str, Any]) -> None:
         """Initialize license info from decoded payload."""
-        self.grower: str = data["grower"]
-        self.farm: str = data["farm"]
+        self.email: str = data["email"]
         self.season: str = data["season"]
         self.expiry: date = date.fromisoformat(data["expiry"])
         self.modules: list[str] = data.get("modules", [])
@@ -44,8 +56,7 @@ class LicenseInfo:
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for storage."""
         result = {
-            "grower": self.grower,
-            "farm": self.farm,
+            "email": self.email,
             "season": self.season,
             "expiry": self.expiry.isoformat(),
             "modules": self.modules,
@@ -104,7 +115,7 @@ def validate_license(key: str) -> LicenseInfo:
         data = json.loads(payload_bytes.decode("utf-8"))
 
         # Validate required fields
-        required_fields = ["grower", "farm", "season", "expiry", "issued"]
+        required_fields = ["email", "season", "expiry", "issued"]
         for field in required_fields:
             if field not in data:
                 raise LicenseError("invalid_key")
@@ -123,6 +134,51 @@ def validate_license(key: str) -> LicenseInfo:
         raise LicenseError("invalid_key") from err
 
 
+async def track_activation(license_info: LicenseInfo, ha_uuid: str | None = None) -> bool:
+    """
+    Report license activation to tracking server (optional).
+
+    This is fire-and-forget - failures are logged but don't affect validation.
+
+    Args:
+        license_info: The validated license
+        ha_uuid: Home Assistant installation UUID for deduplication
+
+    Returns:
+        True if tracking succeeded, False otherwise
+    """
+    if not TRACKING_URL or aiohttp is None:
+        return False
+
+    try:
+        payload = {
+            "email": license_info.email,
+            "season": license_info.season,
+            "modules": license_info.modules,
+            "issued": license_info.issued.isoformat(),
+            "expiry": license_info.expiry.isoformat(),
+            "activated_at": date.today().isoformat(),
+        }
+        if ha_uuid:
+            payload["installation_id"] = ha_uuid
+
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                TRACKING_URL,
+                json=payload,
+                timeout=aiohttp.ClientTimeout(total=5),
+            ) as resp:
+                if resp.status == 200:
+                    _LOGGER.debug("License activation tracked for %s", license_info.email)
+                    return True
+                else:
+                    _LOGGER.warning("Tracking failed with status %s", resp.status)
+                    return False
+    except Exception as err:
+        _LOGGER.debug("Tracking failed (offline or server unavailable): %s", err)
+        return False
+
+
 def check_license_status(key: str) -> dict[str, Any]:
     """
     Check license status without raising on expiry.
@@ -136,7 +192,7 @@ def check_license_status(key: str) -> dict[str, Any]:
             "expired": False,
             "days_remaining": license_info.days_remaining,
             "expiry": license_info.expiry.isoformat(),
-            "grower": license_info.grower,
+            "email": license_info.email,
             "modules": license_info.modules,
             "status": "valid",
         }
@@ -155,7 +211,7 @@ def check_license_status(key: str) -> dict[str, Any]:
                         date.fromisoformat(data["expiry"]) - date.today()
                     ).days,
                     "expiry": data["expiry"],
-                    "grower": data.get("grower", "Unknown"),
+                    "email": data.get("email", "Unknown"),
                     "modules": data.get("modules", []),
                     "status": "expired",
                 }
@@ -166,7 +222,7 @@ def check_license_status(key: str) -> dict[str, Any]:
             "expired": error_code == "expired",
             "days_remaining": 0,
             "expiry": None,
-            "grower": None,
+            "email": None,
             "modules": [],
             "status": error_code,
         }

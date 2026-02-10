@@ -32,7 +32,7 @@ PACKAGES_DIR = PADDISENSE_DIR / "packages"
 # GIT
 # =============================================================================
 
-PADDISENSE_REPO_URL = "https://github.com/PKmac78/PaddiSense.git"  # Your module repo
+PADDISENSE_REPO_URL = "https://github.com/PKmac78/paddisense-release.git"  # Release repo for growers
 PADDISENSE_REPO_BRANCH = "main"
 
 # =============================================================================

@@ -27,6 +27,13 @@
           "grower_email": "Email Address"
         }
       },
+      "license": {
+        "title": "License Key",
+        "description": "If you have a PaddiSense license key, enter it below.\n\nThe license must be registered to: **{email}**\n\nLeave blank to use free modules only (Weather, IPM, PWM, etc).",
+        "data": {
+          "license_key": "License Key (optional)"
+        }
+      },
       "install": {
         "title": "Installing",
         "description": "Setting up PaddiSense..."
@@ -42,7 +49,11 @@
       "invalid_email": "Please enter a valid email address",
       "registration_invalid_email": "This email address could not be verified. Please check and try again.",
       "registration_network_error": "Could not connect to registration service. Please check your internet connection and try again.",
-      "registration_failed": "Registration failed. Please try again."
+      "registration_failed": "Registration failed. Please try again.",
+      "invalid_license": "Invalid license key. Please check the key and try again.",
+      "invalid_format": "License key format is invalid. Keys start with PADDISENSE.",
+      "license_expired": "This license has expired. Please contact support for renewal.",
+      "email_mismatch": "License email does not match your registration email."
     }
   },
   "options": {
