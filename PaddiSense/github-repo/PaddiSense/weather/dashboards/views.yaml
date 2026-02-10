@@ -1,0 +1,2951 @@
+##############################################################################
+# Weather Dashboard - Unified Local Gateway + API Stations (v2.0.0)
+# PaddiSense Farm Management System
+##############################################################################
+#
+# Views:
+# 1. Forecast - BOM weather forecast (always visible)
+# 2. BOM - Bureau of Meteorology current observations (visible if BOM configured)
+# 3. Temps - 7-day temperature forecast (always visible)
+# 4. Station - Local Ecowitt gateway data (visible if gateway available)
+# 5. Stations - API stations overview (visible if API stations configured)
+# 6. Settings - Combined settings for gateway and API
+#
+##############################################################################
+
+title: Weather
+icon: mdi:weather-partly-cloudy
+type: sections
+
+button_card_templates:
+
+  ###########################################################################
+  # DATE TILE (no entity required) - for Temps view
+  ###########################################################################
+  forecast_date_tile:
+    show_icon: false
+    show_name: true
+    show_state: false
+    tap_action:
+      action: none
+    name: >
+      [[[
+        const o = Number(variables?.offset ?? 0);
+        const d = new Date();
+        d.setDate(d.getDate() + o);
+        const dow = d.toLocaleDateString(undefined, { weekday: 'short' });
+        const dm  = d.toLocaleDateString(undefined, { day: '2-digit', month: 'short' });
+        return `${dow}\n${dm}`;
+      ]]]
+    icon: >
+      [[[
+        const o = Number(variables?.offset ?? 0);
+        return o === 0 ? 'mdi:calendar-today' : 'mdi:calendar';
+      ]]]
+    styles:
+      card:
+        - border-radius: 18px
+        - height: 92px
+        - padding: 10px
+        - box-shadow: 0 10px 22px rgba(0,0,0,0.10)
+        - background: "linear-gradient(135deg, rgba(0,0,0,0.10), rgba(0,0,0,0.03))"
+      grid:
+        - grid-template-areas: '"i" "n"'
+        - grid-template-columns: 1fr
+        - grid-template-rows: 1fr auto
+        - row-gap: 6px
+
+      icon:
+        - width: 34px
+        - color: var(--primary-text-color)
+        - opacity: 0.88
+      name:
+        - white-space: pre-line
+        - text-align: center
+        - font-size: 13px
+        - font-weight: 900
+        - color: var(--primary-text-color)
+
+  ###########################################################################
+  # TEMP TILE (strong bands + pop icon) - for Temps view
+  ###########################################################################
+  forecast_temp_tile:
+    show_icon: false
+    show_name: true
+    show_state: true
+    show_label: false
+    tap_action:
+      action: none
+
+    state_display: >
+      [[[
+        const v = Number(entity?.state);
+        if (!Number.isFinite(v)) return '--';
+        return `${v.toFixed(1)}°`;
+      ]]]
+
+    name: >
+      [[[
+        const n = (this._config.name ?? '').toString().trim();
+        return n !== '' ? n : 'Temp';
+      ]]]
+
+    styles:
+      card:
+        - border-radius: 18px
+        - height: 92px
+        - padding: 10px
+        - box-shadow: 0 12px 26px rgba(0,0,0,0.14)
+        - overflow: hidden
+        - background: >
+            [[[
+              const v = Number(entity?.state);
+              const lo = Number(variables?.lo ?? 0);
+              const hi = Number(variables?.hi ?? 40);
+              const step = Math.max(1, Number(variables?.step ?? 2));
+              const mode = (variables?.mode ?? 'min');
+
+              if (!Number.isFinite(v)) return 'rgba(0,0,0,0.06)';
+
+              const clamped = Math.min(Math.max(v, lo), hi);
+              const idx = Math.floor((clamped - lo) / step);
+
+              const bands = [
+                '#062B7A', '#0D47A1', '#1565C0', '#1E88E5',
+                '#00A6A6', '#1B8E3E', '#66BB6A',
+                '#F9A825', '#FB8C00', '#EF6C00',
+                '#E53935', '#B71C1C'
+              ];
+
+              const c = bands[Math.min(idx, bands.length - 1)];
+
+              if (mode === 'min') {
+                return `linear-gradient(135deg, ${c} 0%, rgba(0,0,0,0.32) 140%)`;
+              }
+              return `linear-gradient(135deg, rgba(255,255,255,0.16) -20%, ${c} 55%, rgba(0,0,0,0.36) 140%)`;
+            ]]]
+
+      # IMPORTANT: define where state/name go
+      grid:
+        - grid-template-areas: '"s" "n"'
+        - grid-template-columns: 1fr
+        - grid-template-rows: 1fr auto
+        - row-gap: 6px
+
+      state:
+        - font-size: 26px
+        - font-weight: 900
+        - color: "#FFFFFF"
+        - justify-self: center     # <-- center horizontally
+        - align-self: center       # <-- center vertically in row
+        - text-shadow: "0 2px 10px rgba(0,0,0,0.35)"
+        - line-height: 1
+
+      name:
+        - font-size: 12px
+        - font-weight: 900
+        - color: "rgba(255,255,255,0.92)"
+        - text-align: center
+        - justify-self: center
+        - align-self: end
+        - letter-spacing: 0.2px
+
+
+  ###########################################################################
+  # Section title - for API views
+  ###########################################################################
+  wapi_section_title:
+    show_icon: false
+    show_name: true
+    show_state: false
+    styles:
+      card:
+        - background: "rgba(0,0,0,0.04)"
+        - border-radius: 18px
+        - padding: 14px 16px
+        - box-shadow: 0 8px 18px rgba(0,0,0,0.08)
+      name:
+        - font-size: 18px
+        - font-weight: 900
+        - letter-spacing: 0.2px
+        - color: var(--primary-text-color)
+        - text-align: left
+
+  ###########################################################################
+  # Slot card - for API station slots (configured/empty states)
+  ###########################################################################
+  wapi_slot_card:
+    show_icon: true
+    show_name: true
+    show_state: true
+    show_label: false
+    variables:
+      slot: 1
+      configured: false
+    styles:
+      card:
+        - border-radius: 16px
+        - padding: 14px
+        - height: 90px
+        - box-shadow: 0 8px 20px rgba(0,0,0,0.12)
+        - overflow: hidden
+        - background: >
+            [[[
+              return variables.configured
+                ? 'linear-gradient(135deg, #1565c0 0%, #0d47a1 100%)'
+                : 'linear-gradient(135deg, #616161 0%, #424242 100%)';
+            ]]]
+      grid:
+        - grid-template-areas: '"i n" "i s"'
+        - grid-template-columns: 44px 1fr
+        - grid-template-rows: 1fr auto
+        - column-gap: 10px
+      icon:
+        - color: white
+        - width: 32px
+        - opacity: >
+            [[[
+              return variables.configured ? 1 : 0.6;
+            ]]]
+      name:
+        - color: white
+        - font-size: 15px
+        - font-weight: 800
+        - align-self: end
+        - justify-self: start
+        - white-space: nowrap
+        - overflow: hidden
+        - text-overflow: ellipsis
+        - max-width: 100%
+      state:
+        - color: rgba(255,255,255,0.75)
+        - font-size: 11px
+        - font-weight: 600
+        - align-self: start
+        - justify-self: start
+
+  ###########################################################################
+  # Station header (gradient) - for API stations
+  ###########################################################################
+  station_header:
+    show_icon: true
+    show_name: true
+    show_state: true
+    show_label: false
+    styles:
+      card:
+        - border-radius: 18px
+        - padding: 16px
+        - box-shadow: 0 12px 28px rgba(0,0,0,0.16)
+        - overflow: hidden
+      grid:
+        - grid-template-areas: '"i n" "i s"'
+        - grid-template-columns: 46px 1fr
+        - grid-template-rows: auto auto
+        - column-gap: 12px
+      icon:
+        - color: white
+        - width: 34px
+      name:
+        - color: white
+        - font-size: 20px
+        - font-weight: 900
+        - align-self: end
+        - justify-self: start
+      state:
+        - color: rgba(255,255,255,0.88)
+        - font-size: 12px
+        - font-weight: 700
+        - align-self: start
+        - justify-self: start
+
+  ###########################################################################
+  # Big stat tile - for API stations
+  ###########################################################################
+  big_stat:
+    show_icon: true
+    show_name: true
+    show_state: true
+    show_label: false
+    styles:
+      card:
+        - height: 112px
+        - background: var(--card-background-color)
+        - border-radius: 18px
+        - padding: 14px
+        - box-shadow: 0 8px 18px rgba(0,0,0,0.08)
+      grid:
+        - grid-template-areas: '"i s" "n n"'
+        - grid-template-columns: 40px 1fr
+        - grid-template-rows: 1fr auto
+      icon:
+        - width: 34px
+        - color: var(--state-icon-color)
+      state:
+        - font-size: 24px
+        - font-weight: 900
+        - justify-self: start
+        - align-self: center
+        - line-height: 1.0
+      name:
+        - font-size: 12px
+        - font-weight: 800
+        - color: var(--secondary-text-color)
+        - justify-self: start
+        - margin-top: 6px
+
+  ###########################################################################
+  # Small stat tile - for API stations
+  ###########################################################################
+  small_stat:
+    show_icon: true
+    show_name: true
+    show_state: true
+    show_label: false
+    styles:
+      card:
+        - height: 78px
+        - background: var(--card-background-color)
+        - border-radius: 16px
+        - padding: 12px
+        - box-shadow: 0 6px 14px rgba(0,0,0,0.06)
+      grid:
+        - grid-template-areas: '"i s" "i n"'
+        - grid-template-columns: 34px 1fr
+        - grid-template-rows: 1fr 1fr
+      icon:
+        - width: 28px
+        - color: var(--state-icon-color)
+      state:
+        - font-size: 16px
+        - font-weight: 900
+        - justify-self: start
+        - align-self: end
+      name:
+        - font-size: 11px
+        - font-weight: 800
+        - color: var(--secondary-text-color)
+        - justify-self: start
+        - align-self: start
+
+  ###########################################################################
+  # Action button (settings)
+  ###########################################################################
+  wapi_action:
+    show_icon: true
+    show_name: true
+    show_state: false
+    styles:
+      card:
+        - border-radius: 16px
+        - height: 54px
+        - padding: 10px 14px
+        - box-shadow: 0 10px 22px rgba(0,0,0,0.10)
+      icon:
+        - color: white
+      name:
+        - color: white
+        - font-weight: 900
+
+
+##############################################################################
+# VIEWS
+##############################################################################
+views:
+
+  ###########################################################################
+  # VIEW 1: FORECAST (BOM Weather)
+  ###########################################################################
+  - title: Forecast
+    path: forecast
+#   icon: mdi:weather-partly-cloudy
+    type: sections
+    max_columns: 1
+    sections:
+      - type: grid
+        cards:
+          - type: custom:platinum-weather-card
+            text_card_title_2: Old Coree
+            entity_temperature: sensor.home_forecast_now_temp_now
+            entity_apparent_temp: sensor.home_observations_temp_feels_like
+            entity_humidity: sensor.home_observations_humidity
+            entity_wind_speed: sensor.home_observations_wind_speed_kilometre
+            entity_wind_gust: sensor.home_observations_gust_speed_kilometre
+            entity_wind_bearing: sensor.home_observations_wind_direction
+            entity_pop: sensor.home_forecast_rain_chance_0
+            entity_pos: sensor.home_forecast_rain_amount_max_0
+            entity_summary: sensor.home_forecast_extended_text_0
+            entity_extended: sensor.home_forecast_extended_text_1
+            entity_sun: sun.sun
+            entity_forecast_icon: sensor.home_forecast_icon_descriptor_0
+            entity_forecast_max: sensor.home_forecast_temp_max_0
+            entity_forecast_min: sensor.home_forecast_temp_min_0
+            entity_forecast_icon_1: sensor.home_forecast_icon_descriptor_1
+            entity_forecast_max_1: sensor.home_forecast_temp_max_1
+            entity_forecast_min_1: sensor.home_forecast_temp_min_1
+            entity_pop_1: sensor.home_forecast_rain_chance_1
+            entity_pos_1: sensor.home_forecast_rain_amount_range_1
+            entity_summary_1: sensor.home_forecast_extended_text_0
+            extended_use_attr: false
+            option_static_icons: false
+            option_time_format: 12hour
+            daily_forecast_days: 5
+            daily_extended_forecast_days: 3
+            daily_forecast_layout: vertical
+            section_order:
+              - overview
+              - slots
+              - daily_forecast
+              - extended
+            show_section_extended: true
+            slot_l1: forecast_max
+            slot_l2: forecast_min
+            slot_l3: wind
+            slot_l4: remove
+            slot_l5: sun_next
+            slot_l6: remove
+            slot_l7: remove
+            slot_l8: remove
+            slot_r1: popforecast
+            slot_r2: humidity
+            slot_r3: remove
+            slot_r4: remove
+            slot_r5: sun_following
+            slot_r6: remove
+            slot_r7: remove
+            slot_r8: remove
+
+      - type: grid
+        cards:
+          - type: custom:weather-radar-card
+            data_source: RainViewer-TWC
+            map_style: Dark
+            center_latitude: -35.34395839537419
+            center_longitude: 145.53880716799404
+            zoom_level: 7
+            marker_latitude: -35.34395839537419
+            marker_longitude: 145.53880716799404
+            show_marker: true
+            show_recenter: true
+            show_scale: true
+            show_range: true
+
+
+  ###########################################################################
+  # VIEW 2: BOM OBSERVATIONS (Bureau of Meteorology Current Conditions)
+  ###########################################################################
+  - title: BOM
+    path: bom
+    type: sections
+    max_columns: 1
+    sections:
+
+      - type: grid
+        cards:
+
+          # Conditional: Only show if BOM is configured
+          - type: conditional
+            conditions:
+              - entity: binary_sensor.bom_observations_available
+                state: "on"
+            card:
+              type: vertical-stack
+              cards:
+
+                # Header
+                - type: custom:button-card
+                  template: station_header
+                  entity: binary_sensor.bom_observations_available
+                  icon: mdi:weather-cloudy
+                  name: "Bureau of Meteorology"
+                  state_display: >
+                    [[[
+                      const prefix = hass.states['input_text.bom_location_prefix']?.state || 'home';
+                      return `Location: ${prefix}`;
+                    ]]]
+                  styles:
+                    card:
+                      - background: "linear-gradient(135deg, #0288d1 0%, #01579b 100%)"
+
+                # Main stats (2x2 grid)
+                - type: grid
+                  columns: 2
+                  square: false
+                  cards:
+                    - type: custom:button-card
+                      template: big_stat
+                      entity: sensor.bom_observations_temperature
+                      name: Temperature
+                      icon: mdi:thermometer
+                      styles:
+                        icon:
+                          - color: "#e53935"
+                    - type: custom:button-card
+                      template: big_stat
+                      entity: sensor.bom_observations_rain_since_9am
+                      name: Rain Since 9am
+                      icon: mdi:water
+                      styles:
+                        icon:
+                          - color: "#1e88e5"
+                    - type: custom:button-card
+                      template: big_stat
+                      entity: sensor.bom_observations_humidity
+                      name: Humidity
+                      icon: mdi:water-percent
+                      styles:
+                        icon:
+                          - color: "#43a047"
+                    - type: custom:button-card
+                      template: big_stat
+                      entity: sensor.bom_observations_pressure
+                      name: Pressure
+                      icon: mdi:gauge
+                      styles:
+                        icon:
+                          - color: "#7e57c2"
+
+                # Secondary stats (2x2 grid)
+                - type: grid
+                  columns: 2
+                  square: false
+                  cards:
+                    - type: custom:button-card
+                      template: small_stat
+                      entity: sensor.bom_observations_feels_like
+                      name: Feels Like
+                      icon: mdi:thermometer-check
+                    - type: custom:button-card
+                      template: small_stat
+                      entity: sensor.bom_observations_dew_point
+                      name: Dew Point
+                      icon: mdi:water-thermometer
+                    - type: custom:button-card
+                      template: small_stat
+                      entity: sensor.bom_observations_delta_t
+                      name: Delta T
+                      icon: mdi:delta
+                    - type: custom:button-card
+                      template: small_stat
+                      entity: sensor.bom_observations_wind_speed
+                      name: Wind Speed
+                      icon: mdi:weather-windy
+
+                # Wind section title
+                - type: custom:mushroom-title-card
+                  title: Wind Data
+
+                # Wind Rose
+                - type: custom:windrose-card
+                  wind_direction_entity:
+                    entity: sensor.bom_observations_wind_direction
+                    use_statistics: false
+                    direction_unit: letters
+                  windspeed_entities:
+                    - entity: sensor.bom_observations_wind_speed
+                      name: Speed
+                      speed_unit: kph
+                      output_speed_unit: kph
+                      use_statistics: false
+                      speed_range_beaufort: false
+                      current_speed_arrow: true
+                      speed_ranges:
+                        - from_value: 0
+                          color: blue
+                        - from_value: 10
+                          color: green
+                        - from_value: 25
+                          color: orange
+                        - from_value: 40
+                          color: red
+                    - entity: sensor.bom_observations_wind_gust
+                      name: Gusts
+                      speed_unit: kph
+                      output_speed_unit: kph
+                      use_statistics: false
+                      speed_range_beaufort: false
+                      current_speed_arrow: true
+                      speed_ranges:
+                        - from_value: 0
+                          color: blue
+                        - from_value: 10
+                          color: green
+                        - from_value: 25
+                          color: orange
+                        - from_value: 40
+                          color: red
+                  data_period:
+                    period_selector:
+                      location: top
+                      active_color: white
+                      active_bg_color: "var(--primary-color)"
+                      color: grey
+                      buttons:
+                        - hours: 1
+                          title: 1 hour
+                        - hours: 6
+                          title: 6 hours
+                        - hours: 12
+                          title: 12 hours
+                        - hours: 24
+                          title: 1 day
+                  center_calm_percentage: false
+                  windspeed_bar_location: right
+                  direction_labels:
+                    show_intercardinal_directions: true
+                    intercardinal_directions_text_size: 30
+                  current_direction:
+                    show_arrow: true
+                    arrow_size: 50
+                    centre_circle_size: 10
+                  corner_info:
+                    top_left:
+                      label: "Current Wind Speed"
+                      entity: sensor.bom_observations_wind_speed
+                      value_text_size: 100
+                    top_right:
+                      label: Current Gusts
+                      entity: sensor.bom_observations_wind_gust
+                      value_text_size: 100
+                    bottom_left:
+                      label: Current Direction
+                      entity: sensor.bom_observations_wind_direction
+                      direction_letters: NESWx
+                      value_text_size: 80
+                  colors:
+                    rose_current_direction_arrow: "#dd3322"
+
+                # Wind chart
+                - type: custom:apexcharts-card
+                  cache: false
+                  header:
+                    show: true
+                    show_states: true
+                  experimental:
+                    color_threshold: true
+                  graph_span: 6h
+                  series:
+                    - entity: sensor.bom_observations_wind_speed
+                      name: Wind Speed
+                      group_by:
+                        func: max
+                        duration: 30min
+                      show:
+                        in_chart: true
+                        in_header: false
+                      color_threshold:
+                        - value: 0
+                          color: "#008000"
+                        - value: 15
+                          color: "#ffa500"
+                        - value: 30
+                          color: "#ff0000"
+                    - entity: sensor.bom_observations_wind_gust
+                      name: Gusts
+                      type: line
+                      color: lightskyblue
+                      group_by:
+                        func: max
+                        duration: 30min
+                      show:
+                        in_chart: true
+                        in_header: false
+                  apex_config:
+                    legend:
+                      show: false
+                    yaxis:
+                      labels:
+                        formatter: |
+                          EVAL:function (val) {
+                            return Math.floor(val) + " km/h"
+                          }
+                      tickAmount: 3
+                      min: 0
+                    stroke:
+                      curve: smooth
+
+          # Not configured message
+          - type: conditional
+            conditions:
+              - entity: binary_sensor.bom_observations_available
+                state: "off"
+            card:
+              type: markdown
+              content: |
+                ## BOM Integration Not Configured
+
+                To use BOM observations:
+
+                1. Install the **Bureau of Meteorology** integration via HACS
+                2. Configure it with your location name (e.g., "home", "farm")
+                3. Set the location prefix in **Settings** > **Helpers** > **bom_location_prefix**
+
+                The prefix must match exactly what you used when setting up the BOM integration.
+
+
+  ###########################################################################
+  # VIEW 3: TEMPS (7-Day Temperature Forecast)
+  ###########################################################################
+  - title: Temp
+    path: temps
+#    icon: mdi:thermometer
+    type: sections
+    max_columns: 1
+    sections:
+      - type: grid
+        cards:
+          - type: custom:mushroom-title-card
+            title: 7-Day Temperature (Min / Max)
+            subtitle: Rolling forecast (2C colour bands)
+
+          - type: grid
+            columns: 3
+            square: false
+            cards:
+
+              - type: custom:button-card
+                template: forecast_date_tile
+                variables: { offset: 0 }
+
+              - type: custom:button-card
+                template: forecast_temp_tile
+                entity: sensor.home_forecast_temp_min_0
+
+                name: Min
+                icon: mdi:thermometer-low
+                variables: { mode: min, lo: -4, hi: 25, step: 2 }
+
+              - type: custom:button-card
+                template: forecast_temp_tile
+                entity: sensor.home_forecast_temp_max_0
+                name: Max
+                icon: mdi:thermometer-high
+                variables: { mode: max, lo: 20, hi: 45, step: 2 }
+
+              - type: custom:button-card
+                template: forecast_date_tile
+                variables: { offset: 1 }
+
+              - type: custom:button-card
+                template: forecast_temp_tile
+                entity: sensor.home_forecast_temp_min_1
+                name: Min
+                icon: mdi:thermometer-low
+                variables: { mode: min, lo: -4, hi: 25, step: 2 }
+
+              - type: custom:button-card
+                template: forecast_temp_tile
+                entity: sensor.home_forecast_temp_max_1
+                name: Max
+                icon: mdi:thermometer-high
+                variables: { mode: max, lo: 20, hi: 45, step: 2 }
+
+              - type: custom:button-card
+                template: forecast_date_tile
+                variables: { offset: 2 }
+
+              - type: custom:button-card
+                template: forecast_temp_tile
+                entity: sensor.home_forecast_temp_min_2
+                name: Min
+                icon: mdi:thermometer-low
+                variables: { mode: min, lo: -4, hi: 25, step: 2 }
+
+              - type: custom:button-card
+                template: forecast_temp_tile
+                entity: sensor.home_forecast_temp_max_2
+                name: Max
+                icon: mdi:thermometer-high
+                variables: { mode: max, lo: 20, hi: 45, step: 2 }
+
+              - type: custom:button-card
+                template: forecast_date_tile
+                variables: { offset: 3 }
+
+              - type: custom:button-card
+                template: forecast_temp_tile
+                entity: sensor.home_forecast_temp_min_3
+                name: Min
+                icon: mdi:thermometer-low
+                variables: { mode: min, lo: -4, hi: 25, step: 2 }
+
+              - type: custom:button-card
+                template: forecast_temp_tile
+                entity: sensor.home_forecast_temp_max_3
+                name: Max
+                icon: mdi:thermometer-high
+                variables: { mode: max, lo: 20, hi: 45, step: 2 }
+
+              - type: custom:button-card
+                template: forecast_date_tile
+                variables: { offset: 4 }
+
+              - type: custom:button-card
+                template: forecast_temp_tile
+                entity: sensor.home_forecast_temp_min_4
+                name: Min
+                icon: mdi:thermometer-low
+                variables: { mode: min, lo: -4, hi: 25, step: 2 }
+
+              - type: custom:button-card
+                template: forecast_temp_tile
+                entity: sensor.home_forecast_temp_max_4
+                name: Max
+                icon: mdi:thermometer-high
+                variables: { mode: max, lo: 20, hi: 45, step: 2 }
+
+              - type: custom:button-card
+                template: forecast_date_tile
+                variables: { offset: 5 }
+
+              - type: custom:button-card
+                template: forecast_temp_tile
+                entity: sensor.home_forecast_temp_min_5
+                name: Min
+                icon: mdi:thermometer-low
+                variables: { mode: min, lo: -4, hi: 25, step: 2 }
+
+              - type: custom:button-card
+                template: forecast_temp_tile
+                entity: sensor.home_forecast_temp_max_5
+                name: Max
+                icon: mdi:thermometer-high
+                variables: { mode: max, lo: 20, hi: 45, step: 2 }
+
+              - type: custom:button-card
+                template: forecast_date_tile
+                variables: { offset: 6 }
+
+              - type: custom:button-card
+                template: forecast_temp_tile
+                entity: sensor.home_forecast_temp_min_6
+                name: Min
+                icon: mdi:thermometer-low
+                variables: { mode: min, lo: -4, hi: 25, step: 2 }
+
+              - type: custom:button-card
+                template: forecast_temp_tile
+                entity: sensor.home_forecast_temp_max_6
+                name: Max
+                icon: mdi:thermometer-high
+                variables: { mode: max, lo: 20, hi: 45, step: 2 }
+
+
+  ###########################################################################
+  # VIEW 4: LOCAL STATIONS (Ecowitt Gateway Data)
+  # Conditional: Only shows content when local station is enabled
+  ###########################################################################
+  - title: Local Stations
+    path: local-1
+    type: sections
+    max_columns: 1
+    sections:
+      - type: grid
+        cards:
+          # Show when station is NOT configured - setup message
+          - type: conditional
+            conditions:
+              - entity: binary_sensor.weather_local_station_1_enabled
+                state: "off"
+            card:
+              type: markdown
+              content: |
+                ## Local Station Not Configured
+
+                No local weather station has been configured.
+
+                Go to **Settings** to initialize and configure a local station.
+
+          # Show when station IS configured - full weather view
+          - type: conditional
+            conditions:
+              - entity: binary_sensor.weather_local_station_1_enabled
+                state: "on"
+            card:
+              type: vertical-stack
+              cards:
+                # Title - uses configured station name
+                - type: custom:button-card
+                  color_type: label-card
+                  color: rgb(30, 30, 30)
+                  show_icon: false
+                  show_state: false
+                  entity: binary_sensor.weather_local_station_1_enabled
+                  name: >
+                    [[[
+                      return entity?.attributes?.name || 'ECOWITT WEATHER STATION';
+                    ]]]
+                  styles:
+                    card:
+                      - height: 50px
+                      - border-radius: 12px
+                      - padding: 8px
+                    name:
+                      - font-size: 18px
+                      - font-weight: 700
+                      - text-align: center
+                      - color: white
+
+                # Current Conditions Row
+                - type: horizontal-stack
+                  cards:
+                    - type: entity
+                      entity: sensor.ecowittgateway_1_outdoor_temperature
+                      name: Temperature
+                      icon: mdi:thermometer
+                    - type: entity
+                      entity: sensor.ecowittgateway_1_humidity
+                      name: Humidity
+                      icon: mdi:water-percent
+                    - type: entity
+                      entity: sensor.ecowittgateway_1_wind_speed
+                      name: Wind
+                      icon: mdi:weather-windy
+
+                # Calculated Sensors Title
+                - type: custom:button-card
+                  color_type: label-card
+                  color: rgb(76, 175, 80)
+                  show_icon: false
+                  show_state: false
+                  name: CALCULATED SENSORS
+                  styles:
+                    card:
+                      - height: 40px
+                      - border-radius: 12px
+                      - padding: 8px
+                    name:
+                      - font-size: 14px
+                      - font-weight: 700
+                      - text-align: center
+                      - color: white
+
+                # Delta T and ETo
+                - type: horizontal-stack
+                  cards:
+                    - type: entity
+                      entity: sensor.weather_station_1_delta_t
+                      name: Delta T
+                      icon: mdi:delta
+                    - type: entity
+                      entity: sensor.weather_station_1_evapotranspiration
+                      name: ETo
+                      icon: mdi:water-outline
+
+                # Degree Days
+                - type: horizontal-stack
+                  cards:
+                    - type: entity
+                      entity: sensor.weather_station_1_degree_day
+                      name: Degree Day
+                      icon: mdi:thermometer-lines
+                    - type: entity
+                      entity: input_number.weather_station_1_cdd
+                      name: Cumulative DD
+                      icon: mdi:chart-line
+
+                # Statistics Title
+                - type: custom:button-card
+                  color_type: label-card
+                  color: rgb(33, 150, 243)
+                  show_icon: false
+                  show_state: false
+                  name: 24-HOUR STATISTICS
+                  styles:
+                    card:
+                      - height: 40px
+                      - border-radius: 12px
+                      - padding: 8px
+                    name:
+                      - font-size: 14px
+                      - font-weight: 700
+                      - text-align: center
+                      - color: white
+
+                # Min/Max Temperature
+                - type: horizontal-stack
+                  cards:
+                    - type: entity
+                      entity: sensor.weather_station_1_min_temperature
+                      name: Min Temp
+                      icon: mdi:thermometer-low
+                    - type: entity
+                      entity: sensor.weather_station_1_max_temperature
+                      name: Max Temp
+                      icon: mdi:thermometer-high
+
+                # Min/Max Humidity
+                - type: horizontal-stack
+                  cards:
+                    - type: entity
+                      entity: sensor.weather_station_1_min_humidity
+                      name: Min Humidity
+                      icon: mdi:water-minus
+                    - type: entity
+                      entity: sensor.weather_station_1_max_humidity
+                      name: Max Humidity
+                      icon: mdi:water-plus
+
+                # Avg Wind and Solar
+                - type: horizontal-stack
+                  cards:
+                    - type: entity
+                      entity: sensor.weather_station_1_avg_wind_speed
+                      name: Avg Wind
+                      icon: mdi:weather-windy
+                    - type: entity
+                      entity: utility_meter.weather_station_1_solar_radiation_mj_m2_day
+                      name: Solar (MJ/m2)
+                      icon: mdi:white-balance-sunny
+
+                # Spray Conditions Card
+                - type: custom:button-card
+                  color_type: label-card
+                  color: rgb(255, 152, 0)
+                  show_icon: false
+                  show_state: false
+                  name: SPRAY CONDITIONS
+                  styles:
+                    card:
+                      - height: 40px
+                      - border-radius: 12px
+                      - padding: 8px
+                    name:
+                      - font-size: 14px
+                      - font-weight: 700
+                      - text-align: center
+                      - color: white
+
+                - type: markdown
+                  content: |
+                    {% set dt = states('sensor.weather_station_1_delta_t') | float(0) %}
+                    {% if dt < 2 %}
+                    **Warning: Delta T < 2C** - Conditions too humid, risk of drift/poor evaporation
+                    {% elif dt > 8 %}
+                    **Warning: Delta T > 8C** - Conditions too dry, risk of evaporation before absorption
+                    {% else %}
+                    **Good: Delta T {{ dt | round(1) }}C** - Good spraying conditions
+                    {% endif %}
+
+                    | Condition | Delta T Range |
+                    |-----------|---------------|
+                    | Too Humid | < 2C |
+                    | Marginal | 2-4C |
+                    | Ideal | 4-8C |
+                    | Marginal | 8-10C |
+                    | Too Dry | > 10C |
+                  card_mod:
+                    style: |
+                      ha-card {
+                        border-radius: 12px;
+                        padding: 12px;
+                        background: #fff8e1;
+                      }
+                      table {
+                        width: 100%;
+                        font-size: 0.9rem;
+                      }
+                      th, td {
+                        padding: 4px 8px;
+                        border-bottom: 1px solid var(--divider-color);
+                      }
+
+
+  ###########################################################################
+  # VIEW 5: API STATIONS (Remote Ecowitt API Stations)
+  ###########################################################################
+  - title: Remote Stations
+    path: stations
+#    icon: mdi:weather-station
+    type: sections
+    max_columns: 1
+    sections:
+
+      # LEFT COLUMN
+      - type: grid
+        cards:
+
+          # --------------------------
+          # STATION 1
+          # --------------------------
+          - type: conditional
+            conditions:
+              - entity: sensor.weather_api_station_1_temperature
+                state_not: unavailable
+            card:
+              type: vertical-stack
+              cards:
+
+                # Header (name + status line)
+                - type: custom:button-card
+                  template: station_header
+                  entity: sensor.weather_api_data
+                  icon: mdi:weather-station
+                  name: >
+                    [[[
+                      const s = hass.states['sensor.weather_api_data']?.attributes?.stations?.['1'] || {};
+                      return (typeof s.name === 'string' && s.name.trim()) ? s.name : 'Station 1';
+                    ]]]
+                  state_display: >
+                    [[[
+                      const s = hass.states['sensor.weather_api_data']?.attributes?.stations?.['1'] || {};
+                      const configured = !!(s.imei || s.name);
+                      const enabled = (s.enabled === true);
+                      const connected = (s.connected === true);
+
+                      let status = 'Not configured';
+                      if (configured && !enabled) status = 'Disabled';
+                      else if (configured && enabled && connected) status = 'Online';
+                      else if (configured && enabled && !connected) status = 'Offline';
+
+                      const upd = s.updated ? new Date(s.updated).toLocaleTimeString() : '—';
+                      return `${status} • Updated ${upd}`;
+                    ]]]
+                  styles:
+                    card:
+                      - background: "linear-gradient(135deg, #1565c0 0%, #0d47a1 100%)"
+
+                # Main stats
+                - type: grid
+                  columns: 2
+                  square: false
+                  cards:
+                    - type: custom:button-card
+                      template: big_stat
+                      entity: sensor.weather_api_station_1_temperature
+                      name: Temperature
+                      icon: mdi:thermometer
+                      styles:
+                        icon:
+                          - color: "#e53935"
+                    - type: custom:button-card
+                      template: big_stat
+                      entity: sensor.weather_api_station_1_rain_daily
+                      name: Daily Rain Fall
+                      icon: mdi:water-percent
+                      styles:
+                        icon:
+                          - color: "#1e88e5"
+                    - type: custom:button-card
+                      template: big_stat
+                      entity: sensor.weather_api_station_1_rain_monthly
+                      name: Monthly Rainfall
+                      icon: mdi:thermometer-lines
+                      styles:
+                        icon:
+                          - color: "#43a047"
+                    - type: custom:button-card
+                      template: big_stat
+                      entity: sensor.weather_api_station_1_rain_yearly
+                      name: Yearly Rainfall
+                      icon: mdi:thermometer-lines
+                      styles:
+                        icon:
+                          - color: "#43a7"
+                # Secondary stats
+                - type: grid
+                  columns: 2
+                  square: false
+                  cards:
+                    - type: custom:button-card
+                      template: small_stat
+                      entity: sensor.weather_api_station_1_feels_like
+                      name: Feels
+                      icon: mdi:thermometer-check
+                    - type: custom:button-card
+                      template: small_stat
+                      entity: sensor.weather_api_station_1_dew_point
+                      name: Dew
+                      icon: mdi:water-thermometer
+                    - type: custom:button-card
+                      template: small_stat
+                      entity: sensor.weather_api_station_1_delta_t
+                      name: Delta t
+                      icon: mdi:weather-windy
+                    - type: custom:button-card
+                      template: small_stat
+                      entity: sensor.weather_api_station_1_humidity
+                      name: Max Humidity
+                      icon: mdi:weather-windy-variant
+
+                - type: grid
+                  columns: 2
+                  square: false
+                  cards:
+                    - type: custom:button-card
+                      template: small_stat
+                      entity: sensor.weather_api_station_1_degree_day
+                      name: Degree Days
+                      icon: mdi:weather-rainy
+                    - type: custom:button-card
+                      template: small_stat
+                      entity: sensor.weather_api_station_1_solar_radiation
+                      name: Solar
+                      icon: mdi:white-balance-sunny
+                    - type: custom:button-card
+                      template: small_stat
+                      entity: sensor.weather_api_station_1_uv_index
+                      name: UV
+                      icon: mdi:sun-wireless
+                    - type: custom:button-card
+                      template: small_stat
+                      entity: sensor.weather_api_station_1_pressure_relative
+                      name: Press
+                      icon: mdi:gauge
+
+                ###########################################
+                # Wind Rose
+      ##############################################
+      - type: custom:mushroom-title-card
+        title: Wind Data
+
+      - type: grid
+        cards:
+          - type: custom:windrose-card
+            grid_options:
+              rows: auto
+            wind_direction_entity:
+              entity: sensor.weather_api_station_1_wind_direction
+              use_statistics: false
+            windspeed_entities:
+              - entity: sensor.weather_api_station_1_wind_speed
+                name: Speed
+                speed_unit: kph
+                output_speed_unit: kph
+                use_statistics: false
+                speed_range_beaufort: false
+                current_speed_arrow: true
+                speed_ranges:
+                  - from_value: 0
+                    color: blue
+                  - from_value: 3
+                    color: green
+                  - from_value: 15
+                    color: orange
+                  - from_value: 20
+                    color: red
+              - entity: sensor.weather_api_station_1_wind_gust
+                name: Gusts
+                speed_unit: kph
+                output_speed_unit: kph
+                use_statistics: false
+                speed_range_beaufort: false
+                current_speed_arrow: true
+                speed_ranges:
+                  - from_value: 0
+                    color: blue
+                  - from_value: 3
+                    color: green
+                  - from_value: 15
+                    color: orange
+                  - from_value: 20
+                    color: red
+            data_period:
+              period_selector:
+                location: top
+                active_color: white
+                active_bg_color: "var(--primary-color)"
+                color: grey
+                buttons:
+                  - hours: 1
+                    title: 1 hour
+                  - hours: 6
+                    title: 6 hours
+                  - hours: 12
+                    title: 12 hours
+                  - hours: 24
+                    title: 1 day
+            center_calm_percentage: false
+            windspeed_bar_location: right
+            direction_labels:
+              show_intercardinal_directions: true
+              intercardinal_directions_text_size: 30
+            current_direction:
+              show_arrow: true
+              arrow_size: 50
+              centre_circle_size: 10
+            corner_info:
+              top_left:
+                label: "Current Wind Speed"
+                entity: sensor.weather_api_station_1_wind_speed
+                value_text_size: 100
+              top_right:
+                label: Current Gusts
+                entity: sensor.weather_api_station_1_wind_gust
+                value_text_size: 100
+              bottom_left:
+                label: Current Direction
+                entity: sensor.weather_api_station_1_wind_direction
+                input_unit: degrees
+                output_unit: letters
+                direction_letters: NESWx
+                value_text_size: 80
+            colors:
+              rose_current_direction_arrow: "#dd3322"
+          - type: custom:apexcharts-card
+            grid_options:
+              rows: auto
+            cache: false
+            section_mode: true
+            header:
+              show: true
+              show_states: true
+            experimental:
+              color_threshold: true
+            graph_span: 3h
+            series:
+              - entity: sensor.weather_api_station_1_wind_speed
+                name: Current Windspeed
+                group_by:
+                  func: max
+                  duration: 15min
+                show:
+                  in_chart: true
+                  in_header: false
+                color_threshold:
+                  - value: 0
+                    color: "#ff0000"
+                  - value: 3
+                    color: "#ffa500"
+                  - value: 5
+                    color: "#008000"
+                  - value: 15
+                    color: "#ffa500"
+                  - value: 40
+                    color: "#ff0000"
+              - entity: sensor.weather_api_station_1_wind_gust
+                name: Current Gust
+                type: line
+                color: lightskyblue
+                group_by:
+                  func: max
+                  duration: 15min
+                show:
+                  in_chart: true
+                  in_header: false
+            apex_config:
+              legend:
+                show: false
+              yaxis:
+                labels:
+                  formatter: |
+                    EVAL:function (val) {
+                      return Math.floor(val) + " km/h"
+                    }
+                tickAmount: 3
+                min: 0
+                max: |
+                  EVAL:function(max) {
+                    return max * 1.1;
+                  }
+              grid:
+                xaxis:
+                  lines:
+                    show: false
+                yaxis:
+                  lines:
+                    show: false
+                labels:
+                  formatter: |
+                    EVAL: function (val) {
+                      return (val % 1 === 0) ? val : val.toFixed(1);
+                    }
+              stroke:
+                curve: smooth
+
+          # --------------------------
+          # STATION 3
+          # --------------------------
+          - type: conditional
+            conditions:
+              - entity: sensor.weather_api_station_3_temperature
+                state_not: unavailable
+            card:
+              type: vertical-stack
+              cards:
+
+                - type: custom:button-card
+                  template: station_header
+                  entity: sensor.weather_api_data
+                  icon: mdi:weather-station
+                  name: >
+                    [[[
+                      const s = hass.states['sensor.weather_api_data']?.attributes?.stations?.['3'] || {};
+                      return (typeof s.name === 'string' && s.name.trim()) ? s.name : 'Station 3';
+                    ]]]
+                  state_display: >
+                    [[[
+                      const s = hass.states['sensor.weather_api_data']?.attributes?.stations?.['3'] || {};
+                      const configured = !!(s.imei || s.name);
+                      const enabled = (s.enabled === true);
+                      const connected = (s.connected === true);
+
+                      let status = 'Not configured';
+                      if (configured && !enabled) status = 'Disabled';
+                      else if (configured && enabled && connected) status = 'Online';
+                      else if (configured && enabled && !connected) status = 'Offline';
+
+                      const upd = s.updated ? new Date(s.updated).toLocaleTimeString() : '—';
+                      return `${status} • Updated ${upd}`;
+                    ]]]
+                  styles:
+                    card:
+                      - background: "linear-gradient(135deg, #00796b 0%, #004d40 100%)"
+
+                - type: grid
+                  columns: 1
+                  square: false
+                  cards:
+                    - type: custom:button-card
+                      template: big_stat
+                      entity: sensor.weather_api_station_3_temperature
+                      name: Temperature
+                      icon: mdi:thermometer
+                      styles:
+                        icon:
+                          - color: "#e53935"
+                    - type: custom:button-card
+                      template: big_stat
+                      entity: sensor.weather_api_station_3_humidity
+                      name: Humidity
+                      icon: mdi:water-percent
+                      styles:
+                        icon:
+                          - color: "#1e88e5"
+                    - type: custom:button-card
+                      template: big_stat
+                      entity: sensor.weather_api_station_3_delta_t
+                      name: Delta T
+                      icon: mdi:thermometer-lines
+                      styles:
+                        icon:
+                          - color: "#43a047"
+
+                - type: grid
+                  columns: 2
+                  square: false
+                  cards:
+                    - type: custom:button-card
+                      template: small_stat
+                      entity: sensor.weather_api_station_3_feels_like
+                      name: Feels
+                      icon: mdi:thermometer-check
+                    - type: custom:button-card
+                      template: small_stat
+                      entity: sensor.weather_api_station_3_dew_point
+                      name: Dew
+                      icon: mdi:water-thermometer
+                    - type: custom:button-card
+                      template: small_stat
+                      entity: sensor.weather_api_station_3_wind_speed
+                      name: Wind
+                      icon: mdi:weather-windy
+                    - type: custom:button-card
+                      template: small_stat
+                      entity: sensor.weather_api_station_3_wind_gust
+                      name: Gust
+                      icon: mdi:weather-windy-variant
+
+                - type: grid
+                  columns: 2
+                  square: false
+                  cards:
+                    - type: custom:button-card
+                      template: small_stat
+                      entity: sensor.weather_api_station_3_rain_daily
+                      name: Rain
+                      icon: mdi:weather-rainy
+                    - type: custom:button-card
+                      template: small_stat
+                      entity: sensor.weather_api_station_3_solar_radiation
+                      name: Solar
+                      icon: mdi:white-balance-sunny
+                    - type: custom:button-card
+                      template: small_stat
+                      entity: sensor.weather_api_station_3_uv_index
+                      name: UV
+                      icon: mdi:sun-wireless
+                    - type: custom:button-card
+                      template: small_stat
+                      entity: sensor.weather_api_station_3_pressure_relative
+                      name: Press
+                      icon: mdi:gauge
+###########################################
+# Wind Rose
+##############################################
+                - type: custom:mushroom-title-card
+                  title: Wind Data
+                
+                - type: grid
+                  cards:
+                    - type: custom:windrose-card
+                      grid_options:
+                        rows: auto
+                      wind_direction_entity:
+                        entity: sensor.weather_api_station_3_wind_direction
+                        use_statistics: false
+                      windspeed_entities:
+                        - entity: sensor.weather_api_station_3_wind_speed
+                          name: Speed
+                          speed_unit: kph
+                          output_speed_unit: kph
+                          use_statistics: false
+                          speed_range_beaufort: false
+                          current_speed_arrow: true
+                          speed_ranges:
+                            - from_value: 0
+                              color: blue
+                            - from_value: 3
+                              color: green
+                            - from_value: 15
+                              color: orange
+                            - from_value: 20
+                              color: red
+                        - entity: sensor.weather_api_station_3_wind_gust
+                          name: Gusts
+                          speed_unit: kph
+                          output_speed_unit: kph
+                          use_statistics: false
+                          speed_range_beaufort: false
+                          current_speed_arrow: true
+                          speed_ranges:
+                            - from_value: 0
+                              color: blue
+                            - from_value: 3
+                              color: green
+                            - from_value: 15
+                              color: orange
+                            - from_value: 20
+                              color: red
+                      data_period:
+                        period_selector:
+                          location: top
+                          active_color: white
+                          active_bg_color: "var(--primary-color)"
+                          color: grey
+                          buttons:
+                            - hours: 1
+                              title: 1 hour
+                            - hours: 6
+                              title: 6 hours
+                            - hours: 12
+                              title: 12 hours
+                            - hours: 24
+                              title: 1 day
+                      center_calm_percentage: false
+                      windspeed_bar_location: right
+                      direction_labels:
+                        show_intercardinal_directions: true
+                        intercardinal_directions_text_size: 30
+                      current_direction:
+                        show_arrow: true
+                        arrow_size: 50
+                        centre_circle_size: 10
+                      corner_info:
+                        top_left:
+                          label: "Current Wind Speed"
+                          entity: sensor.weather_api_station_3_wind_speed
+                          value_text_size: 100
+                        top_right:
+                          label: Current Gusts
+                          entity: sensor.weather_api_station_3_wind_gust
+                          value_text_size: 100
+                        bottom_left:
+                          label: Current Direction
+                          entity: sensor.weather_api_station_3_wind_direction
+                          input_unit: degrees
+                          output_unit: letters
+                          direction_letters: NESWx
+                          value_text_size: 80
+                      colors:
+                        rose_current_direction_arrow: "#dd3322"
+                    - type: custom:apexcharts-card
+                      grid_options:
+                        rows: auto
+                      cache: false
+                      section_mode: true
+                      header:
+                        show: true
+                        show_states: true
+                      experimental:
+                        color_threshold: true
+                      graph_span: 3h
+                      series:
+                        - entity: sensor.weather_api_station_3_wind_speed
+                          name: Current Windspeed
+                          group_by:
+                            func: max
+                            duration: 15min
+                          show:
+                            in_chart: true
+                            in_header: false
+                          color_threshold:
+                            - value: 0
+                              color: "#ff0000"
+                            - value: 3
+                              color: "#ffa500"
+                            - value: 5
+                              color: "#008000"
+                            - value: 15
+                              color: "#ffa500"
+                            - value: 40
+                              color: "#ff0000"
+                        - entity: sensor.weather_api_station_3_wind_gust
+                          name: Current Gust
+                          type: line
+                          color: lightskyblue
+                          group_by:
+                            func: max
+                            duration: 15min
+                          show:
+                            in_chart: true
+                            in_header: false
+                      apex_config:
+                        legend:
+                          show: false
+                        yaxis:
+                          labels:
+                            formatter: |
+                              EVAL:function (val) {
+                                return Math.floor(val) + " km/h"
+                              }
+                          tickAmount: 3
+                          min: 0
+                          max: |
+                            EVAL:function(max) {
+                              return max * 1.1;
+                            }
+                        grid:
+                          xaxis:
+                            lines:
+                              show: false
+                          yaxis:
+                            lines:
+                              show: false
+                          labels:
+                            formatter: |
+                              EVAL: function (val) {
+                                return (val % 1 === 0) ? val : val.toFixed(1);
+                              }
+                        stroke:
+                          curve: smooth
+      # RIGHT COLUMN
+      - type: grid
+        cards:
+
+          # --------------------------
+          # STATION 2
+          # --------------------------
+          - type: conditional
+            conditions:
+              - entity: sensor.weather_api_station_2_temperature
+                state_not: unavailable
+            card:
+              type: vertical-stack
+              cards:
+
+                - type: custom:button-card
+                  template: station_header
+                  entity: sensor.weather_api_data
+                  icon: mdi:weather-station
+                  name: >
+                    [[[
+                      const s = hass.states['sensor.weather_api_data']?.attributes?.stations?.['2'] || {};
+                      return (typeof s.name === 'string' && s.name.trim()) ? s.name : 'Station 2';
+                    ]]]
+                  state_display: >
+                    [[[
+                      const s = hass.states['sensor.weather_api_data']?.attributes?.stations?.['2'] || {};
+                      const configured = !!(s.imei || s.name);
+                      const enabled = (s.enabled === true);
+                      const connected = (s.connected === true);
+
+                      let status = 'Not configured';
+                      if (configured && !enabled) status = 'Disabled';
+                      else if (configured && enabled && connected) status = 'Online';
+                      else if (configured && enabled && !connected) status = 'Offline';
+
+                      const upd = s.updated ? new Date(s.updated).toLocaleTimeString() : '—';
+                      return `${status} • Updated ${upd}`;
+                    ]]]
+                  styles:
+                    card:
+                      - background: "linear-gradient(135deg, #7b1fa2 0%, #4a148c 100%)"
+
+                - type: grid
+                  columns: 1
+                  square: false
+                  cards:
+                    - type: custom:button-card
+                      template: big_stat
+                      entity: sensor.weather_api_station_2_temperature
+                      name: Temperature
+                      icon: mdi:thermometer
+                      styles:
+                        icon:
+                          - color: "#e53935"
+                    - type: custom:button-card
+                      template: big_stat
+                      entity: sensor.weather_api_station_2_humidity
+                      name: Humidity
+                      icon: mdi:water-percent
+                      styles:
+                        icon:
+                          - color: "#1e88e5"
+                    - type: custom:button-card
+                      template: big_stat
+                      entity: sensor.weather_api_station_2_delta_t
+                      name: Delta T
+                      icon: mdi:thermometer-lines
+                      styles:
+                        icon:
+                          - color: "#43a047"
+
+                - type: grid
+                  columns: 2
+                  square: false
+                  cards:
+                    - type: custom:button-card
+                      template: small_stat
+                      entity: sensor.weather_api_station_2_feels_like
+                      name: Feels
+                      icon: mdi:thermometer-check
+                    - type: custom:button-card
+                      template: small_stat
+                      entity: sensor.weather_api_station_2_dew_point
+                      name: Dew
+                      icon: mdi:water-thermometer
+                    - type: custom:button-card
+                      template: small_stat
+                      entity: sensor.weather_api_station_2_wind_speed
+                      name: Wind
+                      icon: mdi:weather-windy
+                    - type: custom:button-card
+                      template: small_stat
+                      entity: sensor.weather_api_station_2_wind_gust
+                      name: Gust
+                      icon: mdi:weather-windy-variant
+
+                - type: grid
+                  columns: 2
+                  square: false
+                  cards:
+                    - type: custom:button-card
+                      template: small_stat
+                      entity: sensor.weather_api_station_2_rain_daily
+                      name: Rain
+                      icon: mdi:weather-rainy
+                    - type: custom:button-card
+                      template: small_stat
+                      entity: sensor.weather_api_station_2_solar_radiation
+                      name: Solar
+                      icon: mdi:white-balance-sunny
+                    - type: custom:button-card
+                      template: small_stat
+                      entity: sensor.weather_api_station_2_uv_index
+                      name: UV
+                      icon: mdi:sun-wireless
+                    - type: custom:button-card
+                      template: small_stat
+                      entity: sensor.weather_api_station_2_pressure_relative
+                      name: Press
+                      icon: mdi:gauge
+
+                ###########################################
+                # Wind Rose
+                ##############################################
+      - type: custom:mushroom-title-card
+        title: Wind Data
+
+      - type: grid
+        cards:
+          - type: custom:windrose-card
+            grid_options:
+              rows: auto
+            wind_direction_entity:
+              entity: sensor.weather_api_station_2_wind_direction
+              use_statistics: false
+            windspeed_entities:
+              - entity: sensor.weather_api_station_2_wind_speed
+                name: Speed
+                speed_unit: kph
+                output_speed_unit: kph
+                use_statistics: false
+                speed_range_beaufort: false
+                current_speed_arrow: true
+                speed_ranges:
+                  - from_value: 0
+                    color: blue
+                  - from_value: 3
+                    color: green
+                  - from_value: 15
+                    color: orange
+                  - from_value: 20
+                    color: red
+              - entity: sensor.weather_api_station_2_wind_gust
+                name: Gusts
+                speed_unit: kph
+                output_speed_unit: kph
+                use_statistics: false
+                speed_range_beaufort: false
+                current_speed_arrow: true
+                speed_ranges:
+                  - from_value: 0
+                    color: blue
+                  - from_value: 3
+                    color: green
+                  - from_value: 15
+                    color: orange
+                  - from_value: 20
+                    color: red
+            data_period:
+              period_selector:
+                location: top
+                active_color: white
+                active_bg_color: "var(--primary-color)"
+                color: grey
+                buttons:
+                  - hours: 1
+                    title: 1 hour
+                  - hours: 6
+                    title: 6 hours
+                  - hours: 12
+                    title: 12 hours
+                  - hours: 24
+                    title: 1 day
+            center_calm_percentage: false
+            windspeed_bar_location: right
+            direction_labels:
+              show_intercardinal_directions: true
+              intercardinal_directions_text_size: 30
+            current_direction:
+              show_arrow: true
+              arrow_size: 50
+              centre_circle_size: 10
+            corner_info:
+              top_left:
+                label: "Current Wind Speed"
+                entity: sensor.weather_api_station_2_wind_speed
+                value_text_size: 100
+              top_right:
+                label: Current Gusts
+                entity: sensor.weather_api_station_2_wind_gust
+                value_text_size: 100
+              bottom_left:
+                label: Current Direction
+                entity: sensor.weather_api_station_2_wind_direction
+                input_unit: degrees
+                output_unit: letters
+                direction_letters: NESWx
+                value_text_size: 80
+            colors:
+              rose_current_direction_arrow: "#dd3322"
+          - type: custom:apexcharts-card
+            grid_options:
+              rows: auto
+            cache: false
+            section_mode: true
+            header:
+              show: true
+              show_states: true
+            experimental:
+              color_threshold: true
+            graph_span: 3h
+            series:
+              - entity: sensor.weather_api_station_2_wind_speed
+                name: Current Windspeed
+                group_by:
+                  func: max
+                  duration: 15min
+                show:
+                  in_chart: true
+                  in_header: false
+                color_threshold:
+                  - value: 0
+                    color: "#ff0000"
+                  - value: 3
+                    color: "#ffa500"
+                  - value: 5
+                    color: "#008000"
+                  - value: 15
+                    color: "#ffa500"
+                  - value: 40
+                    color: "#ff0000"
+              - entity: sensor.weather_api_station_2_wind_gust
+                name: Current Gust
+                type: line
+                color: lightskyblue
+                group_by:
+                  func: max
+                  duration: 15min
+                show:
+                  in_chart: true
+                  in_header: false
+            apex_config:
+              legend:
+                show: false
+              yaxis:
+                labels:
+                  formatter: |
+                    EVAL:function (val) {
+                      return Math.floor(val) + " km/h"
+                    }
+                tickAmount: 3
+                min: 0
+                max: |
+                  EVAL:function(max) {
+                    return max * 1.1;
+                  }
+              grid:
+                xaxis:
+                  lines:
+                    show: false
+                yaxis:
+                  lines:
+                    show: false
+                labels:
+                  formatter: |
+                    EVAL: function (val) {
+                      return (val % 1 === 0) ? val : val.toFixed(1);
+                    }
+              stroke:
+                curve: smooth
+
+          # --------------------------
+          # STATION 4
+          # --------------------------
+          - type: conditional
+            conditions:
+              - entity: sensor.weather_api_station_4_temperature
+                state_not: unavailable
+            card:
+              type: vertical-stack
+              cards:
+
+                - type: custom:button-card
+                  template: station_header
+                  entity: sensor.weather_api_data
+                  icon: mdi:weather-station
+                  name: >
+                    [[[
+                      const s = hass.states['sensor.weather_api_data']?.attributes?.stations?.['4'] || {};
+                      return (typeof s.name === 'string' && s.name.trim()) ? s.name : 'Station 4';
+                    ]]]
+                  state_display: >
+                    [[[
+                      const s = hass.states['sensor.weather_api_data']?.attributes?.stations?.['4'] || {};
+                      const configured = !!(s.imei || s.name);
+                      const enabled = (s.enabled === true);
+                      const connected = (s.connected === true);
+
+                      let status = 'Not configured';
+                      if (configured && !enabled) status = 'Disabled';
+                      else if (configured && enabled && connected) status = 'Online';
+                      else if (configured && enabled && !connected) status = 'Offline';
+
+                      const upd = s.updated ? new Date(s.updated).toLocaleTimeString() : '—';
+                      return `${status} • Updated ${upd}`;
+                    ]]]
+                  styles:
+                    card:
+                      - background: "linear-gradient(135deg, #ef6c00 0%, #e65100 100%)"
+
+                - type: grid
+                  columns: 1
+                  square: false
+                  cards:
+                    - type: custom:button-card
+                      template: big_stat
+                      entity: sensor.weather_api_station_4_temperature
+                      name: Temperature
+                      icon: mdi:thermometer
+                      styles:
+                        icon:
+                          - color: "#e53935"
+                    - type: custom:button-card
+                      template: big_stat
+                      entity: sensor.weather_api_station_4_humidity
+                      name: Humidity
+                      icon: mdi:water-percent
+                      styles:
+                        icon:
+                          - color: "#1e88e5"
+                    - type: custom:button-card
+                      template: big_stat
+                      entity: sensor.weather_api_station_4_delta_t
+                      name: Delta T
+                      icon: mdi:thermometer-lines
+                      styles:
+                        icon:
+                          - color: "#43a047"
+
+                - type: grid
+                  columns: 2
+                  square: false
+                  cards:
+                    - type: custom:button-card
+                      template: small_stat
+                      entity: sensor.weather_api_station_4_feels_like
+                      name: Feels
+                      icon: mdi:thermometer-check
+                    - type: custom:button-card
+                      template: small_stat
+                      entity: sensor.weather_api_station_4_dew_point
+                      name: Dew
+                      icon: mdi:water-thermometer
+                    - type: custom:button-card
+                      template: small_stat
+                      entity: sensor.weather_api_station_4_wind_speed
+                      name: Wind
+                      icon: mdi:weather-windy
+                    - type: custom:button-card
+                      template: small_stat
+                      entity: sensor.weather_api_station_4_wind_gust
+                      name: Gust
+                      icon: mdi:weather-windy-variant
+
+                - type: grid
+                  columns: 2
+                  square: false
+                  cards:
+                    - type: custom:button-card
+                      template: small_stat
+                      entity: sensor.weather_api_station_4_rain_daily
+                      name: Rain
+                      icon: mdi:weather-rainy
+                    - type: custom:button-card
+                      template: small_stat
+                      entity: sensor.weather_api_station_4_solar_radiation
+                      name: Solar
+                      icon: mdi:white-balance-sunny
+                    - type: custom:button-card
+                      template: small_stat
+                      entity: sensor.weather_api_station_4_uv_index
+                      name: UV
+                      icon: mdi:sun-wireless
+                    - type: custom:button-card
+                      template: small_stat
+                      entity: sensor.weather_api_station_4_pressure_relative
+                      name: Press
+                      icon: mdi:gauge
+###########################################
+# Wind Rose
+##############################################
+                - type: custom:mushroom-title-card
+                  title: Wind Data
+                
+                - type: grid
+                  cards:
+                    - type: custom:windrose-card
+                      grid_options:
+                        rows: auto
+                      wind_direction_entity:
+                        entity: sensor.weather_api_station_4_wind_direction
+                        use_statistics: false
+                      windspeed_entities:
+                        - entity: sensor.weather_api_station_4_wind_speed
+                          name: Speed
+                          speed_unit: kph
+                          output_speed_unit: kph
+                          use_statistics: false
+                          speed_range_beaufort: false
+                          current_speed_arrow: true
+                          speed_ranges:
+                            - from_value: 0
+                              color: blue
+                            - from_value: 3
+                              color: green
+                            - from_value: 15
+                              color: orange
+                            - from_value: 20
+                              color: red
+                        - entity: sensor.weather_api_station_4_wind_gust
+                          name: Gusts
+                          speed_unit: kph
+                          output_speed_unit: kph
+                          use_statistics: false
+                          speed_range_beaufort: false
+                          current_speed_arrow: true
+                          speed_ranges:
+                            - from_value: 0
+                              color: blue
+                            - from_value: 3
+                              color: green
+                            - from_value: 15
+                              color: orange
+                            - from_value: 20
+                              color: red
+                      data_period:
+                        period_selector:
+                          location: top
+                          active_color: white
+                          active_bg_color: "var(--primary-color)"
+                          color: grey
+                          buttons:
+                            - hours: 1
+                              title: 1 hour
+                            - hours: 6
+                              title: 6 hours
+                            - hours: 12
+                              title: 12 hours
+                            - hours: 24
+                              title: 1 day
+                      center_calm_percentage: false
+                      windspeed_bar_location: right
+                      direction_labels:
+                        show_intercardinal_directions: true
+                        intercardinal_directions_text_size: 30
+                      current_direction:
+                        show_arrow: true
+                        arrow_size: 50
+                        centre_circle_size: 10
+                      corner_info:
+                        top_left:
+                          label: "Current Wind Speed"
+                          entity: sensor.weather_api_station_4_wind_speed
+                          value_text_size: 100
+                        top_right:
+                          label: Current Gusts
+                          entity: sensor.weather_api_station_4_wind_gust
+                          value_text_size: 100
+                        bottom_left:
+                          label: Current Direction
+                          entity: sensor.weather_api_station_4_wind_direction
+                          input_unit: degrees
+                          output_unit: letters
+                          direction_letters: NESWx
+                          value_text_size: 80
+                      colors:
+                        rose_current_direction_arrow: "#dd3322"
+                    - type: custom:apexcharts-card
+                      grid_options:
+                        rows: auto
+                      cache: false
+                      section_mode: true
+                      header:
+                        show: true
+                        show_states: true
+                      experimental:
+                        color_threshold: true
+                      graph_span: 3h
+                      series:
+                        - entity: sensor.weather_api_station_4_wind_speed
+                          name: Current Windspeed
+                          group_by:
+                            func: max
+                            duration: 15min
+                          show:
+                            in_chart: true
+                            in_header: false
+                          color_threshold:
+                            - value: 0
+                              color: "#ff0000"
+                            - value: 3
+                              color: "#ffa500"
+                            - value: 5
+                              color: "#008000"
+                            - value: 15
+                              color: "#ffa500"
+                            - value: 40
+                              color: "#ff0000"
+                        - entity: sensor.weather_api_station_4_wind_gust
+                          name: Current Gust
+                          type: line
+                          color: lightskyblue
+                          group_by:
+                            func: max
+                            duration: 15min
+                          show:
+                            in_chart: true
+                            in_header: false
+                      apex_config:
+                        legend:
+                          show: false
+                        yaxis:
+                          labels:
+                            formatter: |
+                              EVAL:function (val) {
+                                return Math.floor(val) + " km/h"
+                              }
+                          tickAmount: 3
+                          min: 0
+                          max: |
+                            EVAL:function(max) {
+                              return max * 1.1;
+                            }
+                        grid:
+                          xaxis:
+                            lines:
+                              show: false
+                          yaxis:
+                            lines:
+                              show: false
+                          labels:
+                            formatter: |
+                              EVAL: function (val) {
+                                return (val % 1 === 0) ? val : val.toFixed(1);
+                              }
+                        stroke:
+                          curve: smooth
+
+  ###########################################################################
+  # VIEW 6: SETTINGS
+  ###########################################################################
+  - title: Settings
+    path: settings
+    icon: mdi:cog
+    type: sections
+    max_columns: 1
+    sections:
+      - type: grid
+        cards:
+
+          - type: custom:mushroom-title-card
+            title: Weather Settings
+            subtitle: Local Gateway & API Stations
+
+          # API Setup Instructions (show when credentials missing)
+          - type: conditional
+            conditions:
+              - entity: sensor.weather_api_data
+                attribute: credentials_ok
+                state: "False"
+            card:
+              type: markdown
+              content: |
+                ## Ecowitt API Setup Required
+
+                To use remote weather stations, add your Ecowitt API credentials to `/config/secrets.yaml`:
+
+                ```yaml
+                ecowitt_app_key: "YOUR_APPLICATION_KEY"
+                ecowitt_api_key: "YOUR_API_KEY"
+                ```
+
+                **How to get your API keys:**
+                1. Go to [ecowitt.net](https://www.ecowitt.net/) and log in
+                2. Navigate to **Settings** > **API Keys**
+                3. Create an Application Key and API Key
+                4. Copy both keys to your secrets.yaml file
+                5. Restart Home Assistant
+
+                **Adding Stations:**
+                - Each station needs its **IMEI** number (found on the Ecowitt dashboard or device label)
+                - Use the form below to add up to 4 stations
+
+          # BOM Setup Instructions
+          - type: conditional
+            conditions:
+              - entity: binary_sensor.bom_observations_available
+                state: "off"
+            card:
+              type: markdown
+              content: |
+                ## BOM Integration Setup
+
+                To use Bureau of Meteorology observations:
+
+                1. Install **Bureau of Meteorology** from HACS
+                2. Configure with your location name (e.g., "home", "farm")
+                3. Set the location prefix below to match
+
+          # BOM Location Prefix Setting
+          - type: entities
+            title: BOM Configuration
+            show_header_toggle: false
+            entities:
+              - entity: input_text.bom_location_prefix
+                name: BOM Location Prefix
+                icon: mdi:map-marker
+
+          - type: entities
+            title: API System Status
+            show_header_toggle: false
+            entities:
+              - entity: sensor.weather_api_data
+                name: State
+              - type: attribute
+                entity: sensor.weather_api_data
+                attribute: version
+                name: Version
+                icon: mdi:tag
+              - type: attribute
+                entity: sensor.weather_api_data
+                attribute: initialized
+                name: Initialized
+                icon: mdi:check-circle
+              - type: attribute
+                entity: sensor.weather_api_data
+                attribute: credentials_ok
+                name: Credentials OK
+                icon: mdi:key
+              - type: attribute
+                entity: sensor.weather_api_data
+                attribute: station_count
+                name: Active Stations
+                icon: mdi:counter
+              - type: attribute
+                entity: sensor.weather_api_data
+                attribute: last_update
+                name: Last Update
+                icon: mdi:clock-outline
+
+          - type: custom:button-card
+            template: wapi_action
+            name: Refresh Data
+            icon: mdi:refresh
+            styles:
+              card:
+                - background: "#1565c0"
+            tap_action:
+              action: call-service
+              service: script.weather_api_refresh_data
+
+          - type: custom:button-card
+            template: wapi_section_title
+            name: Manage API Stations
+
+          # Slot Status Cards - 2x2 grid showing all slots
+          - type: grid
+            columns: 2
+            square: false
+            cards:
+              # Slot 1
+              - type: custom:button-card
+                template: wapi_slot_card
+                entity: sensor.weather_api_slot_status
+                icon: mdi:numeric-1-circle
+                variables:
+                  slot: 1
+                  configured: >
+                    [[[
+                      return !!(entity?.attributes?.slot_1_name);
+                    ]]]
+                name: >
+                  [[[
+                    const n = entity?.attributes?.slot_1_name;
+                    return n ? n : 'Empty';
+                  ]]]
+                state_display: >
+                  [[[
+                    const n = entity?.attributes?.slot_1_name;
+                    return n ? 'Slot 1 • Configured' : 'Slot 1 • Available';
+                  ]]]
+                tap_action:
+                  action: call-service
+                  service: script.weather_api_load_station
+                  service_data:
+                    slot: 1
+
+              # Slot 2
+              - type: custom:button-card
+                template: wapi_slot_card
+                entity: sensor.weather_api_slot_status
+                icon: mdi:numeric-2-circle
+                variables:
+                  slot: 2
+                  configured: >
+                    [[[
+                      return !!(entity?.attributes?.slot_2_name);
+                    ]]]
+                name: >
+                  [[[
+                    const n = entity?.attributes?.slot_2_name;
+                    return n ? n : 'Empty';
+                  ]]]
+                state_display: >
+                  [[[
+                    const n = entity?.attributes?.slot_2_name;
+                    return n ? 'Slot 2 • Configured' : 'Slot 2 • Available';
+                  ]]]
+                tap_action:
+                  action: call-service
+                  service: script.weather_api_load_station
+                  service_data:
+                    slot: 2
+
+              # Slot 3
+              - type: custom:button-card
+                template: wapi_slot_card
+                entity: sensor.weather_api_slot_status
+                icon: mdi:numeric-3-circle
+                variables:
+                  slot: 3
+                  configured: >
+                    [[[
+                      return !!(entity?.attributes?.slot_3_name);
+                    ]]]
+                name: >
+                  [[[
+                    const n = entity?.attributes?.slot_3_name;
+                    return n ? n : 'Empty';
+                  ]]]
+                state_display: >
+                  [[[
+                    const n = entity?.attributes?.slot_3_name;
+                    return n ? 'Slot 3 • Configured' : 'Slot 3 • Available';
+                  ]]]
+                tap_action:
+                  action: call-service
+                  service: script.weather_api_load_station
+                  service_data:
+                    slot: 3
+
+              # Slot 4
+              - type: custom:button-card
+                template: wapi_slot_card
+                entity: sensor.weather_api_slot_status
+                icon: mdi:numeric-4-circle
+                variables:
+                  slot: 4
+                  configured: >
+                    [[[
+                      return !!(entity?.attributes?.slot_4_name);
+                    ]]]
+                name: >
+                  [[[
+                    const n = entity?.attributes?.slot_4_name;
+                    return n ? n : 'Empty';
+                  ]]]
+                state_display: >
+                  [[[
+                    const n = entity?.attributes?.slot_4_name;
+                    return n ? 'Slot 4 • Configured' : 'Slot 4 • Available';
+                  ]]]
+                tap_action:
+                  action: call-service
+                  service: script.weather_api_load_station
+                  service_data:
+                    slot: 4
+
+          # Station Form
+          - type: entities
+            title: Station Details
+            show_header_toggle: false
+            entities:
+              - entity: input_number.weather_api_station_slot
+                name: Target Slot
+              - entity: input_text.weather_api_station_name
+                name: Name
+              - entity: input_text.weather_api_station_imei
+                name: IMEI
+              - entity: input_number.weather_api_station_latitude
+                name: Latitude
+              - entity: input_number.weather_api_station_longitude
+                name: Longitude
+              - entity: input_number.weather_api_station_elevation
+                name: Elevation (m)
+
+          - type: horizontal-stack
+            cards:
+              - type: custom:button-card
+                template: wapi_action
+                name: Save Station
+                icon: mdi:content-save
+                styles:
+                  card:
+                    - background: "#2e7d32"
+                tap_action:
+                  action: call-service
+                  service: script.weather_api_add_station
+
+              - type: custom:button-card
+                template: wapi_action
+                entity: sensor.weather_api_slot_status
+                name: Add New
+                icon: mdi:plus-circle
+                state_display: >
+                  [[[
+                    const next = entity?.attributes?.next_slot || 0;
+                    return next > 0 ? `Slot ${next}` : 'Full';
+                  ]]]
+                styles:
+                  card:
+                    - background: >
+                        [[[
+                          const next = entity?.attributes?.next_slot || 0;
+                          return next > 0 ? '#1565c0' : '#757575';
+                        ]]]
+                tap_action:
+                  action: call-service
+                  service: script.weather_api_clear_form
+
+          - type: custom:button-card
+            template: wapi_section_title
+            name: Configured API Stations
+
+          # Station 1 Management
+          - type: conditional
+            conditions:
+              - entity: binary_sensor.weather_api_station_1_configured
+                state: "on"
+            card:
+              type: vertical-stack
+              cards:
+                - type: markdown
+                  content: >
+                    {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+                    {% set s = stations.get('1') or stations.get(1) or {} %}
+                    **Slot 1: {{ s.get('name') or '—' }}**
+                    {{ 'Enabled' if s.get('enabled') else 'Disabled' }} - {{ 'Online' if s.get('connected') else 'Offline' }}
+                    IMEI: ****{{ (s.get('imei','')|string)[-4:] }} | Lat: {{ s.get('latitude') }} | Lon: {{ s.get('longitude') }} | Elev: {{ s.get('elevation') }}m
+                - type: horizontal-stack
+                  cards:
+                    - type: custom:button-card
+                      name: Edit
+                      icon: mdi:pencil
+                      styles:
+                        card:
+                          - height: 42px
+                          - border-radius: 12px
+                          - background: "#1565c0"
+                        name:
+                          - font-size: 12px
+                          - font-weight: 700
+                          - color: white
+                        icon:
+                          - color: white
+                      tap_action:
+                        action: call-service
+                        service: script.weather_api_load_station
+                        service_data:
+                          slot: 1
+                    - type: custom:button-card
+                      name: >
+                        [[[
+                          const stations = hass.states['sensor.weather_api_data']?.attributes?.stations || {};
+                          const s = stations['1'] || stations[1] || {};
+                          return s.enabled ? 'Disable' : 'Enable';
+                        ]]]
+                      icon: >
+                        [[[
+                          const stations = hass.states['sensor.weather_api_data']?.attributes?.stations || {};
+                          const s = stations['1'] || stations[1] || {};
+                          return s.enabled ? 'mdi:pause-circle' : 'mdi:play-circle';
+                        ]]]
+                      styles:
+                        card:
+                          - height: 42px
+                          - border-radius: 12px
+                        name:
+                          - font-size: 12px
+                          - font-weight: 700
+                      tap_action:
+                        action: call-service
+                        service: >
+                          [[[
+                            const stations = hass.states['sensor.weather_api_data']?.attributes?.stations || {};
+                            const s = stations['1'] || stations[1] || {};
+                            return s.enabled ? 'script.weather_api_disable_station' : 'script.weather_api_enable_station';
+                          ]]]
+                        service_data:
+                          slot: 1
+                    - type: custom:button-card
+                      name: Remove
+                      icon: mdi:delete
+                      color: "#c62828"
+                      styles:
+                        card:
+                          - height: 42px
+                          - border-radius: 12px
+                        name:
+                          - font-size: 12px
+                          - font-weight: 700
+                        icon:
+                          - color: "#c62828"
+                      tap_action:
+                        action: call-service
+                        service: script.weather_api_remove_station
+                        service_data:
+                          slot: 1
+                        confirmation:
+                          text: "Remove station from slot 1?"
+
+          # Station 2 Management
+          - type: conditional
+            conditions:
+              - entity: binary_sensor.weather_api_station_2_configured
+                state: "on"
+            card:
+              type: vertical-stack
+              cards:
+                - type: markdown
+                  content: >
+                    {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+                    {% set s = stations.get('2') or stations.get(2) or {} %}
+                    **Slot 2: {{ s.get('name') or '—' }}**
+                    {{ 'Enabled' if s.get('enabled') else 'Disabled' }} - {{ 'Online' if s.get('connected') else 'Offline' }}
+                    IMEI: ****{{ (s.get('imei','')|string)[-4:] }} | Lat: {{ s.get('latitude') }} | Lon: {{ s.get('longitude') }} | Elev: {{ s.get('elevation') }}m
+                - type: horizontal-stack
+                  cards:
+                    - type: custom:button-card
+                      name: Edit
+                      icon: mdi:pencil
+                      styles:
+                        card:
+                          - height: 42px
+                          - border-radius: 12px
+                          - background: "#1565c0"
+                        name:
+                          - font-size: 12px
+                          - font-weight: 700
+                          - color: white
+                        icon:
+                          - color: white
+                      tap_action:
+                        action: call-service
+                        service: script.weather_api_load_station
+                        service_data:
+                          slot: 2
+                    - type: custom:button-card
+                      name: >
+                        [[[
+                          const stations = hass.states['sensor.weather_api_data']?.attributes?.stations || {};
+                          const s = stations['2'] || stations[2] || {};
+                          return s.enabled ? 'Disable' : 'Enable';
+                        ]]]
+                      icon: >
+                        [[[
+                          const stations = hass.states['sensor.weather_api_data']?.attributes?.stations || {};
+                          const s = stations['2'] || stations[2] || {};
+                          return s.enabled ? 'mdi:pause-circle' : 'mdi:play-circle';
+                        ]]]
+                      styles:
+                        card:
+                          - height: 42px
+                          - border-radius: 12px
+                        name:
+                          - font-size: 12px
+                          - font-weight: 700
+                      tap_action:
+                        action: call-service
+                        service: >
+                          [[[
+                            const stations = hass.states['sensor.weather_api_data']?.attributes?.stations || {};
+                            const s = stations['2'] || stations[2] || {};
+                            return s.enabled ? 'script.weather_api_disable_station' : 'script.weather_api_enable_station';
+                          ]]]
+                        service_data:
+                          slot: 2
+                    - type: custom:button-card
+                      name: Remove
+                      icon: mdi:delete
+                      color: "#c62828"
+                      styles:
+                        card:
+                          - height: 42px
+                          - border-radius: 12px
+                        name:
+                          - font-size: 12px
+                          - font-weight: 700
+                        icon:
+                          - color: "#c62828"
+                      tap_action:
+                        action: call-service
+                        service: script.weather_api_remove_station
+                        service_data:
+                          slot: 2
+                        confirmation:
+                          text: "Remove station from slot 2?"
+
+          # Station 3 Management
+          - type: conditional
+            conditions:
+              - entity: binary_sensor.weather_api_station_3_configured
+                state: "on"
+            card:
+              type: vertical-stack
+              cards:
+                - type: markdown
+                  content: >
+                    {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+                    {% set s = stations.get('3') or stations.get(3) or {} %}
+                    **Slot 3: {{ s.get('name') or '—' }}**
+                    {{ 'Enabled' if s.get('enabled') else 'Disabled' }} - {{ 'Online' if s.get('connected') else 'Offline' }}
+                    IMEI: ****{{ (s.get('imei','')|string)[-4:] }} | Lat: {{ s.get('latitude') }} | Lon: {{ s.get('longitude') }} | Elev: {{ s.get('elevation') }}m
+                - type: horizontal-stack
+                  cards:
+                    - type: custom:button-card
+                      name: Edit
+                      icon: mdi:pencil
+                      styles:
+                        card:
+                          - height: 42px
+                          - border-radius: 12px
+                          - background: "#1565c0"
+                        name:
+                          - font-size: 12px
+                          - font-weight: 700
+                          - color: white
+                        icon:
+                          - color: white
+                      tap_action:
+                        action: call-service
+                        service: script.weather_api_load_station
+                        service_data:
+                          slot: 3
+                    - type: custom:button-card
+                      name: >
+                        [[[
+                          const stations = hass.states['sensor.weather_api_data']?.attributes?.stations || {};
+                          const s = stations['3'] || stations[3] || {};
+                          return s.enabled ? 'Disable' : 'Enable';
+                        ]]]
+                      icon: >
+                        [[[
+                          const stations = hass.states['sensor.weather_api_data']?.attributes?.stations || {};
+                          const s = stations['3'] || stations[3] || {};
+                          return s.enabled ? 'mdi:pause-circle' : 'mdi:play-circle';
+                        ]]]
+                      styles:
+                        card:
+                          - height: 42px
+                          - border-radius: 12px
+                        name:
+                          - font-size: 12px
+                          - font-weight: 700
+                      tap_action:
+                        action: call-service
+                        service: >
+                          [[[
+                            const stations = hass.states['sensor.weather_api_data']?.attributes?.stations || {};
+                            const s = stations['3'] || stations[3] || {};
+                            return s.enabled ? 'script.weather_api_disable_station' : 'script.weather_api_enable_station';
+                          ]]]
+                        service_data:
+                          slot: 3
+                    - type: custom:button-card
+                      name: Remove
+                      icon: mdi:delete
+                      color: "#c62828"
+                      styles:
+                        card:
+                          - height: 42px
+                          - border-radius: 12px
+                        name:
+                          - font-size: 12px
+                          - font-weight: 700
+                        icon:
+                          - color: "#c62828"
+                      tap_action:
+                        action: call-service
+                        service: script.weather_api_remove_station
+                        service_data:
+                          slot: 3
+                        confirmation:
+                          text: "Remove station from slot 3?"
+
+          # Station 4 Management
+          - type: conditional
+            conditions:
+              - entity: binary_sensor.weather_api_station_4_configured
+                state: "on"
+            card:
+              type: vertical-stack
+              cards:
+                - type: markdown
+                  content: >
+                    {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+                    {% set s = stations.get('4') or stations.get(4) or {} %}
+                    **Slot 4: {{ s.get('name') or '—' }}**
+                    {{ 'Enabled' if s.get('enabled') else 'Disabled' }} - {{ 'Online' if s.get('connected') else 'Offline' }}
+                    IMEI: ****{{ (s.get('imei','')|string)[-4:] }} | Lat: {{ s.get('latitude') }} | Lon: {{ s.get('longitude') }} | Elev: {{ s.get('elevation') }}m
+                - type: horizontal-stack
+                  cards:
+                    - type: custom:button-card
+                      name: Edit
+                      icon: mdi:pencil
+                      styles:
+                        card:
+                          - height: 42px
+                          - border-radius: 12px
+                          - background: "#1565c0"
+                        name:
+                          - font-size: 12px
+                          - font-weight: 700
+                          - color: white
+                        icon:
+                          - color: white
+                      tap_action:
+                        action: call-service
+                        service: script.weather_api_load_station
+                        service_data:
+                          slot: 4
+                    - type: custom:button-card
+                      name: >
+                        [[[
+                          const stations = hass.states['sensor.weather_api_data']?.attributes?.stations || {};
+                          const s = stations['4'] || stations[4] || {};
+                          return s.enabled ? 'Disable' : 'Enable';
+                        ]]]
+                      icon: >
+                        [[[
+                          const stations = hass.states['sensor.weather_api_data']?.attributes?.stations || {};
+                          const s = stations['4'] || stations[4] || {};
+                          return s.enabled ? 'mdi:pause-circle' : 'mdi:play-circle';
+                        ]]]
+                      styles:
+                        card:
+                          - height: 42px
+                          - border-radius: 12px
+                        name:
+                          - font-size: 12px
+                          - font-weight: 700
+                      tap_action:
+                        action: call-service
+                        service: >
+                          [[[
+                            const stations = hass.states['sensor.weather_api_data']?.attributes?.stations || {};
+                            const s = stations['4'] || stations[4] || {};
+                            return s.enabled ? 'script.weather_api_disable_station' : 'script.weather_api_enable_station';
+                          ]]]
+                        service_data:
+                          slot: 4
+                    - type: custom:button-card
+                      name: Remove
+                      icon: mdi:delete
+                      color: "#c62828"
+                      styles:
+                        card:
+                          - height: 42px
+                          - border-radius: 12px
+                        name:
+                          - font-size: 12px
+                          - font-weight: 700
+                        icon:
+                          - color: "#c62828"
+                      tap_action:
+                        action: call-service
+                        service: script.weather_api_remove_station
+                        service_data:
+                          slot: 4
+                        confirmation:
+                          text: "Remove station from slot 4?"
+
+          # =========================================================================
+          # LOCAL STATION SETTINGS
+          # =========================================================================
+          - type: custom:button-card
+            template: wapi_section_title
+            name: Local Station Settings
+
+          - type: markdown
+            content: >
+              {% set cfg = state_attr('sensor.weather_local_config', 'local_stations') or {} %}
+              {% set s = cfg.get('1', {}) %}
+              {% if s %}
+              **Local Station 1:** {{ s.get('name', 'Not configured') }}
+
+              Status: {{ 'Enabled' if s.get('enabled') else 'Disabled' }}
+              {% else %}
+              No local station configured. Click **Initialize** to set up.
+              {% endif %}
+
+          - type: horizontal-stack
+            cards:
+              - type: custom:button-card
+                template: wapi_action
+                name: Initialize
+                icon: mdi:cog
+                styles:
+                  card:
+                    - background: "#1565c0"
+                tap_action:
+                  action: call-service
+                  service: script.weather_local_init
+                  confirmation:
+                    text: "Initialize local station configuration?"
+
+              - type: custom:button-card
+                template: wapi_action
+                name: Refresh
+                icon: mdi:refresh
+                styles:
+                  card:
+                    - background: "#43a047"
+                tap_action:
+                  action: call-service
+                  service: script.weather_local_refresh
+
+          - type: conditional
+            conditions:
+              - entity: binary_sensor.weather_local_station_1_enabled
+                state: "on"
+            card:
+              type: vertical-stack
+              cards:
+                - type: entities
+                  title: Edit Local Station Name
+                  show_header_toggle: false
+                  entities:
+                    - entity: input_text.weather_local_station_name
+                      name: New Name
+
+                - type: horizontal-stack
+                  cards:
+                    - type: custom:button-card
+                      name: Save Name
+                      icon: mdi:content-save
+                      styles:
+                        card:
+                          - height: 42px
+                          - border-radius: 12px
+                          - background: "#2e7d32"
+                        name:
+                          - font-size: 12px
+                          - font-weight: 700
+                          - color: white
+                        icon:
+                          - color: white
+                      tap_action:
+                        action: call-service
+                        service: script.weather_local_set_station_name
+                        service_data:
+                          slot: "1"
+
+                    - type: custom:button-card
+                      name: Disable Station
+                      icon: mdi:pause-circle
+                      styles:
+                        card:
+                          - height: 42px
+                          - border-radius: 12px
+                          - background: "#ff9800"
+                        name:
+                          - font-size: 12px
+                          - font-weight: 700
+                          - color: white
+                        icon:
+                          - color: white
+                      tap_action:
+                        action: call-service
+                        service: script.weather_local_disable_station
+                        service_data:
+                          slot: "1"
+                        confirmation:
+                          text: "Disable local station 1?"
+
+          - type: conditional
+            conditions:
+              - entity: binary_sensor.weather_local_station_1_enabled
+                state: "off"
+            card:
+              type: custom:button-card
+              name: Enable Local Station
+              icon: mdi:play-circle
+              styles:
+                card:
+                  - height: 42px
+                  - border-radius: 12px
+                  - background: "#43a047"
+                name:
+                  - font-size: 12px
+                  - font-weight: 700
+                  - color: white
+                icon:
+                  - color: white
+              tap_action:
+                action: call-service
+                service: script.weather_local_enable_station
+                service_data:
+                  slot: "1"
