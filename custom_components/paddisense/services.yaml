@@ -1,0 +1,407 @@
+# =============================================================================
+# REGISTRY SERVICES
+# =============================================================================
+
+add_paddock:
+  name: Add Paddock
+  description: Add a new paddock with bays
+  fields:
+    name:
+      name: Name
+      description: Paddock name
+      required: true
+      example: "SW6"
+      selector:
+        text:
+    bay_count:
+      name: Bay Count
+      description: Number of bays to create
+      required: true
+      example: 5
+      selector:
+        number:
+          min: 1
+          max: 50
+    farm_id:
+      name: Farm ID
+      description: Farm to assign paddock to
+      default: "farm_1"
+      selector:
+        text:
+    bay_prefix:
+      name: Bay Prefix
+      description: Prefix for bay names
+      default: "B-"
+      selector:
+        text:
+    current_season:
+      name: Current Season
+      description: Include in current season
+      default: true
+      selector:
+        boolean:
+
+edit_paddock:
+  name: Edit Paddock
+  description: Edit an existing paddock
+  fields:
+    paddock_id:
+      name: Paddock ID
+      description: ID of paddock to edit
+      required: true
+      selector:
+        text:
+    name:
+      name: Name
+      description: New paddock name
+      selector:
+        text:
+    farm_id:
+      name: Farm ID
+      description: New farm assignment
+      selector:
+        text:
+    current_season:
+      name: Current Season
+      description: Include in current season
+      selector:
+        boolean:
+
+delete_paddock:
+  name: Delete Paddock
+  description: Delete a paddock and all its bays
+  fields:
+    paddock_id:
+      name: Paddock ID
+      description: ID of paddock to delete
+      required: true
+      selector:
+        text:
+
+set_current_season:
+  name: Set Current Season Flag
+  description: Toggle paddock current_season flag
+  fields:
+    paddock_id:
+      name: Paddock ID
+      description: ID of paddock
+      required: true
+      selector:
+        text:
+    value:
+      name: Value
+      description: Set to true/false or omit to toggle
+      selector:
+        boolean:
+
+add_bay:
+  name: Add Bay
+  description: Add a bay to an existing paddock
+  fields:
+    paddock_id:
+      name: Paddock ID
+      description: ID of paddock to add bay to
+      required: true
+      selector:
+        text:
+    name:
+      name: Name
+      description: Bay name
+      required: true
+      example: "B-06"
+      selector:
+        text:
+    order:
+      name: Order
+      description: Display order
+      selector:
+        number:
+          min: 1
+          max: 100
+    is_last:
+      name: Is Last Bay
+      description: Mark as last bay in paddock
+      default: false
+      selector:
+        boolean:
+
+edit_bay:
+  name: Edit Bay
+  description: Edit an existing bay
+  fields:
+    bay_id:
+      name: Bay ID
+      description: ID of bay to edit
+      required: true
+      selector:
+        text:
+    name:
+      name: Name
+      description: New bay name
+      selector:
+        text:
+    order:
+      name: Order
+      description: New display order
+      selector:
+        number:
+          min: 1
+          max: 100
+    is_last:
+      name: Is Last Bay
+      description: Mark as last bay in paddock
+      selector:
+        boolean:
+
+delete_bay:
+  name: Delete Bay
+  description: Delete a bay
+  fields:
+    bay_id:
+      name: Bay ID
+      description: ID of bay to delete
+      required: true
+      selector:
+        text:
+
+add_season:
+  name: Add Season
+  description: Add a new season
+  fields:
+    name:
+      name: Name
+      description: Season name
+      required: true
+      example: "CY26"
+      selector:
+        text:
+    start_date:
+      name: Start Date
+      description: Season start date (YYYY-MM-DD)
+      required: true
+      example: "2026-01-01"
+      selector:
+        text:
+    end_date:
+      name: End Date
+      description: Season end date (YYYY-MM-DD)
+      required: true
+      example: "2026-12-31"
+      selector:
+        text:
+    active:
+      name: Active
+      description: Set as active season
+      default: false
+      selector:
+        boolean:
+
+edit_season:
+  name: Edit Season
+  description: Edit an existing season
+  fields:
+    season_id:
+      name: Season ID
+      description: ID of season to edit
+      required: true
+      selector:
+        text:
+    name:
+      name: Name
+      description: New season name
+      selector:
+        text:
+    start_date:
+      name: Start Date
+      description: New start date
+      selector:
+        text:
+    end_date:
+      name: End Date
+      description: New end date
+      selector:
+        text:
+
+delete_season:
+  name: Delete Season
+  description: Delete a season
+  fields:
+    season_id:
+      name: Season ID
+      description: ID of season to delete
+      required: true
+      selector:
+        text:
+
+set_active_season:
+  name: Set Active Season
+  description: Set a season as the active season
+  fields:
+    season_id:
+      name: Season ID
+      description: ID of season to set as active
+      required: true
+      selector:
+        text:
+
+add_farm:
+  name: Add Farm
+  description: Add a new farm
+  fields:
+    name:
+      name: Name
+      description: Farm name
+      required: true
+      example: "Main Farm"
+      selector:
+        text:
+
+edit_farm:
+  name: Edit Farm
+  description: Edit an existing farm
+  fields:
+    farm_id:
+      name: Farm ID
+      description: ID of farm to edit
+      required: true
+      selector:
+        text:
+    name:
+      name: Name
+      description: New farm name
+      selector:
+        text:
+
+delete_farm:
+  name: Delete Farm
+  description: Delete a farm (only if no paddocks assigned)
+  fields:
+    farm_id:
+      name: Farm ID
+      description: ID of farm to delete
+      required: true
+      selector:
+        text:
+
+export_registry:
+  name: Export Registry
+  description: Export registry to a backup file
+
+import_registry:
+  name: Import Registry
+  description: Import registry from a backup file
+  fields:
+    filename:
+      name: Filename
+      description: Name of backup file to import
+      required: true
+      selector:
+        text:
+
+# =============================================================================
+# INSTALLER SERVICES
+# =============================================================================
+
+check_for_updates:
+  name: Check for Updates
+  description: Check if PaddiSense updates are available
+
+update_paddisense:
+  name: Update PaddiSense
+  description: Update PaddiSense to latest version
+  fields:
+    backup_first:
+      name: Backup First
+      description: Create backup before updating
+      default: true
+      selector:
+        boolean:
+
+install_module:
+  name: Install Module
+  description: Install a PaddiSense module. Validates YAML and checks dependencies before install.
+  fields:
+    module_id:
+      name: Module ID
+      description: Module to install
+      required: true
+      selector:
+        select:
+          options:
+            - "ipm"
+            - "asm"
+            - "weather"
+            - "pwm"
+            - "rtr"
+            - "str"
+            - "wss"
+            - "hfm"
+
+remove_module:
+  name: Remove Module
+  description: Remove a PaddiSense module (preserves local data). Will fail if other modules depend on it unless force is set.
+  fields:
+    module_id:
+      name: Module ID
+      description: Module to remove
+      required: true
+      selector:
+        select:
+          options:
+            - "ipm"
+            - "asm"
+            - "weather"
+            - "pwm"
+            - "rtr"
+            - "str"
+            - "wss"
+            - "hfm"
+    force:
+      name: Force
+      description: Remove even if other modules depend on this one
+      default: false
+      selector:
+        boolean:
+
+create_backup:
+  name: Create Backup
+  description: Create a backup of PaddiSense configuration
+
+restore_backup:
+  name: Restore Backup
+  description: Restore from a backup
+  fields:
+    backup_id:
+      name: Backup ID
+      description: Backup to restore (folder name)
+      required: true
+      selector:
+        text:
+
+rollback:
+  name: Rollback
+  description: Rollback to previous version
+
+install_hacs_cards:
+  name: Install Required HACS Cards
+  description: Install button-card and card-mod from HACS (required for PaddiSense dashboards)
+
+# =============================================================================
+# RTR (REAL TIME RICE) SERVICES
+# =============================================================================
+
+set_rtr_url:
+  name: Set RTR URL
+  description: Set the Real Time Rice dashboard URL (supports Microsoft SafeLinks wrapped URLs)
+  fields:
+    url:
+      name: URL
+      description: The RTR dashboard URL from your email (can be the full SafeLinks URL or direct Google Storage URL)
+      required: true
+      example: "https://storage.googleapis.com/realtimerice/farms/.../rtr_dashboard_xxx.html"
+      selector:
+        text:
+
+refresh_rtr_data:
+  name: Refresh RTR Data
+  description: Fetch latest predictions from the Real Time Rice CSV endpoint

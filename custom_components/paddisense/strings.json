@@ -1,0 +1,94 @@
+{
+  "config": {
+    "step": {
+      "welcome_fresh": {
+        "title": "Welcome to PaddiSense",
+        "description": "PaddiSense is a modular farm management platform for Home Assistant.\n\nThis wizard will:\n1. Register your account\n2. Download PaddiSense from GitHub\n3. Configure Home Assistant\n\nAfter setup, use the **PaddiSense Manager** dashboard to:\n- Add farms and paddocks\n- Install modules\n- Manage seasons\n\nClick Submit to continue."
+      },
+      "welcome_upgrade": {
+        "title": "Existing Installation Detected",
+        "description": "Found PaddiSense v{version} with {module_count} modules installed.\n\nRegistry data: {paddock_count} paddocks, {bay_count} bays.\n\nChoose how to proceed:",
+        "data": {
+          "install_type": "Installation Type"
+        }
+      },
+      "welcome_import": {
+        "title": "Existing Data Detected",
+        "description": "Found existing registry data:\n- {paddock_count} paddocks\n- {bay_count} bays\n- {season_count} seasons\n\nWould you like to keep this data?",
+        "data": {
+          "import_existing": "Import existing data"
+        }
+      },
+      "registration": {
+        "title": "Account Registration",
+        "description": "Enter your details to register.\n\nYour email is used for verification and important notifications.\n\nDev mode: {dev_mode}",
+        "data": {
+          "grower_name": "Your Name",
+          "grower_email": "Email Address"
+        }
+      },
+      "license": {
+        "title": "License Key",
+        "description": "If you have a PaddiSense license key, enter it below.\n\nThe license must be registered to: **{email}**\n\nLeave blank to use free modules only (Weather, IPM, PWM, etc).",
+        "data": {
+          "license_key": "License Key (optional)"
+        }
+      },
+      "install": {
+        "title": "Installing",
+        "description": "Setting up PaddiSense..."
+      }
+    },
+    "abort": {
+      "already_configured": "PaddiSense is already configured",
+      "git_not_available": "Git is not available on this system. PaddiSense requires git to install modules. Please install git and try again.",
+      "clone_failed": "Failed to download PaddiSense: {error}"
+    },
+    "error": {
+      "required": "This field is required",
+      "invalid_email": "Please enter a valid email address",
+      "registration_invalid_email": "This email address could not be verified. Please check and try again.",
+      "registration_network_error": "Could not connect to registration service. Please check your internet connection and try again.",
+      "registration_failed": "Registration failed. Please try again.",
+      "invalid_license": "Invalid license key. Please check the key and try again.",
+      "invalid_format": "License key format is invalid. Keys start with PADDISENSE.",
+      "license_expired": "This license has expired. Please contact support for renewal.",
+      "email_mismatch": "License email does not match your registration email."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "PaddiSense Options",
+        "menu_options": {
+          "update_profile": "Update Profile",
+          "backup_restore": "Backup & Restore"
+        }
+      },
+      "update_profile": {
+        "title": "Update Profile",
+        "description": "Update your name and email address.",
+        "data": {
+          "grower_name": "Your Name",
+          "grower_email": "Email Address"
+        }
+      },
+      "backup_restore": {
+        "title": "Backup & Restore",
+        "data": {
+          "action": "Action"
+        }
+      },
+      "restore_backup": {
+        "title": "Restore from Backup",
+        "description": "Select a backup to restore. Home Assistant will restart after restore.",
+        "data": {
+          "backup_id": "Backup"
+        }
+      }
+    },
+    "abort": {
+      "no_backups": "No backups available"
+    }
+  }
+}
