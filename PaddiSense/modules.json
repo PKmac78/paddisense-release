@@ -2,6 +2,17 @@
   "schema_version": "1.0.0",
   "version": "1.0.0-dev",
   "released": "2026-02-10T18:20:06+11:00",
+  "core": {
+    "registry": {
+      "name": "PaddiSense Manager",
+      "description": "Core farm registry and module manager",
+      "icon": "mdi:view-dashboard",
+      "version": "1.0.0",
+      "dashboard_slug": "paddisense-manager",
+      "dashboard_title": "PaddiSense",
+      "dashboard_file": "registry/dashboards/manager.yaml"
+    }
+  },
   "modules": {
     "weather": {
       "name": "Weather Stations",

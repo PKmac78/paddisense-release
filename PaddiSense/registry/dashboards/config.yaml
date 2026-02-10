@@ -1,0 +1,926 @@
+##############################################################################
+# Farm Registry Configuration Dashboard
+# PaddiSense Farm Management System
+#
+# Views:
+#   1. Farm Management - Add or edit farms
+#   2. Paddock Editor - Add or edit paddocks (filtered by farm)
+#   3. Season - Add or edit seasons
+##############################################################################
+
+title: Farm Registry Config
+
+button_card_templates:
+  #---------------------------------------------------------------------------
+  # Section title bar
+  #---------------------------------------------------------------------------
+  template_titleblock:
+    variables:
+      var_name: Name
+    color_type: card
+    color: "#1e1e1e"
+    show_icon: false
+    show_state: false
+    name: '[[[ return variables.var_name ]]]'
+    styles:
+      card:
+        - height: 50px
+        - border-radius: 12px
+        - padding: 8px
+      name:
+        - font-size: 18px
+        - font-weight: 700
+        - text-align: center
+        - color: white
+
+  #---------------------------------------------------------------------------
+  # Action button (primary)
+  #---------------------------------------------------------------------------
+  template_action:
+    color_type: card
+    color: "#0066cc"
+    show_icon: true
+    show_name: true
+    show_state: false
+    styles:
+      card:
+        - height: 70px
+        - border-radius: 12px
+      name:
+        - font-size: 16px
+        - font-weight: 700
+        - color: white
+      icon:
+        - color: white
+        - width: 28px
+
+  #---------------------------------------------------------------------------
+  # Secondary action button (muted)
+  #---------------------------------------------------------------------------
+  template_secondary:
+    color_type: card
+    color: "#555555"
+    show_icon: true
+    show_name: true
+    show_state: false
+    styles:
+      card:
+        - height: 60px
+        - border-radius: 12px
+      name:
+        - font-size: 14px
+        - font-weight: 600
+        - color: white
+      icon:
+        - color: white
+        - width: 24px
+
+  #---------------------------------------------------------------------------
+  # Success button (green)
+  #---------------------------------------------------------------------------
+  template_success:
+    color_type: card
+    color: "#28a745"
+    show_icon: true
+    show_name: true
+    show_state: false
+    styles:
+      card:
+        - height: 70px
+        - border-radius: 12px
+      name:
+        - font-size: 16px
+        - font-weight: 700
+        - color: white
+      icon:
+        - color: white
+        - width: 28px
+
+  #---------------------------------------------------------------------------
+  # Danger button (red) - same height as success/action buttons
+  #---------------------------------------------------------------------------
+  template_danger:
+    color_type: card
+    color: "#dc3545"
+    show_icon: true
+    show_name: true
+    show_state: false
+    styles:
+      card:
+        - height: 70px
+        - border-radius: 12px
+      name:
+        - font-size: 16px
+        - font-weight: 700
+        - color: white
+      icon:
+        - color: white
+        - width: 28px
+
+views:
+  # ---------------------------------------------------------------------------
+  # View 1: Farm Management
+  # ---------------------------------------------------------------------------
+  - title: Farm Management
+    path: farms
+    icon: mdi:barn
+    type: sections
+    max_columns: 1
+    sections:
+      - type: grid
+        cards:
+          - type: vertical-stack
+            cards:
+              - type: custom:button-card
+                template: template_titleblock
+                variables:
+                  var_name: FARM MANAGEMENT
+
+              # Editor mode selector
+              - type: entities
+                entities:
+                  - entity: input_select.registry_farm_editor_mode
+                    name: Mode
+                card_mod:
+                  style: |
+                    ha-card {
+                      border-radius: 12px;
+                      padding: 4px;
+                    }
+                    .mdc-list-item__primary-text {
+                      font-size: 1.3rem !important;
+                    }
+
+              #----------------------------------------------------------------
+              # Edit Existing Farm (conditional)
+              #----------------------------------------------------------------
+              - type: conditional
+                conditions:
+                  - condition: state
+                    entity: input_select.registry_farm_editor_mode
+                    state: "Edit Existing Farm"
+                card:
+                  type: vertical-stack
+                  cards:
+                    - type: markdown
+                      content: |
+                        **Select a farm to edit.** Changes are auto-loaded when you select.
+                      card_mod:
+                        style: |
+                          ha-card {
+                            border-radius: 12px;
+                            padding: 8px;
+                            background: var(--card-background-color);
+                          }
+
+                    - type: entities
+                      entities:
+                        - entity: input_select.registry_farm
+                          name: Select Farm
+                      card_mod:
+                        style: |
+                          ha-card {
+                            border-radius: 12px;
+                            padding: 4px;
+                            background: var(--card-background-color);
+                          }
+                          .mdc-list-item__primary-text {
+                            font-size: 1.3rem !important;
+                          }
+
+                    - type: custom:button-card
+                      template: template_titleblock
+                      variables:
+                        var_name: EDIT FARM DETAILS
+
+                    - type: entities
+                      entities:
+                        - entity: input_text.registry_edit_farm_name
+                          name: Farm Name
+                      card_mod:
+                        style: |
+                          ha-card {
+                            border-radius: 12px;
+                            padding: 6px;
+                            background: var(--card-background-color);
+                          }
+                          .mdc-list-item__primary-text {
+                            font-size: 1.2rem !important;
+                          }
+
+                    - type: horizontal-stack
+                      cards:
+                        - type: custom:button-card
+                          template: template_success
+                          name: Save Changes
+                          icon: mdi:content-save
+                          tap_action:
+                            action: call-service
+                            service: script.registry_save_farm_edit
+                          confirmation:
+                            text: Save farm changes?
+
+                        - type: custom:button-card
+                          template: template_danger
+                          name: Delete
+                          icon: mdi:delete
+                          tap_action:
+                            action: call-service
+                            service: script.registry_delete_farm
+                            data:
+                              id: "{{ states('input_text.registry_edit_farm_pointer') }}"
+                          confirmation:
+                            text: Delete this farm? Farms with paddocks cannot be deleted.
+
+              #----------------------------------------------------------------
+              # Add New Farm (conditional)
+              #----------------------------------------------------------------
+              - type: conditional
+                conditions:
+                  - condition: state
+                    entity: input_select.registry_farm_editor_mode
+                    state: "Add New Farm"
+                card:
+                  type: vertical-stack
+                  cards:
+                    - type: custom:button-card
+                      template: template_titleblock
+                      variables:
+                        var_name: NEW FARM DETAILS
+
+                    - type: entities
+                      entities:
+                        - entity: input_text.registry_new_farm_name
+                          name: Farm Name
+                      card_mod:
+                        style: |
+                          ha-card {
+                            border-radius: 12px;
+                            padding: 6px;
+                            background: var(--card-background-color);
+                          }
+                          .mdc-list-item__primary-text {
+                            font-size: 1.2rem !important;
+                          }
+
+                    - type: custom:button-card
+                      template: template_success
+                      name: Add Farm
+                      icon: mdi:barn
+                      tap_action:
+                        action: call-service
+                        service: script.registry_add_farm
+                        data:
+                          name: "{{ states('input_text.registry_new_farm_name') }}"
+                      confirmation:
+                        text: Add new farm?
+
+              #----------------------------------------------------------------
+              # Farm Cards (professional grid display)
+              #----------------------------------------------------------------
+              - type: custom:button-card
+                template: template_titleblock
+                variables:
+                  var_name: REGISTERED FARMS
+
+              - type: custom:button-card
+                entity: sensor.farm_registry_data
+                show_icon: false
+                show_name: false
+                show_state: false
+                styles:
+                  card:
+                    - background: transparent
+                    - box-shadow: none
+                    - padding: 0
+                    - margin: 0
+                  grid:
+                    - display: block
+                custom_fields:
+                  farms: |
+                    [[[
+                      try {
+                        if (!entity || !entity.attributes) {
+                          return `<div style="text-align:center;padding:30px;color:var(--secondary-text-color);">
+                                    Loading...
+                                  </div>`;
+                        }
+
+                        const farms = entity.attributes.farms || {};
+                        const paddocks = entity.attributes.paddocks || {};
+                        const farmList = Object.entries(farms);
+
+                        if (farmList.length === 0) {
+                          return `<div style="text-align:center;padding:40px;color:var(--secondary-text-color);">
+                                    <ha-icon icon="mdi:barn" style="--mdc-icon-size:48px;margin-bottom:12px;opacity:0.5;"></ha-icon>
+                                    <div style="font-size:16px;">No farms defined</div>
+                                    <div style="font-size:14px;margin-top:8px;">Add one using the form above</div>
+                                  </div>`;
+                        }
+
+                        let html = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;padding:4px;">`;
+
+                        for (const [fid, farm] of farmList) {
+                          const name = farm.name || fid;
+                          const farmPaddocks = Object.values(paddocks).filter(p => p.farm_id === fid);
+                          const paddockNames = farmPaddocks.map(p => p.name || 'Unnamed').sort();
+
+                          html += `
+                            <div style="background:var(--card-background-color);border-radius:12px;padding:16px;box-shadow:0 2px 6px rgba(0,0,0,0.1);border-left:4px solid #8d6e63;">
+                              <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+                                <div style="width:50px;height:50px;border-radius:50%;background:rgba(141,110,99,0.15);display:flex;align-items:center;justify-content:center;">
+                                  <ha-icon icon="mdi:barn" style="--mdc-icon-size:28px;color:#8d6e63;"></ha-icon>
+                                </div>
+                                <div style="flex:1;min-width:0;">
+                                  <div style="font-size:18px;font-weight:700;color:var(--primary-text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${name}</div>
+                                </div>
+                              </div>
+                              <div style="padding-top:12px;border-top:1px solid var(--divider-color,#e0e0e0);">
+                                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                                  <ha-icon icon="mdi:view-grid" style="--mdc-icon-size:18px;color:var(--secondary-text-color);"></ha-icon>
+                                  <span style="font-size:13px;font-weight:600;color:var(--secondary-text-color);text-transform:uppercase;">Paddocks (${paddockNames.length})</span>
+                                </div>
+                                <div style="font-size:14px;color:var(--primary-text-color);line-height:1.5;">
+                                  ${paddockNames.length > 0 ? paddockNames.join(', ') : '<span style="color:var(--secondary-text-color);font-style:italic;">No paddocks assigned</span>'}
+                                </div>
+                              </div>
+                            </div>`;
+                        }
+
+                        html += `</div>`;
+                        return html;
+
+                      } catch (e) {
+                        return `<div style="padding:14px;border-radius:12px;background:rgba(244,67,54,0.12);color:var(--primary-text-color);">
+                                  <div style="font-weight:700;margin-bottom:6px;">Render error</div>
+                                  <div style="font-family:monospace;font-size:12px;opacity:.85;">${String(e)}</div>
+                                </div>`;
+                      }
+                    ]]]
+
+  # ---------------------------------------------------------------------------
+  # View 2: Paddock Editor
+  # ---------------------------------------------------------------------------
+  - title: Paddock Editor
+    path: paddocks
+    icon: mdi:view-grid
+    type: sections
+    max_columns: 1
+    sections:
+      - type: grid
+        cards:
+          - type: vertical-stack
+            cards:
+              - type: custom:button-card
+                template: template_titleblock
+                variables:
+                  var_name: PADDOCK EDITOR
+
+              # Editor mode selector
+              - type: entities
+                entities:
+                  - entity: input_select.registry_paddock_editor_mode
+                    name: Mode
+                card_mod:
+                  style: |
+                    ha-card {
+                      border-radius: 12px;
+                      padding: 4px;
+                    }
+                    .mdc-list-item__primary-text {
+                      font-size: 1.3rem !important;
+                    }
+
+              #----------------------------------------------------------------
+              # Edit Existing Paddock (conditional)
+              #----------------------------------------------------------------
+              - type: conditional
+                conditions:
+                  - condition: state
+                    entity: input_select.registry_paddock_editor_mode
+                    state: "Edit Existing Paddock"
+                card:
+                  type: vertical-stack
+                  cards:
+                    - type: markdown
+                      content: |
+                        **Select a farm to filter paddocks, then select a paddock to edit.**
+                      card_mod:
+                        style: |
+                          ha-card {
+                            border-radius: 12px;
+                            padding: 8px;
+                            background: var(--card-background-color);
+                          }
+
+                    # Farm filter
+                    - type: entities
+                      entities:
+                        - entity: input_select.registry_paddock_farm_filter
+                          name: Filter by Farm
+                      card_mod:
+                        style: |
+                          ha-card {
+                            border-radius: 12px;
+                            padding: 4px;
+                          }
+                          .mdc-list-item__primary-text {
+                            font-size: 1.3rem !important;
+                          }
+
+                    # Paddock selector
+                    - type: entities
+                      entities:
+                        - entity: input_select.registry_paddock
+                          name: Select Paddock
+                      card_mod:
+                        style: |
+                          ha-card {
+                            border-radius: 12px;
+                            padding: 4px;
+                            background: var(--card-background-color);
+                          }
+                          .mdc-list-item__primary-text {
+                            font-size: 1.3rem !important;
+                          }
+
+                    - type: custom:button-card
+                      template: template_titleblock
+                      variables:
+                        var_name: EDIT PADDOCK DETAILS
+
+                    # Edit paddock form
+                    - type: entities
+                      entities:
+                        - entity: input_text.registry_edit_paddock_name
+                          name: Paddock Name
+                        - entity: input_number.registry_edit_paddock_bay_count
+                          name: Number of Bays
+                        - entity: input_boolean.registry_edit_current_season
+                          name: Active This Season
+                      card_mod:
+                        style: |
+                          ha-card {
+                            border-radius: 12px;
+                            padding: 6px;
+                            background: var(--card-background-color);
+                          }
+                          .mdc-list-item__primary-text {
+                            font-size: 1.2rem !important;
+                          }
+
+                    - type: horizontal-stack
+                      cards:
+                        - type: custom:button-card
+                          template: template_success
+                          name: Save Changes
+                          icon: mdi:content-save
+                          tap_action:
+                            action: call-service
+                            service: script.registry_save_paddock_edit
+                          confirmation:
+                            text: Save paddock changes?
+
+                        - type: custom:button-card
+                          template: template_danger
+                          name: Delete
+                          icon: mdi:delete
+                          tap_action:
+                            action: call-service
+                            service: script.registry_delete_paddock
+                            data:
+                              id: "{{ states('input_text.registry_edit_paddock_pointer') }}"
+                          confirmation:
+                            text: Delete this paddock and all its bays?
+
+              #----------------------------------------------------------------
+              # Add New Paddock (conditional)
+              #----------------------------------------------------------------
+              - type: conditional
+                conditions:
+                  - condition: state
+                    entity: input_select.registry_paddock_editor_mode
+                    state: "Add New Paddock"
+                card:
+                  type: vertical-stack
+                  cards:
+                    - type: custom:button-card
+                      template: template_titleblock
+                      variables:
+                        var_name: NEW PADDOCK DETAILS
+
+                    - type: entities
+                      entities:
+                        - entity: input_text.registry_new_paddock_name
+                          name: Paddock Name
+                        - entity: input_number.registry_new_paddock_bay_count
+                          name: Number of Bays
+                        - entity: input_select.registry_new_paddock_farm
+                          name: Assign to Farm
+                      card_mod:
+                        style: |
+                          ha-card {
+                            border-radius: 12px;
+                            padding: 6px;
+                            background: var(--card-background-color);
+                          }
+                          .mdc-list-item__primary-text {
+                            font-size: 1.2rem !important;
+                          }
+
+                    - type: custom:button-card
+                      template: template_success
+                      name: Add Paddock
+                      icon: mdi:view-grid-plus
+                      tap_action:
+                        action: call-service
+                        service: script.registry_add_paddock
+                        data:
+                          name: "{{ states('input_text.registry_new_paddock_name') }}"
+                          bay_count: "{{ states('input_number.registry_new_paddock_bay_count') | int(1) }}"
+                          farm: >-
+                            {% set farm_name = states('input_select.registry_new_paddock_farm') %}
+                            {% set farms = state_attr('sensor.farm_registry_data', 'farms') or {} %}
+                            {% for fid, f in farms.items() if f.name == farm_name %}
+                            {{ fid }}
+                            {% endfor %}
+                      confirmation:
+                        text: Add new paddock?
+
+              #----------------------------------------------------------------
+              # Paddock Cards (professional grid display)
+              #----------------------------------------------------------------
+              - type: custom:button-card
+                template: template_titleblock
+                variables:
+                  var_name: PADDOCK LIST
+
+              - type: custom:button-card
+                entity: sensor.farm_registry_data
+                show_icon: false
+                show_name: false
+                show_state: false
+                styles:
+                  card:
+                    - background: transparent
+                    - box-shadow: none
+                    - padding: 0
+                    - margin: 0
+                  grid:
+                    - display: block
+                custom_fields:
+                  paddocks: |
+                    [[[
+                      try {
+                        if (!entity || !entity.attributes) {
+                          return `<div style="text-align:center;padding:30px;color:var(--secondary-text-color);">
+                                    Loading...
+                                  </div>`;
+                        }
+
+                        const paddocks = entity.attributes.paddocks || {};
+                        const farms = entity.attributes.farms || {};
+                        const bays = entity.attributes.bays || {};
+                        const paddockList = Object.entries(paddocks);
+
+                        if (paddockList.length === 0) {
+                          return `<div style="text-align:center;padding:40px;color:var(--secondary-text-color);">
+                                    <ha-icon icon="mdi:view-grid" style="--mdc-icon-size:48px;margin-bottom:12px;opacity:0.5;"></ha-icon>
+                                    <div style="font-size:16px;">No paddocks configured</div>
+                                    <div style="font-size:14px;margin-top:8px;">Add one using the form above</div>
+                                  </div>`;
+                        }
+
+                        let html = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;padding:4px;">`;
+
+                        for (const [pid, paddock] of paddockList) {
+                          const name = paddock.name || pid;
+                          const bayCount = paddock.bay_count || 0;
+                          const isActive = paddock.current_season === true;
+                          const farmId = paddock.farm_id || '';
+                          const farm = farms[farmId] || {};
+                          const farmName = farm.name || farmId || 'Unassigned';
+                          const area = paddock.area_ha || null;
+                          const areaDisplay = area ? area.toFixed(1) + ' ha' : '--';
+
+                          const statusColor = isActive ? '#4caf50' : '#9e9e9e';
+                          const statusBg = isActive ? 'rgba(76,175,80,0.15)' : 'rgba(158,158,158,0.15)';
+                          const statusText = isActive ? 'ACTIVE' : 'INACTIVE';
+
+                          html += `
+                            <div style="background:var(--card-background-color);border-radius:12px;padding:16px;box-shadow:0 2px 6px rgba(0,0,0,0.1);border-left:4px solid #43a047;">
+                              <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+                                <div style="width:50px;height:50px;border-radius:50%;background:rgba(67,160,71,0.15);display:flex;align-items:center;justify-content:center;">
+                                  <ha-icon icon="mdi:view-grid" style="--mdc-icon-size:28px;color:#43a047;"></ha-icon>
+                                </div>
+                                <div style="flex:1;min-width:0;">
+                                  <div style="font-size:18px;font-weight:700;color:var(--primary-text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${name}</div>
+                                  <div style="font-size:12px;color:var(--secondary-text-color);">${farmName}</div>
+                                </div>
+                                <div style="padding:4px 10px;border-radius:12px;background:${statusBg};color:${statusColor};font-size:11px;font-weight:700;">${statusText}</div>
+                              </div>
+                              <div style="display:flex;justify-content:space-around;padding-top:12px;border-top:1px solid var(--divider-color,#e0e0e0);">
+                                <div style="text-align:center;">
+                                  <div style="font-size:24px;font-weight:700;color:var(--primary-text-color);">${bayCount}</div>
+                                  <div style="font-size:11px;color:var(--secondary-text-color);">Bays</div>
+                                </div>
+                                <div style="width:1px;background:var(--divider-color,#e0e0e0);"></div>
+                                <div style="text-align:center;">
+                                  <div style="font-size:16px;font-weight:600;color:var(--primary-text-color);">${areaDisplay}</div>
+                                  <div style="font-size:11px;color:var(--secondary-text-color);">Total Area</div>
+                                </div>
+                              </div>
+                            </div>`;
+                        }
+
+                        html += `</div>`;
+                        return html;
+
+                      } catch (e) {
+                        return `<div style="padding:14px;border-radius:12px;background:rgba(244,67,54,0.12);color:var(--primary-text-color);">
+                                  <div style="font-weight:700;margin-bottom:6px;">Render error</div>
+                                  <div style="font-family:monospace;font-size:12px;opacity:.85;">${String(e)}</div>
+                                </div>`;
+                      }
+                    ]]]
+
+  # ---------------------------------------------------------------------------
+  # View 3: Season
+  # ---------------------------------------------------------------------------
+  - title: Season
+    path: seasons
+    icon: mdi:calendar-range
+    type: sections
+    max_columns: 1
+    sections:
+      - type: grid
+        cards:
+          - type: vertical-stack
+            cards:
+              - type: custom:button-card
+                template: template_titleblock
+                variables:
+                  var_name: SEASON MANAGEMENT
+
+              # Current active season display
+              - type: entities
+                title: Current Status
+                entities:
+                  - entity: sensor.farm_registry_active_season
+                    name: Active Season
+                    icon: mdi:calendar-star
+
+              # Editor mode selector
+              - type: entities
+                entities:
+                  - entity: input_select.registry_season_editor_mode
+                    name: Mode
+                card_mod:
+                  style: |
+                    ha-card {
+                      border-radius: 12px;
+                      padding: 4px;
+                    }
+                    .mdc-list-item__primary-text {
+                      font-size: 1.3rem !important;
+                    }
+
+              #----------------------------------------------------------------
+              # Edit Existing Season (conditional)
+              #----------------------------------------------------------------
+              - type: conditional
+                conditions:
+                  - condition: state
+                    entity: input_select.registry_season_editor_mode
+                    state: "Edit Existing Season"
+                card:
+                  type: vertical-stack
+                  cards:
+                    - type: markdown
+                      content: |
+                        **Select a season to edit.** Changes are auto-loaded when you select.
+                      card_mod:
+                        style: |
+                          ha-card {
+                            border-radius: 12px;
+                            padding: 8px;
+                            background: var(--card-background-color);
+                          }
+
+                    - type: entities
+                      entities:
+                        - entity: input_select.registry_season
+                          name: Select Season
+                      card_mod:
+                        style: |
+                          ha-card {
+                            border-radius: 12px;
+                            padding: 4px;
+                            background: var(--card-background-color);
+                          }
+                          .mdc-list-item__primary-text {
+                            font-size: 1.3rem !important;
+                          }
+
+                    - type: custom:button-card
+                      template: template_titleblock
+                      variables:
+                        var_name: EDIT SEASON DETAILS
+
+                    - type: entities
+                      entities:
+                        - entity: input_text.registry_edit_season_name
+                          name: Season Name
+                        - entity: input_datetime.registry_edit_season_start
+                          name: Start Date
+                        - entity: input_datetime.registry_edit_season_end
+                          name: End Date
+                      card_mod:
+                        style: |
+                          ha-card {
+                            border-radius: 12px;
+                            padding: 6px;
+                            background: var(--card-background-color);
+                          }
+                          .mdc-list-item__primary-text {
+                            font-size: 1.2rem !important;
+                          }
+
+                    - type: horizontal-stack
+                      cards:
+                        - type: custom:button-card
+                          template: template_success
+                          name: Save Changes
+                          icon: mdi:content-save
+                          tap_action:
+                            action: call-service
+                            service: script.registry_save_season_edit
+                          confirmation:
+                            text: Save season changes?
+
+                        - type: custom:button-card
+                          template: template_action
+                          name: Set Active
+                          icon: mdi:calendar-check
+                          tap_action:
+                            action: call-service
+                            service: script.registry_set_active_season
+                            data:
+                              id: "{{ states('input_text.registry_edit_season_pointer') }}"
+                          confirmation:
+                            text: Set this season as the active season?
+
+                        - type: custom:button-card
+                          template: template_danger
+                          name: Delete
+                          icon: mdi:delete
+                          tap_action:
+                            action: call-service
+                            service: script.registry_delete_season
+                            data:
+                              id: "{{ states('input_text.registry_edit_season_pointer') }}"
+                          confirmation:
+                            text: Delete this season?
+
+              #----------------------------------------------------------------
+              # Add New Season (conditional)
+              #----------------------------------------------------------------
+              - type: conditional
+                conditions:
+                  - condition: state
+                    entity: input_select.registry_season_editor_mode
+                    state: "Add New Season"
+                card:
+                  type: vertical-stack
+                  cards:
+                    - type: custom:button-card
+                      template: template_titleblock
+                      variables:
+                        var_name: NEW SEASON DETAILS
+
+                    - type: entities
+                      entities:
+                        - entity: input_text.registry_new_season_name
+                          name: Season Name (e.g., CY26)
+                        - entity: input_datetime.registry_season_start
+                          name: Start Date
+                        - entity: input_datetime.registry_season_end
+                          name: End Date
+                      card_mod:
+                        style: |
+                          ha-card {
+                            border-radius: 12px;
+                            padding: 6px;
+                            background: var(--card-background-color);
+                          }
+                          .mdc-list-item__primary-text {
+                            font-size: 1.2rem !important;
+                          }
+
+                    - type: custom:button-card
+                      template: template_success
+                      name: Add Season
+                      icon: mdi:calendar-plus
+                      tap_action:
+                        action: call-service
+                        service: script.registry_add_season
+                        data:
+                          name: "{{ states('input_text.registry_new_season_name') }}"
+                          start: "{{ states('input_datetime.registry_season_start') }}"
+                          end: "{{ states('input_datetime.registry_season_end') }}"
+                          active: false
+                      confirmation:
+                        text: Add new season?
+
+              #----------------------------------------------------------------
+              # Season Cards (professional grid display)
+              #----------------------------------------------------------------
+              - type: custom:button-card
+                template: template_titleblock
+                variables:
+                  var_name: SEASON LIST
+
+              - type: custom:button-card
+                entity: sensor.farm_registry_data
+                show_icon: false
+                show_name: false
+                show_state: false
+                styles:
+                  card:
+                    - background: transparent
+                    - box-shadow: none
+                    - padding: 0
+                    - margin: 0
+                  grid:
+                    - display: block
+                custom_fields:
+                  seasons: |
+                    [[[
+                      try {
+                        if (!entity || !entity.attributes) {
+                          return `<div style="text-align:center;padding:30px;color:var(--secondary-text-color);">
+                                    Loading...
+                                  </div>`;
+                        }
+
+                        const seasons = entity.attributes.seasons || {};
+                        const activeSeason = entity.attributes.active_season || '';
+                        const seasonList = Object.entries(seasons);
+
+                        if (seasonList.length === 0) {
+                          return `<div style="text-align:center;padding:40px;color:var(--secondary-text-color);">
+                                    <ha-icon icon="mdi:calendar-range" style="--mdc-icon-size:48px;margin-bottom:12px;opacity:0.5;"></ha-icon>
+                                    <div style="font-size:16px;">No seasons defined</div>
+                                    <div style="font-size:14px;margin-top:8px;">Add one using the form above</div>
+                                  </div>`;
+                        }
+
+                        let html = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;padding:4px;">`;
+
+                        for (const [sid, season] of seasonList) {
+                          const name = season.name || sid;
+                          const startDate = season.start_date || '---';
+                          const endDate = season.end_date || '---';
+                          const isActive = sid === activeSeason;
+
+                          const cardColor = isActive ? '#7b1fa2' : '#5c6bc0';
+                          const cardBg = isActive ? 'rgba(123,31,162,0.15)' : 'rgba(92,107,192,0.15)';
+                          const statusColor = isActive ? '#4caf50' : '#9e9e9e';
+                          const statusBg = isActive ? 'rgba(76,175,80,0.15)' : 'rgba(158,158,158,0.15)';
+                          const statusText = isActive ? 'ACTIVE' : 'INACTIVE';
+
+                          html += `
+                            <div style="background:var(--card-background-color);border-radius:12px;padding:16px;box-shadow:0 2px 6px rgba(0,0,0,0.1);border-left:4px solid ${cardColor};">
+                              <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+                                <div style="width:50px;height:50px;border-radius:50%;background:${cardBg};display:flex;align-items:center;justify-content:center;">
+                                  <ha-icon icon="${isActive ? 'mdi:calendar-star' : 'mdi:calendar-range'}" style="--mdc-icon-size:28px;color:${cardColor};"></ha-icon>
+                                </div>
+                                <div style="flex:1;min-width:0;">
+                                  <div style="font-size:20px;font-weight:700;color:var(--primary-text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${name}</div>
+                                </div>
+                                <div style="padding:4px 10px;border-radius:12px;background:${statusBg};color:${statusColor};font-size:11px;font-weight:700;">${statusText}</div>
+                              </div>
+                              <div style="display:flex;justify-content:space-between;padding-top:12px;border-top:1px solid var(--divider-color,#e0e0e0);">
+                                <div style="text-align:center;flex:1;">
+                                  <div style="font-size:11px;font-weight:600;color:var(--secondary-text-color);text-transform:uppercase;margin-bottom:4px;">Start</div>
+                                  <div style="font-size:14px;font-weight:600;color:var(--primary-text-color);">${startDate}</div>
+                                </div>
+                                <div style="width:1px;background:var(--divider-color,#e0e0e0);"></div>
+                                <div style="text-align:center;flex:1;">
+                                  <div style="font-size:11px;font-weight:600;color:var(--secondary-text-color);text-transform:uppercase;margin-bottom:4px;">End</div>
+                                  <div style="font-size:14px;font-weight:600;color:var(--primary-text-color);">${endDate}</div>
+                                </div>
+                              </div>
+                            </div>`;
+                        }
+
+                        html += `</div>`;
+                        return html;
+
+                      } catch (e) {
+                        return `<div style="padding:14px;border-radius:12px;background:rgba(244,67,54,0.12);color:var(--primary-text-color);">
+                                  <div style="font-weight:700;margin-bottom:6px;">Render error</div>
+                                  <div style="font-family:monospace;font-size:12px;opacity:.85;">${String(e)}</div>
+                                </div>`;
+                      }
+                    ]]]
