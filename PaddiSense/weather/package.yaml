@@ -1,0 +1,2910 @@
+template:
+  - sensor:
+      - name: "Weather Station 1 Delta T"
+        state: >-
+          {% set t = states('sensor.ecowittgateway_1_outdoor_temperature') | float(0)
+             if has_value('sensor.ecowittgateway_1_outdoor_temperature') else 0 %}
+          {% set rh = states('sensor.ecowittgateway_1_humidity') | float(0)
+             if has_value('sensor.ecowittgateway_1_humidity') else 0 %}
+          {% set a = t * atan(0.151977 * (rh + 8.313659) ** 0.5) %}
+          {% set b = 0.00391838 * ((rh ** 3) ** 0.5) * atan(0.023101 * rh) %}
+          {% set c = atan(rh - 1.676331) %}
+          {% set d = atan(t + rh) %}
+          {{ (t - (a + b - c + d - 4.686035)) | round(2) }}
+        unit_of_measurement: "°C"
+
+  - sensor:
+      - name: "Weather Station 1 Evapotranspiration"
+        state: >-
+          {% set maxT = states('sensor.weather_station_1_max_temperature') | float(0) %}
+          {% set minT = states('sensor.weather_station_1_min_temperature') | float(0) %}
+          {% set maxRH = states('sensor.weather_station_1_max_humidity') | float(0) %}
+          {% set minRH = states('sensor.weather_station_1_min_humidity') | float(0) %}
+          {% set avgWS = (states('sensor.weather_station_1_avg_wind_speed') | float(0)) / 3.6 %}
+          {% set SolRad = (states('sensor.weather_station_1_solar_radiation_mj_m2_day') | float(0)) | round(1) %}
+
+          {% set e = 2.718281828459045 %}
+          {% set pi = 3.141592653589793 %}
+          {% set Day = ((now() - now().replace(month=1, day=1)).days + 1) | int %}
+
+          {% set avgT = (maxT + minT) / 2 %}
+          {% set PsyCon = 0.0665043028282533 %}
+          {% set MnSVP = ((0.6108 * e ** ((17.27 * maxT) / (maxT + 237.3))) + (0.6108 * e ** ((17.27 * minT) / (minT + 237.3)))) / 2 %}
+          {% set SSVPC = (4098 * (0.6108 * e ** ((17.27 * avgT) / (avgT + 237.3)))) / ((avgT + 237.3) ** 2) %}
+          {% set ActVP = (((0.6108 * e ** ((17.27 * maxT) / (maxT + 237.3))) * (minRH / 100)) + ((0.6108 * e ** ((17.27 * minT) / (minT + 237.3))) * (maxRH / 100))) / 2 %}
+          {% set VPD = MnSVP - ActVP %}
+
+          {% set alpha = 0.23 %}
+          {% set sigma = 0.000000004903 %}
+          {% set latitude = -35.5575 %}
+          {% set elevation = 180 %}
+
+          {% set Gsc = 0.0820 %}
+          {% set dr = 1 + 0.033 * cos((2 * pi / 365) * Day) %}
+          {% set delta = 0.409 * sin((2 * pi / 365) * Day - 1.39) %}
+          {% set omega_s = acos(-tan(latitude * pi / 180) * tan(delta)) %}
+          {% set Ra = (24 * 60 / pi) * Gsc * dr * (omega_s * sin(latitude * pi / 180) * sin(delta) + cos(latitude * pi / 180) * cos(delta) * sin(omega_s)) %}
+
+          {% set Rso = (0.75 + 2e-5 * elevation) * Ra %}
+
+          {% set TmaxK = maxT + 273.16 %}
+          {% set TminK = minT + 273.16 %}
+
+          {% set Rns = (1 - alpha) * SolRad %}
+          {% set Rnl = sigma * ((TmaxK**4 + TminK**4) / 2) * (0.34 - 0.14 * (ActVP**0.5)) * (1.35 * (SolRad / Rso) - 0.35) %}
+          {% set NetRad = Rns - Rnl %}
+
+          {{ (0.408 * NetRad * SSVPC / (SSVPC + PsyCon * (1 + 0.34 * avgWS)))
+             + ((900 / (avgT + 273)) * avgWS * VPD * PsyCon / (SSVPC + PsyCon * (1 + 0.34 * avgWS))) }}
+        unit_of_measurement: "mm"
+
+  - sensor:
+      - name: "Weather Station 1 Filtered Solar Radiation"
+        state: >-
+          {% set input = 'sensor.ecowittgateway_1_solar_radiation' %}
+          {% set val = states(input) | float(0) %}
+          {{ val * 300 / 1000000 if has_value(input) and 0 < val < 2000 else 0 }}
+        unit_of_measurement: "MJ"
+        #device_class: energy
+        #state_class: total
+
+  - trigger:
+      - platform: time
+        at: "23:59:00"
+    sensor:
+      - name: "Weather Station 1 Degree Day"
+        unique_id: weather_station_1_degree_day
+        state_class: measurement
+        unit_of_measurement: "°C"
+        icon: mdi:chart-line
+        availability: >-
+          {{ is_number(states('sensor.weather_station_1_max_temperature'))
+             and is_number(states('sensor.weather_station_1_min_temperature')) }}
+        state: >-
+          {% set maxT = states('sensor.weather_station_1_max_temperature') | float(0) %}
+          {% set minT = states('sensor.weather_station_1_min_temperature') | float(0) %}
+          {{ (((maxT + minT) / 2) - 10) | round(2) }}
+        attributes:
+          max_temperature: "{{ states('sensor.weather_station_1_max_temperature') }}"
+          min_temperature: "{{ states('sensor.weather_station_1_min_temperature') }}"
+
+
+# =============================================================================
+# BOM CONFIGURATION - Bureau of Meteorology Integration
+# =============================================================================
+# The BOM integration creates sensors with a location prefix (e.g., "home", "farm").
+# Configure input_text.bom_location_prefix to match your BOM integration location.
+
+# =============================================================================
+# BINARY SENSORS - For dashboard conditional cards
+# =============================================================================
+  - binary_sensor:
+      # BOM Configuration Status
+      - name: "BOM Observations Available"
+        unique_id: bom_observations_available
+        icon: mdi:weather-cloudy
+        state: >-
+          {% set prefix = states('input_text.bom_location_prefix') | default('home', true) %}
+          {% set temp_entity = 'sensor.' ~ prefix ~ '_observations_temp' %}
+          {{ has_value(temp_entity) }}
+      # API Station Configuration Status (for Settings conditional cards)
+      - name: "Weather API Station 1 Configured"
+        unique_id: weather_api_station_1_configured
+        icon: mdi:weather-station
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('1') or stations.get(1) or {} %}
+          {{ (s.get('imei') or s.get('name')) | default(false) | bool }}
+
+      - name: "Weather API Station 2 Configured"
+        unique_id: weather_api_station_2_configured
+        icon: mdi:weather-station
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('2') or stations.get(2) or {} %}
+          {{ (s.get('imei') or s.get('name')) | default(false) | bool }}
+
+      - name: "Weather API Station 3 Configured"
+        unique_id: weather_api_station_3_configured
+        icon: mdi:weather-station
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('3') or stations.get(3) or {} %}
+          {{ (s.get('imei') or s.get('name')) | default(false) | bool }}
+
+      - name: "Weather API Station 4 Configured"
+        unique_id: weather_api_station_4_configured
+        icon: mdi:weather-station
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('4') or stations.get(4) or {} %}
+          {{ (s.get('imei') or s.get('name')) | default(false) | bool }}
+
+  # Template sensor to find next available slot and slot summary
+  - sensor:
+      - name: "Weather API Slot Status"
+        unique_id: weather_api_slot_status
+        icon: mdi:format-list-numbered
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set count = namespace(val=0) %}
+          {% for i in range(1, 5) %}
+            {% set s = stations.get(i | string) or stations.get(i) or {} %}
+            {% if s.get('imei') or s.get('name') %}
+              {% set count.val = count.val + 1 %}
+            {% endif %}
+          {% endfor %}
+          {{ count.val }}/4 configured
+        attributes:
+          next_slot: >-
+            {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+            {% set ns = namespace(slot=0) %}
+            {% for i in range(1, 5) %}
+              {% if ns.slot == 0 %}
+                {% set s = stations.get(i | string) or stations.get(i) or {} %}
+                {% if not (s.get('imei') or s.get('name')) %}
+                  {% set ns.slot = i %}
+                {% endif %}
+              {% endif %}
+            {% endfor %}
+            {{ ns.slot if ns.slot > 0 else 0 }}
+          slot_1_name: >-
+            {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+            {% set s = stations.get('1') or stations.get(1) or {} %}
+            {{ s.get('name', '') if s.get('imei') or s.get('name') else '' }}
+          slot_2_name: >-
+            {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+            {% set s = stations.get('2') or stations.get(2) or {} %}
+            {{ s.get('name', '') if s.get('imei') or s.get('name') else '' }}
+          slot_3_name: >-
+            {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+            {% set s = stations.get('3') or stations.get(3) or {} %}
+            {{ s.get('name', '') if s.get('imei') or s.get('name') else '' }}
+          slot_4_name: >-
+            {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+            {% set s = stations.get('4') or stations.get(4) or {} %}
+            {{ s.get('name', '') if s.get('imei') or s.get('name') else '' }}
+
+  # Local Station Configuration Status (for Local view conditional)
+  - binary_sensor:
+      - name: "Weather Local Station 1 Enabled"
+        unique_id: weather_local_station_1_enabled
+        icon: mdi:home-thermometer
+        state: >-
+          {% set s = (state_attr('sensor.weather_local_config', 'local_stations') or {}).get('1', {}) %}
+          {{ s.get('enabled', false) }}
+        attributes:
+          name: >-
+            {% set s = (state_attr('sensor.weather_local_config', 'local_stations') or {}).get('1', {}) %}
+            {{ s.get('name', 'Local Station 1') }}
+          entity_prefix: >-
+            {% set s = (state_attr('sensor.weather_local_config', 'local_stations') or {}).get('1', {}) %}
+            {{ s.get('entity_prefix', 'ecowittgateway_1') }}
+
+
+# =============================================================================
+# BOM TEMPLATE SENSORS - Bureau of Meteorology Observations
+# =============================================================================
+# These sensors normalize BOM data to standardized entity names.
+# The source entities are determined by the bom_location_prefix input_text.
+# BOM sensors follow pattern: sensor.<prefix>_observations_<metric>
+
+  - sensor:
+      - name: "BOM Observations Temperature"
+        unique_id: bom_observations_temperature
+        device_class: temperature
+        state_class: measurement
+        unit_of_measurement: "°C"
+        icon: mdi:thermometer
+        availability: >-
+          {% set prefix = states('input_text.bom_location_prefix') | default('home', true) %}
+          {{ has_value('sensor.' ~ prefix ~ '_observations_temp') }}
+        state: >-
+          {% set prefix = states('input_text.bom_location_prefix') | default('home', true) %}
+          {{ states('sensor.' ~ prefix ~ '_observations_temp') | float(none) }}
+
+      - name: "BOM Observations Feels Like"
+        unique_id: bom_observations_feels_like
+        device_class: temperature
+        state_class: measurement
+        unit_of_measurement: "°C"
+        icon: mdi:thermometer-lines
+        availability: >-
+          {% set prefix = states('input_text.bom_location_prefix') | default('home', true) %}
+          {{ has_value('sensor.' ~ prefix ~ '_observations_temp_feels_like') }}
+        state: >-
+          {% set prefix = states('input_text.bom_location_prefix') | default('home', true) %}
+          {{ states('sensor.' ~ prefix ~ '_observations_temp_feels_like') | float(none) }}
+
+      - name: "BOM Observations Humidity"
+        unique_id: bom_observations_humidity
+        device_class: humidity
+        state_class: measurement
+        unit_of_measurement: "%"
+        icon: mdi:water-percent
+        availability: >-
+          {% set prefix = states('input_text.bom_location_prefix') | default('home', true) %}
+          {{ has_value('sensor.' ~ prefix ~ '_observations_humidity') }}
+        state: >-
+          {% set prefix = states('input_text.bom_location_prefix') | default('home', true) %}
+          {{ states('sensor.' ~ prefix ~ '_observations_humidity') | float(none) }}
+
+      - name: "BOM Observations Dew Point"
+        unique_id: bom_observations_dew_point
+        device_class: temperature
+        state_class: measurement
+        unit_of_measurement: "°C"
+        icon: mdi:water-thermometer
+        availability: >-
+          {% set prefix = states('input_text.bom_location_prefix') | default('home', true) %}
+          {{ has_value('sensor.' ~ prefix ~ '_observations_dew_point') }}
+        state: >-
+          {% set prefix = states('input_text.bom_location_prefix') | default('home', true) %}
+          {{ states('sensor.' ~ prefix ~ '_observations_dew_point') | float(none) }}
+
+      - name: "BOM Observations Wind Speed"
+        unique_id: bom_observations_wind_speed
+        device_class: wind_speed
+        state_class: measurement
+        unit_of_measurement: "km/h"
+        icon: mdi:weather-windy
+        availability: >-
+          {% set prefix = states('input_text.bom_location_prefix') | default('home', true) %}
+          {{ has_value('sensor.' ~ prefix ~ '_observations_wind_speed_kilometre') }}
+        state: >-
+          {% set prefix = states('input_text.bom_location_prefix') | default('home', true) %}
+          {{ states('sensor.' ~ prefix ~ '_observations_wind_speed_kilometre') | float(none) }}
+
+      - name: "BOM Observations Wind Gust"
+        unique_id: bom_observations_wind_gust
+        device_class: wind_speed
+        state_class: measurement
+        unit_of_measurement: "km/h"
+        icon: mdi:weather-windy-variant
+        availability: >-
+          {% set prefix = states('input_text.bom_location_prefix') | default('home', true) %}
+          {{ has_value('sensor.' ~ prefix ~ '_observations_gust_speed_kilometre') }}
+        state: >-
+          {% set prefix = states('input_text.bom_location_prefix') | default('home', true) %}
+          {{ states('sensor.' ~ prefix ~ '_observations_gust_speed_kilometre') | float(none) }}
+
+      - name: "BOM Observations Wind Direction"
+        unique_id: bom_observations_wind_direction
+        icon: mdi:compass
+        availability: >-
+          {% set prefix = states('input_text.bom_location_prefix') | default('home', true) %}
+          {{ has_value('sensor.' ~ prefix ~ '_observations_wind_direction') }}
+        state: >-
+          {% set prefix = states('input_text.bom_location_prefix') | default('home', true) %}
+          {{ states('sensor.' ~ prefix ~ '_observations_wind_direction') }}
+
+      - name: "BOM Observations Pressure"
+        unique_id: bom_observations_pressure
+        device_class: pressure
+        state_class: measurement
+        unit_of_measurement: "hPa"
+        icon: mdi:gauge
+        availability: >-
+          {% set prefix = states('input_text.bom_location_prefix') | default('home', true) %}
+          {{ has_value('sensor.' ~ prefix ~ '_observations_pressure') }}
+        state: >-
+          {% set prefix = states('input_text.bom_location_prefix') | default('home', true) %}
+          {{ states('sensor.' ~ prefix ~ '_observations_pressure') | float(none) }}
+
+      - name: "BOM Observations Rain Since 9am"
+        unique_id: bom_observations_rain_since_9am
+        device_class: precipitation
+        state_class: measurement
+        unit_of_measurement: "mm"
+        icon: mdi:water
+        availability: >-
+          {% set prefix = states('input_text.bom_location_prefix') | default('home', true) %}
+          {{ has_value('sensor.' ~ prefix ~ '_observations_rain_since_9am') }}
+        state: >-
+          {% set prefix = states('input_text.bom_location_prefix') | default('home', true) %}
+          {{ states('sensor.' ~ prefix ~ '_observations_rain_since_9am') | float(none) }}
+
+      # Calculated: Delta T from BOM observations
+      - name: "BOM Observations Delta T"
+        unique_id: bom_observations_delta_t
+        state_class: measurement
+        unit_of_measurement: "°C"
+        icon: mdi:delta
+        availability: >-
+          {% set prefix = states('input_text.bom_location_prefix') | default('home', true) %}
+          {{ has_value('sensor.' ~ prefix ~ '_observations_temp') and
+             has_value('sensor.' ~ prefix ~ '_observations_humidity') }}
+        state: >-
+          {% set prefix = states('input_text.bom_location_prefix') | default('home', true) %}
+          {% set t = states('sensor.' ~ prefix ~ '_observations_temp') | float(0) %}
+          {% set rh = states('sensor.' ~ prefix ~ '_observations_humidity') | float(0) %}
+          {% if rh > 0 %}
+            {% set a = t * atan(0.151977 * (rh + 8.313659) ** 0.5) %}
+            {% set b = 0.00391838 * ((rh ** 3) ** 0.5) * atan(0.023101 * rh) %}
+            {% set c = atan(rh - 1.676331) %}
+            {% set d = atan(t + rh) %}
+            {{ (t - (a + b - c + d - 4.686035)) | round(1) }}
+          {% else %}
+            {{ none }}
+          {% endif %}
+
+
+# =============================================================================
+# API TEMPLATE SENSORS - Raw data extraction per station
+# =============================================================================
+  # ---------------------------------------------------------------------------
+  # STATION 1 - Raw Sensors
+  # ---------------------------------------------------------------------------
+  - sensor:
+      - name: "Weather API Station 1 Temperature"
+        unique_id: weather_api_station_1_temperature
+        device_class: temperature
+        state_class: measurement
+        unit_of_measurement: "°C"
+        icon: mdi:thermometer
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('1', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('1', {}) %}
+          {% set val = s.get('outdoor', {}).get('temperature') %}
+          {{ val if val is not none else this.state }}
+        attributes:
+          station_name: >-
+            {{ (state_attr('sensor.weather_api_data', 'stations') or {}).get('1', {}).get('name', 'Station 1') }}
+
+      - name: "Weather API Station 1 Humidity"
+        unique_id: weather_api_station_1_humidity
+        device_class: humidity
+        state_class: measurement
+        unit_of_measurement: "%"
+        icon: mdi:water-percent
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('1', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('1', {}) %}
+          {% set val = s.get('outdoor', {}).get('humidity') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 1 Feels Like"
+        unique_id: weather_api_station_1_feels_like
+        device_class: temperature
+        state_class: measurement
+        unit_of_measurement: "°C"
+        icon: mdi:thermometer-lines
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('1', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('1', {}) %}
+          {% set val = s.get('outdoor', {}).get('feels_like') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 1 Dew Point"
+        unique_id: weather_api_station_1_dew_point
+        device_class: temperature
+        state_class: measurement
+        unit_of_measurement: "°C"
+        icon: mdi:water-thermometer
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('1', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('1', {}) %}
+          {% set val = s.get('outdoor', {}).get('dew_point') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 1 Solar Radiation"
+        unique_id: weather_api_station_1_solar_radiation
+        device_class: irradiance
+        state_class: measurement
+        unit_of_measurement: "W/m²"
+        icon: mdi:white-balance-sunny
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('1', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('1', {}) %}
+          {% set val = s.get('solar', {}).get('radiation') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 1 UV Index"
+        unique_id: weather_api_station_1_uv_index
+        state_class: measurement
+        icon: mdi:sun-wireless
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('1', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('1', {}) %}
+          {% set val = s.get('solar', {}).get('uv_index') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 1 Rain Rate"
+        unique_id: weather_api_station_1_rain_rate
+        device_class: precipitation_intensity
+        state_class: measurement
+        unit_of_measurement: "mm/h"
+        icon: mdi:weather-pouring
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('1', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('1', {}) %}
+          {% set val = s.get('rain', {}).get('rate') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 1 Rain Hourly"
+        unique_id: weather_api_station_1_rain_hourly
+        device_class: precipitation
+        state_class: measurement
+        unit_of_measurement: "mm"
+        icon: mdi:weather-rainy
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('1', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('1', {}) %}
+          {% set val = s.get('rain', {}).get('hourly') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 1 Rain Daily"
+        unique_id: weather_api_station_1_rain_daily
+        device_class: precipitation
+        state_class: measurement
+        unit_of_measurement: "mm"
+        icon: mdi:weather-rainy
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('1', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('1', {}) %}
+          {% set val = s.get('rain', {}).get('daily') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 1 Rain Monthly"
+        unique_id: weather_api_station_1_rain_monthly
+        device_class: precipitation
+        state_class: measurement
+        unit_of_measurement: "mm"
+        icon: mdi:weather-rainy
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('1', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('1', {}) %}
+          {% set val = s.get('rain', {}).get('monthly') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 1 Rain Yearly"
+        unique_id: weather_api_station_1_rain_yearly
+        device_class: precipitation
+        state_class: measurement
+        unit_of_measurement: "mm"
+        icon: mdi:weather-rainy
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('1', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('1', {}) %}
+          {% set val = s.get('rain', {}).get('yearly') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 1 Wind Speed"
+        unique_id: weather_api_station_1_wind_speed
+        device_class: wind_speed
+        state_class: measurement
+        unit_of_measurement: "km/h"
+        icon: mdi:weather-windy
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('1', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('1', {}) %}
+          {% set val = s.get('wind', {}).get('speed') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 1 Wind Gust"
+        unique_id: weather_api_station_1_wind_gust
+        device_class: wind_speed
+        state_class: measurement
+        unit_of_measurement: "km/h"
+        icon: mdi:weather-windy-variant
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('1', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('1', {}) %}
+          {% set val = s.get('wind', {}).get('gust') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 1 Wind Direction"
+        unique_id: weather_api_station_1_wind_direction
+        state_class: measurement
+        unit_of_measurement: "°"
+        icon: mdi:compass
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('1', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('1', {}) %}
+          {% set val = s.get('wind', {}).get('direction') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 1 Pressure Relative"
+        unique_id: weather_api_station_1_pressure_relative
+        device_class: atmospheric_pressure
+        state_class: measurement
+        unit_of_measurement: "hPa"
+        icon: mdi:gauge
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('1', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('1', {}) %}
+          {% set val = s.get('pressure', {}).get('relative') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 1 Pressure Absolute"
+        unique_id: weather_api_station_1_pressure_absolute
+        device_class: atmospheric_pressure
+        state_class: measurement
+        unit_of_measurement: "hPa"
+        icon: mdi:gauge
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('1', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('1', {}) %}
+          {% set val = s.get('pressure', {}).get('absolute') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 1 Battery"
+        unique_id: weather_api_station_1_battery
+        device_class: battery
+        state_class: measurement
+        unit_of_measurement: "%"
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('1', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) and s.get('battery') is not none }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('1', {}) %}
+          {% set val = s.get('battery') %}
+          {{ val if val is not none else this.state }}
+
+  # ---------------------------------------------------------------------------
+  # STATION 1 - Derived Sensors
+  # ---------------------------------------------------------------------------
+  - sensor:
+      - name: "Weather API Station 1 Delta T"
+        unique_id: weather_api_station_1_delta_t
+        unit_of_measurement: "°C"
+        icon: mdi:thermometer-alert
+        availability: >-
+          {{ is_number(states('sensor.weather_api_station_1_temperature'))
+             and is_number(states('sensor.weather_api_station_1_humidity')) }}
+        state: >-
+          {% set t = states('sensor.weather_api_station_1_temperature') | float(0) %}
+          {% set rh = states('sensor.weather_api_station_1_humidity') | float(0) %}
+          {% set a = t * atan(0.151977 * (rh + 8.313659) ** 0.5) %}
+          {% set b = 0.00391838 * ((rh ** 3) ** 0.5) * atan(0.023101 * rh) %}
+          {% set c = atan(rh - 1.676331) %}
+          {% set d = atan(t + rh) %}
+          {{ (t - (a + b - c + d - 4.686035)) | round(2) }}
+
+      - name: "Weather API Station 1 Filtered Solar Radiation"
+        unique_id: weather_api_station_1_filtered_solar
+        device_class: energy
+        state_class: total
+        unit_of_measurement: "MJ"
+        availability: >-
+          {{ has_value('sensor.weather_api_station_1_solar_radiation') }}
+        state: >-
+          {% set val = states('sensor.weather_api_station_1_solar_radiation') | float(0) %}
+          {{ (val * 60 / 1000000) if 0 < val < 2000 else 0 }}
+
+  # ---------------------------------------------------------------------------
+  # STATION 1 - Evapotranspiration (triggered at end of day)
+  # ---------------------------------------------------------------------------
+  - trigger:
+      - platform: time
+        at: "23:59:00"
+    sensor:
+      - name: "Weather API Station 1 Evapotranspiration"
+        unique_id: weather_api_station_1_eto
+        state_class: measurement
+        unit_of_measurement: "mm"
+        icon: mdi:water-outline
+        availability: >-
+          {{ is_number(states('sensor.weather_api_station_1_max_temperature'))
+             and is_number(states('sensor.weather_api_station_1_min_temperature')) }}
+        state: >-
+          {% set maxT = states('sensor.weather_api_station_1_max_temperature') | float(0) %}
+          {% set minT = states('sensor.weather_api_station_1_min_temperature') | float(0) %}
+          {% set maxRH = states('sensor.weather_api_station_1_max_humidity') | float(0) %}
+          {% set minRH = states('sensor.weather_api_station_1_min_humidity') | float(0) %}
+          {% set avgWS = states('sensor.weather_api_station_1_avg_wind_speed') | float(0) / 3.6 %}
+          {% set SolRad = states('sensor.weather_api_station_1_solar_mj_day') | float(0) %}
+
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('1', {}) %}
+          {% set latitude = s.get('latitude', -35.0) %}
+          {% set elevation = s.get('elevation', 100) %}
+
+          {% set e = 2.718281828459045 %}
+          {% set pi = 3.141592653589793 %}
+          {% set Day = (now() - now().replace(month=1, day=1)).days + 1 %}
+
+          {% set avgT = (maxT + minT) / 2 %}
+          {% set PsyCon = 0.0665043028282533 %}
+          {% set MnSVP = ((0.6108 * e ** ((17.27 * maxT) / (maxT + 237.3))) + (0.6108 * e ** ((17.27 * minT) / (minT + 237.3)))) / 2 %}
+          {% set SSVPC = (4098 * (0.6108 * e ** ((17.27 * avgT) / (avgT + 237.3)))) / ((avgT + 237.3) ** 2) %}
+          {% set ActVP = (((0.6108 * e ** ((17.27 * maxT) / (maxT + 237.3))) * (minRH / 100)) + ((0.6108 * e ** ((17.27 * minT) / (minT + 237.3))) * (maxRH / 100))) / 2 %}
+          {% set VPD = MnSVP - ActVP %}
+
+          {% set alpha = 0.23 %}
+          {% set sigma = 0.000000004903 %}
+          {% set Gsc = 0.0820 %}
+          {% set dr = 1 + 0.033 * cos((2 * pi / 365) * Day) %}
+          {% set delta = 0.409 * sin((2 * pi / 365) * Day - 1.39) %}
+          {% set omega_s = acos(-tan(latitude * pi / 180) * tan(delta)) %}
+          {% set Ra = (24 * 60 / pi) * Gsc * dr * (omega_s * sin(latitude * pi / 180) * sin(delta) + cos(latitude * pi / 180) * cos(delta) * sin(omega_s)) %}
+          {% set Rso = (0.75 + 2e-5 * elevation) * Ra %}
+          {% set TmaxK = maxT + 273.16 %}
+          {% set TminK = minT + 273.16 %}
+          {% set Rns = (1 - alpha) * SolRad %}
+          {% set Rnl = sigma * ((TmaxK**4 + TminK**4) / 2) * (0.34 - 0.14 * (ActVP**0.5)) * (1.35 * (SolRad / Rso) - 0.35) if Rso > 0 else 0 %}
+          {% set NetRad = Rns - Rnl %}
+
+          {{ ((0.408 * NetRad * SSVPC / (SSVPC + PsyCon * (1 + 0.34 * avgWS))) + ((900 / (avgT + 273)) * avgWS * VPD * PsyCon / (SSVPC + PsyCon * (1 + 0.34 * avgWS)))) | round(2) }}
+
+      - name: "Weather API Station 1 Degree Day"
+        unique_id: weather_api_station_1_degree_day
+        state_class: measurement
+        unit_of_measurement: "°C-d"
+        icon: mdi:chart-line
+        availability: >-
+          {{ is_number(states('sensor.weather_api_station_1_max_temperature'))
+             and is_number(states('sensor.weather_api_station_1_min_temperature')) }}
+        state: >-
+          {% set maxT = states('sensor.weather_api_station_1_max_temperature') | float(0) %}
+          {% set minT = states('sensor.weather_api_station_1_min_temperature') | float(0) %}
+          {{ (((maxT + minT) / 2) - 10) | round(2) }}
+        attributes:
+          max_temperature: "{{ states('sensor.weather_api_station_1_max_temperature') }}"
+          min_temperature: "{{ states('sensor.weather_api_station_1_min_temperature') }}"
+
+  # ---------------------------------------------------------------------------
+  # STATION 2 - Raw Sensors
+  # ---------------------------------------------------------------------------
+  - sensor:
+      - name: "Weather API Station 2 Temperature"
+        unique_id: weather_api_station_2_temperature
+        device_class: temperature
+        state_class: measurement
+        unit_of_measurement: "°C"
+        icon: mdi:thermometer
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('2', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('2', {}) %}
+          {% set val = s.get('outdoor', {}).get('temperature') %}
+          {{ val if val is not none else this.state }}
+        attributes:
+          station_name: >-
+            {{ (state_attr('sensor.weather_api_data', 'stations') or {}).get('2', {}).get('name', 'Station 2') }}
+
+      - name: "Weather API Station 2 Humidity"
+        unique_id: weather_api_station_2_humidity
+        device_class: humidity
+        state_class: measurement
+        unit_of_measurement: "%"
+        icon: mdi:water-percent
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('2', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('2', {}) %}
+          {% set val = s.get('outdoor', {}).get('humidity') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 2 Feels Like"
+        unique_id: weather_api_station_2_feels_like
+        device_class: temperature
+        state_class: measurement
+        unit_of_measurement: "°C"
+        icon: mdi:thermometer-lines
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('2', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('2', {}) %}
+          {% set val = s.get('outdoor', {}).get('feels_like') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 2 Dew Point"
+        unique_id: weather_api_station_2_dew_point
+        device_class: temperature
+        state_class: measurement
+        unit_of_measurement: "°C"
+        icon: mdi:water-thermometer
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('2', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('2', {}) %}
+          {% set val = s.get('outdoor', {}).get('dew_point') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 2 Solar Radiation"
+        unique_id: weather_api_station_2_solar_radiation
+        device_class: irradiance
+        state_class: measurement
+        unit_of_measurement: "W/m²"
+        icon: mdi:white-balance-sunny
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('2', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('2', {}) %}
+          {% set val = s.get('solar', {}).get('radiation') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 2 UV Index"
+        unique_id: weather_api_station_2_uv_index
+        state_class: measurement
+        icon: mdi:sun-wireless
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('2', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('2', {}) %}
+          {% set val = s.get('solar', {}).get('uv_index') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 2 Rain Rate"
+        unique_id: weather_api_station_2_rain_rate
+        device_class: precipitation_intensity
+        state_class: measurement
+        unit_of_measurement: "mm/h"
+        icon: mdi:weather-pouring
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('2', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('2', {}) %}
+          {% set val = s.get('rain', {}).get('rate') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 2 Rain Hourly"
+        unique_id: weather_api_station_2_rain_hourly
+        device_class: precipitation
+        state_class: measurement
+        unit_of_measurement: "mm"
+        icon: mdi:weather-rainy
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('2', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('2', {}) %}
+          {% set val = s.get('rain', {}).get('hourly') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 2 Rain Daily"
+        unique_id: weather_api_station_2_rain_daily
+        device_class: precipitation
+        state_class: measurement
+        unit_of_measurement: "mm"
+        icon: mdi:weather-rainy
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('2', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('2', {}) %}
+          {% set val = s.get('rain', {}).get('daily') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 2 Rain Monthly"
+        unique_id: weather_api_station_2_rain_monthly
+        device_class: precipitation
+        state_class: measurement
+        unit_of_measurement: "mm"
+        icon: mdi:weather-rainy
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('2', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('2', {}) %}
+          {% set val = s.get('rain', {}).get('monthly') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 2 Rain Yearly"
+        unique_id: weather_api_station_2_rain_yearly
+        device_class: precipitation
+        state_class: measurement
+        unit_of_measurement: "mm"
+        icon: mdi:weather-rainy
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('2', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('2', {}) %}
+          {% set val = s.get('rain', {}).get('yearly') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 2 Wind Speed"
+        unique_id: weather_api_station_2_wind_speed
+        device_class: wind_speed
+        state_class: measurement
+        unit_of_measurement: "km/h"
+        icon: mdi:weather-windy
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('2', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('2', {}) %}
+          {% set val = s.get('wind', {}).get('speed') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 2 Wind Gust"
+        unique_id: weather_api_station_2_wind_gust
+        device_class: wind_speed
+        state_class: measurement
+        unit_of_measurement: "km/h"
+        icon: mdi:weather-windy-variant
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('2', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('2', {}) %}
+          {% set val = s.get('wind', {}).get('gust') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 2 Wind Direction"
+        unique_id: weather_api_station_2_wind_direction
+        state_class: measurement
+        unit_of_measurement: "°"
+        icon: mdi:compass
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('2', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('2', {}) %}
+          {% set val = s.get('wind', {}).get('direction') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 2 Pressure Relative"
+        unique_id: weather_api_station_2_pressure_relative
+        device_class: atmospheric_pressure
+        state_class: measurement
+        unit_of_measurement: "hPa"
+        icon: mdi:gauge
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('2', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('2', {}) %}
+          {% set val = s.get('pressure', {}).get('relative') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 2 Pressure Absolute"
+        unique_id: weather_api_station_2_pressure_absolute
+        device_class: atmospheric_pressure
+        state_class: measurement
+        unit_of_measurement: "hPa"
+        icon: mdi:gauge
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('2', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('2', {}) %}
+          {% set val = s.get('pressure', {}).get('absolute') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 2 Battery"
+        unique_id: weather_api_station_2_battery
+        device_class: battery
+        state_class: measurement
+        unit_of_measurement: "%"
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('2', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) and s.get('battery') is not none }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('2', {}) %}
+          {% set val = s.get('battery') %}
+          {{ val if val is not none else this.state }}
+
+  # ---------------------------------------------------------------------------
+  # STATION 2 - Derived Sensors
+  # ---------------------------------------------------------------------------
+  - sensor:
+      - name: "Weather API Station 2 Delta T"
+        unique_id: weather_api_station_2_delta_t
+        unit_of_measurement: "°C"
+        icon: mdi:thermometer-alert
+        availability: >-
+          {{ is_number(states('sensor.weather_api_station_2_temperature'))
+             and is_number(states('sensor.weather_api_station_2_humidity')) }}
+        state: >-
+          {% set t = states('sensor.weather_api_station_2_temperature') | float(0) %}
+          {% set rh = states('sensor.weather_api_station_2_humidity') | float(0) %}
+          {% set a = t * atan(0.151977 * (rh + 8.313659) ** 0.5) %}
+          {% set b = 0.00391838 * ((rh ** 3) ** 0.5) * atan(0.023101 * rh) %}
+          {% set c = atan(rh - 1.676331) %}
+          {% set d = atan(t + rh) %}
+          {{ (t - (a + b - c + d - 4.686035)) | round(2) }}
+
+      - name: "Weather API Station 2 Filtered Solar Radiation"
+        unique_id: weather_api_station_2_filtered_solar
+        device_class: energy
+        state_class: total
+        unit_of_measurement: "MJ"
+        availability: >-
+          {{ has_value('sensor.weather_api_station_2_solar_radiation') }}
+        state: >-
+          {% set val = states('sensor.weather_api_station_2_solar_radiation') | float(0) %}
+          {{ (val * 60 / 1000000) if 0 < val < 2000 else 0 }}
+
+  - trigger:
+      - platform: time
+        at: "23:59:00"
+    sensor:
+      - name: "Weather API Station 2 Evapotranspiration"
+        unique_id: weather_api_station_2_eto
+        state_class: measurement
+        unit_of_measurement: "mm"
+        icon: mdi:water-outline
+        availability: >-
+          {{ is_number(states('sensor.weather_api_station_2_max_temperature'))
+             and is_number(states('sensor.weather_api_station_2_min_temperature')) }}
+        state: >-
+          {% set maxT = states('sensor.weather_api_station_2_max_temperature') | float(0) %}
+          {% set minT = states('sensor.weather_api_station_2_min_temperature') | float(0) %}
+          {% set maxRH = states('sensor.weather_api_station_2_max_humidity') | float(0) %}
+          {% set minRH = states('sensor.weather_api_station_2_min_humidity') | float(0) %}
+          {% set avgWS = states('sensor.weather_api_station_2_avg_wind_speed') | float(0) / 3.6 %}
+          {% set SolRad = states('sensor.weather_api_station_2_solar_mj_day') | float(0) %}
+
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('2', {}) %}
+          {% set latitude = s.get('latitude', -35.0) %}
+          {% set elevation = s.get('elevation', 100) %}
+
+          {% set e = 2.718281828459045 %}
+          {% set pi = 3.141592653589793 %}
+          {% set Day = (now() - now().replace(month=1, day=1)).days + 1 %}
+
+          {% set avgT = (maxT + minT) / 2 %}
+          {% set PsyCon = 0.0665043028282533 %}
+          {% set MnSVP = ((0.6108 * e ** ((17.27 * maxT) / (maxT + 237.3))) + (0.6108 * e ** ((17.27 * minT) / (minT + 237.3)))) / 2 %}
+          {% set SSVPC = (4098 * (0.6108 * e ** ((17.27 * avgT) / (avgT + 237.3)))) / ((avgT + 237.3) ** 2) %}
+          {% set ActVP = (((0.6108 * e ** ((17.27 * maxT) / (maxT + 237.3))) * (minRH / 100)) + ((0.6108 * e ** ((17.27 * minT) / (minT + 237.3))) * (maxRH / 100))) / 2 %}
+          {% set VPD = MnSVP - ActVP %}
+
+          {% set alpha = 0.23 %}
+          {% set sigma = 0.000000004903 %}
+          {% set Gsc = 0.0820 %}
+          {% set dr = 1 + 0.033 * cos((2 * pi / 365) * Day) %}
+          {% set delta = 0.409 * sin((2 * pi / 365) * Day - 1.39) %}
+          {% set omega_s = acos(-tan(latitude * pi / 180) * tan(delta)) %}
+          {% set Ra = (24 * 60 / pi) * Gsc * dr * (omega_s * sin(latitude * pi / 180) * sin(delta) + cos(latitude * pi / 180) * cos(delta) * sin(omega_s)) %}
+          {% set Rso = (0.75 + 2e-5 * elevation) * Ra %}
+          {% set TmaxK = maxT + 273.16 %}
+          {% set TminK = minT + 273.16 %}
+          {% set Rns = (1 - alpha) * SolRad %}
+          {% set Rnl = sigma * ((TmaxK**4 + TminK**4) / 2) * (0.34 - 0.14 * (ActVP**0.5)) * (1.35 * (SolRad / Rso) - 0.35) if Rso > 0 else 0 %}
+          {% set NetRad = Rns - Rnl %}
+
+          {{ ((0.408 * NetRad * SSVPC / (SSVPC + PsyCon * (1 + 0.34 * avgWS))) + ((900 / (avgT + 273)) * avgWS * VPD * PsyCon / (SSVPC + PsyCon * (1 + 0.34 * avgWS)))) | round(2) }}
+
+      - name: "Weather API Station 2 Degree Day"
+        unique_id: weather_api_station_2_degree_day
+        state_class: measurement
+        unit_of_measurement: "°C-d"
+        icon: mdi:chart-line
+        availability: >-
+          {{ is_number(states('sensor.weather_api_station_2_max_temperature'))
+             and is_number(states('sensor.weather_api_station_2_min_temperature')) }}
+        state: >-
+          {% set maxT = states('sensor.weather_api_station_2_max_temperature') | float(0) %}
+          {% set minT = states('sensor.weather_api_station_2_min_temperature') | float(0) %}
+          {{ (((maxT + minT) / 2) - 10) | round(2) }}
+        attributes:
+          max_temperature: "{{ states('sensor.weather_api_station_2_max_temperature') }}"
+          min_temperature: "{{ states('sensor.weather_api_station_2_min_temperature') }}"
+
+  # ---------------------------------------------------------------------------
+  # STATION 3 - Raw Sensors
+  # ---------------------------------------------------------------------------
+  - sensor:
+      - name: "Weather API Station 3 Temperature"
+        unique_id: weather_api_station_3_temperature
+        device_class: temperature
+        state_class: measurement
+        unit_of_measurement: "°C"
+        icon: mdi:thermometer
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('3', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('3', {}) %}
+          {% set val = s.get('outdoor', {}).get('temperature') %}
+          {{ val if val is not none else this.state }}
+        attributes:
+          station_name: >-
+            {{ (state_attr('sensor.weather_api_data', 'stations') or {}).get('3', {}).get('name', 'Station 3') }}
+
+      - name: "Weather API Station 3 Humidity"
+        unique_id: weather_api_station_3_humidity
+        device_class: humidity
+        state_class: measurement
+        unit_of_measurement: "%"
+        icon: mdi:water-percent
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('3', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('3', {}) %}
+          {% set val = s.get('outdoor', {}).get('humidity') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 3 Feels Like"
+        unique_id: weather_api_station_3_feels_like
+        device_class: temperature
+        state_class: measurement
+        unit_of_measurement: "°C"
+        icon: mdi:thermometer-lines
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('3', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('3', {}) %}
+          {% set val = s.get('outdoor', {}).get('feels_like') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 3 Dew Point"
+        unique_id: weather_api_station_3_dew_point
+        device_class: temperature
+        state_class: measurement
+        unit_of_measurement: "°C"
+        icon: mdi:water-thermometer
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('3', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('3', {}) %}
+          {% set val = s.get('outdoor', {}).get('dew_point') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 3 Solar Radiation"
+        unique_id: weather_api_station_3_solar_radiation
+        device_class: irradiance
+        state_class: measurement
+        unit_of_measurement: "W/m²"
+        icon: mdi:white-balance-sunny
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('3', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('3', {}) %}
+          {% set val = s.get('solar', {}).get('radiation') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 3 UV Index"
+        unique_id: weather_api_station_3_uv_index
+        state_class: measurement
+        icon: mdi:sun-wireless
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('3', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('3', {}) %}
+          {% set val = s.get('solar', {}).get('uv_index') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 3 Rain Rate"
+        unique_id: weather_api_station_3_rain_rate
+        device_class: precipitation_intensity
+        state_class: measurement
+        unit_of_measurement: "mm/h"
+        icon: mdi:weather-pouring
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('3', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('3', {}) %}
+          {% set val = s.get('rain', {}).get('rate') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 3 Rain Hourly"
+        unique_id: weather_api_station_3_rain_hourly
+        device_class: precipitation
+        state_class: measurement
+        unit_of_measurement: "mm"
+        icon: mdi:weather-rainy
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('3', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('3', {}) %}
+          {% set val = s.get('rain', {}).get('hourly') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 3 Rain Daily"
+        unique_id: weather_api_station_3_rain_daily
+        device_class: precipitation
+        state_class: measurement
+        unit_of_measurement: "mm"
+        icon: mdi:weather-rainy
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('3', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('3', {}) %}
+          {% set val = s.get('rain', {}).get('daily') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 3 Rain Monthly"
+        unique_id: weather_api_station_3_rain_monthly
+        device_class: precipitation
+        state_class: measurement
+        unit_of_measurement: "mm"
+        icon: mdi:weather-rainy
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('3', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('3', {}) %}
+          {% set val = s.get('rain', {}).get('monthly') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 3 Rain Yearly"
+        unique_id: weather_api_station_3_rain_yearly
+        device_class: precipitation
+        state_class: measurement
+        unit_of_measurement: "mm"
+        icon: mdi:weather-rainy
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('3', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('3', {}) %}
+          {% set val = s.get('rain', {}).get('yearly') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 3 Wind Speed"
+        unique_id: weather_api_station_3_wind_speed
+        device_class: wind_speed
+        state_class: measurement
+        unit_of_measurement: "km/h"
+        icon: mdi:weather-windy
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('3', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('3', {}) %}
+          {% set val = s.get('wind', {}).get('speed') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 3 Wind Gust"
+        unique_id: weather_api_station_3_wind_gust
+        device_class: wind_speed
+        state_class: measurement
+        unit_of_measurement: "km/h"
+        icon: mdi:weather-windy-variant
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('3', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('3', {}) %}
+          {% set val = s.get('wind', {}).get('gust') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 3 Wind Direction"
+        unique_id: weather_api_station_3_wind_direction
+        state_class: measurement
+        unit_of_measurement: "°"
+        icon: mdi:compass
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('3', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('3', {}) %}
+          {% set val = s.get('wind', {}).get('direction') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 3 Pressure Relative"
+        unique_id: weather_api_station_3_pressure_relative
+        device_class: atmospheric_pressure
+        state_class: measurement
+        unit_of_measurement: "hPa"
+        icon: mdi:gauge
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('3', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('3', {}) %}
+          {% set val = s.get('pressure', {}).get('relative') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 3 Pressure Absolute"
+        unique_id: weather_api_station_3_pressure_absolute
+        device_class: atmospheric_pressure
+        state_class: measurement
+        unit_of_measurement: "hPa"
+        icon: mdi:gauge
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('3', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('3', {}) %}
+          {% set val = s.get('pressure', {}).get('absolute') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 3 Battery"
+        unique_id: weather_api_station_3_battery
+        device_class: battery
+        state_class: measurement
+        unit_of_measurement: "%"
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('3', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) and s.get('battery') is not none }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('3', {}) %}
+          {% set val = s.get('battery') %}
+          {{ val if val is not none else this.state }}
+
+  # ---------------------------------------------------------------------------
+  # STATION 3 - Derived Sensors
+  # ---------------------------------------------------------------------------
+  - sensor:
+      - name: "Weather API Station 3 Delta T"
+        unique_id: weather_api_station_3_delta_t
+        unit_of_measurement: "°C"
+        icon: mdi:thermometer-alert
+        availability: >-
+          {{ is_number(states('sensor.weather_api_station_3_temperature'))
+             and is_number(states('sensor.weather_api_station_3_humidity')) }}
+        state: >-
+          {% set t = states('sensor.weather_api_station_3_temperature') | float(0) %}
+          {% set rh = states('sensor.weather_api_station_3_humidity') | float(0) %}
+          {% set a = t * atan(0.151977 * (rh + 8.313659) ** 0.5) %}
+          {% set b = 0.00391838 * ((rh ** 3) ** 0.5) * atan(0.023101 * rh) %}
+          {% set c = atan(rh - 1.676331) %}
+          {% set d = atan(t + rh) %}
+          {{ (t - (a + b - c + d - 4.686035)) | round(2) }}
+
+      - name: "Weather API Station 3 Filtered Solar Radiation"
+        unique_id: weather_api_station_3_filtered_solar
+        device_class: energy
+        state_class: total
+        unit_of_measurement: "MJ"
+        availability: >-
+          {{ has_value('sensor.weather_api_station_3_solar_radiation') }}
+        state: >-
+          {% set val = states('sensor.weather_api_station_3_solar_radiation') | float(0) %}
+          {{ (val * 60 / 1000000) if 0 < val < 2000 else 0 }}
+
+  - trigger:
+      - platform: time
+        at: "23:59:00"
+    sensor:
+      - name: "Weather API Station 3 Evapotranspiration"
+        unique_id: weather_api_station_3_eto
+        state_class: measurement
+        unit_of_measurement: "mm"
+        icon: mdi:water-outline
+        availability: >-
+          {{ is_number(states('sensor.weather_api_station_3_max_temperature'))
+             and is_number(states('sensor.weather_api_station_3_min_temperature')) }}
+        state: >-
+          {% set maxT = states('sensor.weather_api_station_3_max_temperature') | float(0) %}
+          {% set minT = states('sensor.weather_api_station_3_min_temperature') | float(0) %}
+          {% set maxRH = states('sensor.weather_api_station_3_max_humidity') | float(0) %}
+          {% set minRH = states('sensor.weather_api_station_3_min_humidity') | float(0) %}
+          {% set avgWS = states('sensor.weather_api_station_3_avg_wind_speed') | float(0) / 3.6 %}
+          {% set SolRad = states('sensor.weather_api_station_3_solar_mj_day') | float(0) %}
+
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('3', {}) %}
+          {% set latitude = s.get('latitude', -35.0) %}
+          {% set elevation = s.get('elevation', 100) %}
+
+          {% set e = 2.718281828459045 %}
+          {% set pi = 3.141592653589793 %}
+          {% set Day = (now() - now().replace(month=1, day=1)).days + 1 %}
+
+          {% set avgT = (maxT + minT) / 2 %}
+          {% set PsyCon = 0.0665043028282533 %}
+          {% set MnSVP = ((0.6108 * e ** ((17.27 * maxT) / (maxT + 237.3))) + (0.6108 * e ** ((17.27 * minT) / (minT + 237.3)))) / 2 %}
+          {% set SSVPC = (4098 * (0.6108 * e ** ((17.27 * avgT) / (avgT + 237.3)))) / ((avgT + 237.3) ** 2) %}
+          {% set ActVP = (((0.6108 * e ** ((17.27 * maxT) / (maxT + 237.3))) * (minRH / 100)) + ((0.6108 * e ** ((17.27 * minT) / (minT + 237.3))) * (maxRH / 100))) / 2 %}
+          {% set VPD = MnSVP - ActVP %}
+
+          {% set alpha = 0.23 %}
+          {% set sigma = 0.000000004903 %}
+          {% set Gsc = 0.0820 %}
+          {% set dr = 1 + 0.033 * cos((2 * pi / 365) * Day) %}
+          {% set delta = 0.409 * sin((2 * pi / 365) * Day - 1.39) %}
+          {% set omega_s = acos(-tan(latitude * pi / 180) * tan(delta)) %}
+          {% set Ra = (24 * 60 / pi) * Gsc * dr * (omega_s * sin(latitude * pi / 180) * sin(delta) + cos(latitude * pi / 180) * cos(delta) * sin(omega_s)) %}
+          {% set Rso = (0.75 + 2e-5 * elevation) * Ra %}
+          {% set TmaxK = maxT + 273.16 %}
+          {% set TminK = minT + 273.16 %}
+          {% set Rns = (1 - alpha) * SolRad %}
+          {% set Rnl = sigma * ((TmaxK**4 + TminK**4) / 2) * (0.34 - 0.14 * (ActVP**0.5)) * (1.35 * (SolRad / Rso) - 0.35) if Rso > 0 else 0 %}
+          {% set NetRad = Rns - Rnl %}
+
+          {{ ((0.408 * NetRad * SSVPC / (SSVPC + PsyCon * (1 + 0.34 * avgWS))) + ((900 / (avgT + 273)) * avgWS * VPD * PsyCon / (SSVPC + PsyCon * (1 + 0.34 * avgWS)))) | round(2) }}
+
+      - name: "Weather API Station 3 Degree Day"
+        unique_id: weather_api_station_3_degree_day
+        state_class: measurement
+        unit_of_measurement: "°C-d"
+        icon: mdi:chart-line
+        availability: >-
+          {{ is_number(states('sensor.weather_api_station_3_max_temperature'))
+             and is_number(states('sensor.weather_api_station_3_min_temperature')) }}
+        state: >-
+          {% set maxT = states('sensor.weather_api_station_3_max_temperature') | float(0) %}
+          {% set minT = states('sensor.weather_api_station_3_min_temperature') | float(0) %}
+          {{ (((maxT + minT) / 2) - 10) | round(2) }}
+        attributes:
+          max_temperature: "{{ states('sensor.weather_api_station_3_max_temperature') }}"
+          min_temperature: "{{ states('sensor.weather_api_station_3_min_temperature') }}"
+
+  # ---------------------------------------------------------------------------
+  # STATION 4 - Raw Sensors
+  # ---------------------------------------------------------------------------
+  - sensor:
+      - name: "Weather API Station 4 Temperature"
+        unique_id: weather_api_station_4_temperature
+        device_class: temperature
+        state_class: measurement
+        unit_of_measurement: "°C"
+        icon: mdi:thermometer
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('4', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('4', {}) %}
+          {% set val = s.get('outdoor', {}).get('temperature') %}
+          {{ val if val is not none else this.state }}
+        attributes:
+          station_name: >-
+            {{ (state_attr('sensor.weather_api_data', 'stations') or {}).get('4', {}).get('name', 'Station 4') }}
+
+      - name: "Weather API Station 4 Humidity"
+        unique_id: weather_api_station_4_humidity
+        device_class: humidity
+        state_class: measurement
+        unit_of_measurement: "%"
+        icon: mdi:water-percent
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('4', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('4', {}) %}
+          {% set val = s.get('outdoor', {}).get('humidity') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 4 Feels Like"
+        unique_id: weather_api_station_4_feels_like
+        device_class: temperature
+        state_class: measurement
+        unit_of_measurement: "°C"
+        icon: mdi:thermometer-lines
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('4', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('4', {}) %}
+          {% set val = s.get('outdoor', {}).get('feels_like') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 4 Dew Point"
+        unique_id: weather_api_station_4_dew_point
+        device_class: temperature
+        state_class: measurement
+        unit_of_measurement: "°C"
+        icon: mdi:water-thermometer
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('4', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('4', {}) %}
+          {% set val = s.get('outdoor', {}).get('dew_point') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 4 Solar Radiation"
+        unique_id: weather_api_station_4_solar_radiation
+        device_class: irradiance
+        state_class: measurement
+        unit_of_measurement: "W/m²"
+        icon: mdi:white-balance-sunny
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('4', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('4', {}) %}
+          {% set val = s.get('solar', {}).get('radiation') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 4 UV Index"
+        unique_id: weather_api_station_4_uv_index
+        state_class: measurement
+        icon: mdi:sun-wireless
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('4', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('4', {}) %}
+          {% set val = s.get('solar', {}).get('uv_index') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 4 Rain Rate"
+        unique_id: weather_api_station_4_rain_rate
+        device_class: precipitation_intensity
+        state_class: measurement
+        unit_of_measurement: "mm/h"
+        icon: mdi:weather-pouring
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('4', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('4', {}) %}
+          {% set val = s.get('rain', {}).get('rate') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 4 Rain Hourly"
+        unique_id: weather_api_station_4_rain_hourly
+        device_class: precipitation
+        state_class: measurement
+        unit_of_measurement: "mm"
+        icon: mdi:weather-rainy
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('4', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('4', {}) %}
+          {% set val = s.get('rain', {}).get('hourly') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 4 Rain Daily"
+        unique_id: weather_api_station_4_rain_daily
+        device_class: precipitation
+        state_class: measurement
+        unit_of_measurement: "mm"
+        icon: mdi:weather-rainy
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('4', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('4', {}) %}
+          {% set val = s.get('rain', {}).get('daily') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 4 Rain Monthly"
+        unique_id: weather_api_station_4_rain_monthly
+        device_class: precipitation
+        state_class: measurement
+        unit_of_measurement: "mm"
+        icon: mdi:weather-rainy
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('4', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('4', {}) %}
+          {% set val = s.get('rain', {}).get('monthly') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 4 Rain Yearly"
+        unique_id: weather_api_station_4_rain_yearly
+        device_class: precipitation
+        state_class: measurement
+        unit_of_measurement: "mm"
+        icon: mdi:weather-rainy
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('4', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('4', {}) %}
+          {% set val = s.get('rain', {}).get('yearly') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 4 Wind Speed"
+        unique_id: weather_api_station_4_wind_speed
+        device_class: wind_speed
+        state_class: measurement
+        unit_of_measurement: "km/h"
+        icon: mdi:weather-windy
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('4', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('4', {}) %}
+          {% set val = s.get('wind', {}).get('speed') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 4 Wind Gust"
+        unique_id: weather_api_station_4_wind_gust
+        device_class: wind_speed
+        state_class: measurement
+        unit_of_measurement: "km/h"
+        icon: mdi:weather-windy-variant
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('4', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('4', {}) %}
+          {% set val = s.get('wind', {}).get('gust') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 4 Wind Direction"
+        unique_id: weather_api_station_4_wind_direction
+        state_class: measurement
+        unit_of_measurement: "°"
+        icon: mdi:compass
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('4', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('4', {}) %}
+          {% set val = s.get('wind', {}).get('direction') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 4 Pressure Relative"
+        unique_id: weather_api_station_4_pressure_relative
+        device_class: atmospheric_pressure
+        state_class: measurement
+        unit_of_measurement: "hPa"
+        icon: mdi:gauge
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('4', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('4', {}) %}
+          {% set val = s.get('pressure', {}).get('relative') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 4 Pressure Absolute"
+        unique_id: weather_api_station_4_pressure_absolute
+        device_class: atmospheric_pressure
+        state_class: measurement
+        unit_of_measurement: "hPa"
+        icon: mdi:gauge
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('4', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('4', {}) %}
+          {% set val = s.get('pressure', {}).get('absolute') %}
+          {{ val if val is not none else this.state }}
+
+      - name: "Weather API Station 4 Battery"
+        unique_id: weather_api_station_4_battery
+        device_class: battery
+        state_class: measurement
+        unit_of_measurement: "%"
+        availability: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('4', {}) %}
+          {{ s.get('enabled', false) and s.get('connected', false) and s.get('battery') is not none }}
+        state: >-
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('4', {}) %}
+          {% set val = s.get('battery') %}
+          {{ val if val is not none else this.state }}
+
+  # ---------------------------------------------------------------------------
+  # STATION 4 - Derived Sensors
+  # ---------------------------------------------------------------------------
+  - sensor:
+      - name: "Weather API Station 4 Delta T"
+        unique_id: weather_api_station_4_delta_t
+        unit_of_measurement: "°C"
+        icon: mdi:thermometer-alert
+        availability: >-
+          {{ is_number(states('sensor.weather_api_station_4_temperature'))
+             and is_number(states('sensor.weather_api_station_4_humidity')) }}
+        state: >-
+          {% set t = states('sensor.weather_api_station_4_temperature') | float(0) %}
+          {% set rh = states('sensor.weather_api_station_4_humidity') | float(0) %}
+          {% set a = t * atan(0.151977 * (rh + 8.313659) ** 0.5) %}
+          {% set b = 0.00391838 * ((rh ** 3) ** 0.5) * atan(0.023101 * rh) %}
+          {% set c = atan(rh - 1.676331) %}
+          {% set d = atan(t + rh) %}
+          {{ (t - (a + b - c + d - 4.686035)) | round(2) }}
+
+      - name: "Weather API Station 4 Filtered Solar Radiation"
+        unique_id: weather_api_station_4_filtered_solar
+        device_class: energy
+        state_class: total
+        unit_of_measurement: "MJ"
+        availability: >-
+          {{ has_value('sensor.weather_api_station_4_solar_radiation') }}
+        state: >-
+          {% set val = states('sensor.weather_api_station_4_solar_radiation') | float(0) %}
+          {{ (val * 60 / 1000000) if 0 < val < 2000 else 0 }}
+
+  - trigger:
+      - platform: time
+        at: "23:59:00"
+    sensor:
+      - name: "Weather API Station 4 Evapotranspiration"
+        unique_id: weather_api_station_4_eto
+        state_class: measurement
+        unit_of_measurement: "mm"
+        icon: mdi:water-outline
+        availability: >-
+          {{ is_number(states('sensor.weather_api_station_4_max_temperature'))
+             and is_number(states('sensor.weather_api_station_4_min_temperature')) }}
+        state: >-
+          {% set maxT = states('sensor.weather_api_station_4_max_temperature') | float(0) %}
+          {% set minT = states('sensor.weather_api_station_4_min_temperature') | float(0) %}
+          {% set maxRH = states('sensor.weather_api_station_4_max_humidity') | float(0) %}
+          {% set minRH = states('sensor.weather_api_station_4_min_humidity') | float(0) %}
+          {% set avgWS = states('sensor.weather_api_station_4_avg_wind_speed') | float(0) / 3.6 %}
+          {% set SolRad = states('sensor.weather_api_station_4_solar_mj_day') | float(0) %}
+
+          {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+          {% set s = stations.get('4', {}) %}
+          {% set latitude = s.get('latitude', -35.0) %}
+          {% set elevation = s.get('elevation', 100) %}
+
+          {% set e = 2.718281828459045 %}
+          {% set pi = 3.141592653589793 %}
+          {% set Day = (now() - now().replace(month=1, day=1)).days + 1 %}
+
+          {% set avgT = (maxT + minT) / 2 %}
+          {% set PsyCon = 0.0665043028282533 %}
+          {% set MnSVP = ((0.6108 * e ** ((17.27 * maxT) / (maxT + 237.3))) + (0.6108 * e ** ((17.27 * minT) / (minT + 237.3)))) / 2 %}
+          {% set SSVPC = (4098 * (0.6108 * e ** ((17.27 * avgT) / (avgT + 237.3)))) / ((avgT + 237.3) ** 2) %}
+          {% set ActVP = (((0.6108 * e ** ((17.27 * maxT) / (maxT + 237.3))) * (minRH / 100)) + ((0.6108 * e ** ((17.27 * minT) / (minT + 237.3))) * (maxRH / 100))) / 2 %}
+          {% set VPD = MnSVP - ActVP %}
+
+          {% set alpha = 0.23 %}
+          {% set sigma = 0.000000004903 %}
+          {% set Gsc = 0.0820 %}
+          {% set dr = 1 + 0.033 * cos((2 * pi / 365) * Day) %}
+          {% set delta = 0.409 * sin((2 * pi / 365) * Day - 1.39) %}
+          {% set omega_s = acos(-tan(latitude * pi / 180) * tan(delta)) %}
+          {% set Ra = (24 * 60 / pi) * Gsc * dr * (omega_s * sin(latitude * pi / 180) * sin(delta) + cos(latitude * pi / 180) * cos(delta) * sin(omega_s)) %}
+          {% set Rso = (0.75 + 2e-5 * elevation) * Ra %}
+          {% set TmaxK = maxT + 273.16 %}
+          {% set TminK = minT + 273.16 %}
+          {% set Rns = (1 - alpha) * SolRad %}
+          {% set Rnl = sigma * ((TmaxK**4 + TminK**4) / 2) * (0.34 - 0.14 * (ActVP**0.5)) * (1.35 * (SolRad / Rso) - 0.35) if Rso > 0 else 0 %}
+          {% set NetRad = Rns - Rnl %}
+
+          {{ ((0.408 * NetRad * SSVPC / (SSVPC + PsyCon * (1 + 0.34 * avgWS))) + ((900 / (avgT + 273)) * avgWS * VPD * PsyCon / (SSVPC + PsyCon * (1 + 0.34 * avgWS)))) | round(2) }}
+
+      - name: "Weather API Station 4 Degree Day"
+        unique_id: weather_api_station_4_degree_day
+        state_class: measurement
+        unit_of_measurement: "°C-d"
+        icon: mdi:chart-line
+        availability: >-
+          {{ is_number(states('sensor.weather_api_station_4_max_temperature'))
+             and is_number(states('sensor.weather_api_station_4_min_temperature')) }}
+        state: >-
+          {% set maxT = states('sensor.weather_api_station_4_max_temperature') | float(0) %}
+          {% set minT = states('sensor.weather_api_station_4_min_temperature') | float(0) %}
+          {{ (((maxT + minT) / 2) - 10) | round(2) }}
+        attributes:
+          max_temperature: "{{ states('sensor.weather_api_station_4_max_temperature') }}"
+          min_temperature: "{{ states('sensor.weather_api_station_4_min_temperature') }}"
+
+
+
+# =============================================================================
+# API COMMAND LINE SENSOR - Main data source for remote stations
+# =============================================================================
+
+command_line:
+  - sensor:
+      name: Weather API Data
+      unique_id: weather_api_data
+      command: "python3 /config/PaddiSense/weather/python/weather_api_sensor.py"
+      scan_interval: 60
+      command_timeout: 30
+      value_template: "{{ value_json.status }}"
+      json_attributes:
+        - initialized
+        - credentials_ok
+        - version
+        - station_count
+        - last_update
+        - stations
+
+
+# =============================================================================
+# API SHELL COMMANDS - Backend operations for remote stations
+# =============================================================================
+
+  - sensor:
+      name: Weather Local Config
+      unique_id: weather_local_config
+      command: >-
+        if [ -f /config/local_data/weather/config.json ]; then
+          cat /config/local_data/weather/config.json
+        else
+          echo '{"local_stations":{},"version":"1.0.0"}'
+        fi
+      scan_interval: 300
+      value_template: "{{ value_json.version | default('1.0.0') }}"
+      json_attributes:
+        - local_stations
+        - version
+
+
+shell_command:
+  weather_api_init: >-
+    python3 /config/PaddiSense/weather/python/weather_api_backend.py init
+  weather_api_add_station: >-
+    python3 /config/PaddiSense/weather/python/weather_api_backend.py add_station
+    --slot "{{ slot }}" --name "{{ name }}" --imei "{{ imei }}"
+    --latitude "{{ latitude }}" --elevation "{{ elevation }}"
+  weather_api_edit_station: >-
+    python3 /config/PaddiSense/weather/python/weather_api_backend.py edit_station
+    --slot "{{ slot }}" --name "{{ name }}" --imei "{{ imei }}"
+    --latitude "{{ latitude }}" --elevation "{{ elevation }}"
+  weather_api_remove_station: >-
+    python3 /config/PaddiSense/weather/python/weather_api_backend.py remove_station
+    --slot "{{ slot }}"
+  weather_api_enable_station: >-
+    python3 /config/PaddiSense/weather/python/weather_api_backend.py enable_station
+    --slot "{{ slot }}"
+  weather_api_disable_station: >-
+    python3 /config/PaddiSense/weather/python/weather_api_backend.py disable_station
+    --slot "{{ slot }}"
+
+
+# =============================================================================
+# INPUT HELPERS
+# =============================================================================
+
+  weather_local_init: >-
+    mkdir -p /config/local_data/weather &&
+    echo '{"local_stations":{"1":{"enabled":true,"name":"Local Station 1","entity_prefix":"ecowittgateway_1"}},"version":"1.0.0","created":"'$(date -Iseconds)'","modified":"'$(date -Iseconds)'"}' > /config/local_data/weather/config.json
+  weather_local_set_station: >-
+    python3 -c "
+    import json, sys
+    from datetime import datetime
+    try:
+        with open('/config/local_data/weather/config.json', 'r') as f:
+            cfg = json.load(f)
+    except:
+        cfg = {'local_stations': {}, 'version': '1.0.0'}
+    cfg['local_stations']['{{ slot }}'] = {
+        'enabled': {{ 'true' if enabled else 'false' }},
+        'name': '{{ name }}',
+        'entity_prefix': '{{ entity_prefix }}'
+    }
+    cfg['modified'] = datetime.now().isoformat()
+    with open('/config/local_data/weather/config.json', 'w') as f:
+        json.dump(cfg, f, indent=2)
+    "
+  weather_local_disable_station: >-
+    python3 -c "
+    import json
+    from datetime import datetime
+    with open('/config/local_data/weather/config.json', 'r') as f:
+        cfg = json.load(f)
+    if '{{ slot }}' in cfg.get('local_stations', {}):
+        cfg['local_stations']['{{ slot }}']['enabled'] = False
+        cfg['modified'] = datetime.now().isoformat()
+    with open('/config/local_data/weather/config.json', 'w') as f:
+        json.dump(cfg, f, indent=2)
+    "
+  weather_local_enable_station: >-
+    python3 -c "
+    import json
+    from datetime import datetime
+    with open('/config/local_data/weather/config.json', 'r') as f:
+        cfg = json.load(f)
+    if '{{ slot }}' in cfg.get('local_stations', {}):
+        cfg['local_stations']['{{ slot }}']['enabled'] = True
+        cfg['modified'] = datetime.now().isoformat()
+    with open('/config/local_data/weather/config.json', 'w') as f:
+        json.dump(cfg, f, indent=2)
+    "
+  weather_local_remove_station: >-
+    python3 -c "
+    import json
+    from datetime import datetime
+    with open('/config/local_data/weather/config.json', 'r') as f:
+        cfg = json.load(f)
+    if '{{ slot }}' in cfg.get('local_stations', {}):
+        del cfg['local_stations']['{{ slot }}']
+        cfg['modified'] = datetime.now().isoformat()
+    with open('/config/local_data/weather/config.json', 'w') as f:
+        json.dump(cfg, f, indent=2)
+    "
+
+
+# =============================================================================
+# STATISTICS SENSORS - For calculations
+# =============================================================================
+
+input_number:
+  # Local gateway CDD
+  weather_station_1_cdd:
+    name: Weather Station 1 Cumulative Degree Days
+    min: -1000000
+    max: 1000000
+    initial: 0
+    step: 0.1
+    unit_of_measurement: "°C"
+    icon: mdi:chart-multiple
+    mode: box
+
+  # API station settings form
+  weather_api_station_slot:
+    name: Weather API Station Slot
+    min: 1
+    max: 4
+    step: 1
+    mode: box
+    icon: mdi:numeric
+
+  weather_api_station_latitude:
+    name: Weather API Station Latitude
+    min: -90
+    max: 90
+    step: 0.0001
+    mode: box
+    icon: mdi:latitude
+
+  weather_api_station_elevation:
+    name: Weather API Station Elevation
+    min: 0
+    max: 5000
+    step: 1
+    unit_of_measurement: "m"
+    mode: box
+    icon: mdi:elevation-rise
+
+  # API station CDD helpers
+  weather_api_station_1_cdd:
+    name: Weather API Station 1 Cumulative Degree Days
+    min: -1000000
+    max: 1000000
+    initial: 0
+    step: 0.1
+    unit_of_measurement: "°C-d"
+    icon: mdi:chart-multiple
+    mode: box
+  weather_api_station_2_cdd:
+    name: Weather API Station 2 Cumulative Degree Days
+    min: -1000000
+    max: 1000000
+    initial: 0
+    step: 0.1
+    unit_of_measurement: "°C-d"
+    icon: mdi:chart-multiple
+    mode: box
+  weather_api_station_3_cdd:
+    name: Weather API Station 3 Cumulative Degree Days
+    min: -1000000
+    max: 1000000
+    initial: 0
+    step: 0.1
+    unit_of_measurement: "°C-d"
+    icon: mdi:chart-multiple
+    mode: box
+  weather_api_station_4_cdd:
+    name: Weather API Station 4 Cumulative Degree Days
+    min: -1000000
+    max: 1000000
+    initial: 0
+    step: 0.1
+    unit_of_measurement: "°C-d"
+    icon: mdi:chart-multiple
+    mode: box
+
+
+input_text:
+  # BOM Configuration
+  bom_location_prefix:
+    name: "BOM Location Prefix"
+    icon: mdi:map-marker
+    initial: "home"
+    min: 1
+    max: 50
+
+  # Weather API Station Configuration
+  weather_api_station_name:
+    name: Weather API Station Name
+    max: 50
+    icon: mdi:label
+  weather_api_station_imei:
+    name: Weather API Station IMEI
+    max: 50
+    icon: mdi:identifier
+
+  # Local Station Configuration
+  weather_local_station_name:
+    name: Weather Local Station Name
+    max: 50
+    icon: mdi:label
+
+
+input_select:
+  weather_api_editor_mode:
+    name: Weather API Editor Mode
+    options:
+      - "View"
+      - "Add Station"
+      - "Edit Station 1"
+      - "Edit Station 2"
+      - "Edit Station 3"
+      - "Edit Station 4"
+    initial: "View"
+    icon: mdi:pencil
+
+
+# =============================================================================
+# LOCAL STATION CONFIGURATION SENSOR
+# =============================================================================
+
+sensor:
+  # Local gateway statistics
+  - platform: statistics
+    name: Weather Station 1 Min Temperature
+    entity_id: sensor.ecowittgateway_1_outdoor_temperature
+    state_characteristic: value_min
+    max_age:
+      hours: 24
+
+  - platform: statistics
+    name: Weather Station 1 Max Temperature
+    entity_id: sensor.ecowittgateway_1_outdoor_temperature
+    state_characteristic: value_max
+    max_age:
+      hours: 24
+
+  - platform: statistics
+    name: Weather Station 1 Min Humidity
+    entity_id: sensor.ecowittgateway_1_humidity
+    state_characteristic: value_min
+    max_age:
+      hours: 24
+
+  - platform: statistics
+    name: Weather Station 1 Max Humidity
+    entity_id: sensor.ecowittgateway_1_humidity
+    state_characteristic: value_max
+    max_age:
+      hours: 24
+
+  - platform: statistics
+    name: Weather Station 1 Avg Wind Speed
+    entity_id: sensor.ecowittgateway_1_wind_speed
+    state_characteristic: mean
+    max_age:
+      hours: 24
+
+  # API Station 1 statistics
+  - platform: statistics
+    name: Weather API Station 1 Min Temperature
+    entity_id: sensor.weather_api_station_1_temperature
+    state_characteristic: value_min
+    max_age:
+      hours: 24
+  - platform: statistics
+    name: Weather API Station 1 Max Temperature
+    entity_id: sensor.weather_api_station_1_temperature
+    state_characteristic: value_max
+    max_age:
+      hours: 24
+  - platform: statistics
+    name: Weather API Station 1 Min Humidity
+    entity_id: sensor.weather_api_station_1_humidity
+    state_characteristic: value_min
+    max_age:
+      hours: 24
+  - platform: statistics
+    name: Weather API Station 1 Max Humidity
+    entity_id: sensor.weather_api_station_1_humidity
+    state_characteristic: value_max
+    max_age:
+      hours: 24
+  - platform: statistics
+    name: Weather API Station 1 Avg Wind Speed
+    entity_id: sensor.weather_api_station_1_wind_speed
+    state_characteristic: mean
+    max_age:
+      hours: 24
+
+  # API Station 2 statistics
+  - platform: statistics
+    name: Weather API Station 2 Min Temperature
+    entity_id: sensor.weather_api_station_2_temperature
+    state_characteristic: value_min
+    max_age:
+      hours: 24
+  - platform: statistics
+    name: Weather API Station 2 Max Temperature
+    entity_id: sensor.weather_api_station_2_temperature
+    state_characteristic: value_max
+    max_age:
+      hours: 24
+  - platform: statistics
+    name: Weather API Station 2 Min Humidity
+    entity_id: sensor.weather_api_station_2_humidity
+    state_characteristic: value_min
+    max_age:
+      hours: 24
+  - platform: statistics
+    name: Weather API Station 2 Max Humidity
+    entity_id: sensor.weather_api_station_2_humidity
+    state_characteristic: value_max
+    max_age:
+      hours: 24
+  - platform: statistics
+    name: Weather API Station 2 Avg Wind Speed
+    entity_id: sensor.weather_api_station_2_wind_speed
+    state_characteristic: mean
+    max_age:
+      hours: 24
+
+  # API Station 3 statistics
+  - platform: statistics
+    name: Weather API Station 3 Min Temperature
+    entity_id: sensor.weather_api_station_3_temperature
+    state_characteristic: value_min
+    max_age:
+      hours: 24
+  - platform: statistics
+    name: Weather API Station 3 Max Temperature
+    entity_id: sensor.weather_api_station_3_temperature
+    state_characteristic: value_max
+    max_age:
+      hours: 24
+  - platform: statistics
+    name: Weather API Station 3 Min Humidity
+    entity_id: sensor.weather_api_station_3_humidity
+    state_characteristic: value_min
+    max_age:
+      hours: 24
+  - platform: statistics
+    name: Weather API Station 3 Max Humidity
+    entity_id: sensor.weather_api_station_3_humidity
+    state_characteristic: value_max
+    max_age:
+      hours: 24
+  - platform: statistics
+    name: Weather API Station 3 Avg Wind Speed
+    entity_id: sensor.weather_api_station_3_wind_speed
+    state_characteristic: mean
+    max_age:
+      hours: 24
+
+  # API Station 4 statistics
+  - platform: statistics
+    name: Weather API Station 4 Min Temperature
+    entity_id: sensor.weather_api_station_4_temperature
+    state_characteristic: value_min
+    max_age:
+      hours: 24
+  - platform: statistics
+    name: Weather API Station 4 Max Temperature
+    entity_id: sensor.weather_api_station_4_temperature
+    state_characteristic: value_max
+    max_age:
+      hours: 24
+  - platform: statistics
+    name: Weather API Station 4 Min Humidity
+    entity_id: sensor.weather_api_station_4_humidity
+    state_characteristic: value_min
+    max_age:
+      hours: 24
+  - platform: statistics
+    name: Weather API Station 4 Max Humidity
+    entity_id: sensor.weather_api_station_4_humidity
+    state_characteristic: value_max
+    max_age:
+      hours: 24
+  - platform: statistics
+    name: Weather API Station 4 Avg Wind Speed
+    entity_id: sensor.weather_api_station_4_wind_speed
+    state_characteristic: mean
+    max_age:
+      hours: 24
+
+
+# =============================================================================
+# UTILITY METERS - Daily solar radiation
+# =============================================================================
+
+utility_meter:
+  # Local gateway
+  weather_station_1_solar_radiation_mj_m2_day:
+    name: Weather Station 1 Solar Radiation (MJ/m2/day)
+    source: sensor.weather_station_1_filtered_solar_radiation
+    cycle: daily
+    delta_values: true
+    periodically_resetting: true
+    always_available: true
+
+  # API stations
+  weather_api_station_1_solar_mj_day:
+    name: Weather API Station 1 Solar Radiation (MJ/m2/day)
+    source: sensor.weather_api_station_1_filtered_solar
+    cycle: daily
+    delta_values: true
+    periodically_resetting: true
+    always_available: true
+
+  weather_api_station_2_solar_mj_day:
+    name: Weather API Station 2 Solar Radiation (MJ/m2/day)
+    source: sensor.weather_api_station_2_filtered_solar
+    cycle: daily
+    delta_values: true
+    periodically_resetting: true
+    always_available: true
+
+  weather_api_station_3_solar_mj_day:
+    name: Weather API Station 3 Solar Radiation (MJ/m2/day)
+    source: sensor.weather_api_station_3_filtered_solar
+    cycle: daily
+    delta_values: true
+    periodically_resetting: true
+    always_available: true
+
+  weather_api_station_4_solar_mj_day:
+    name: Weather API Station 4 Solar Radiation (MJ/m2/day)
+    source: sensor.weather_api_station_4_filtered_solar
+    cycle: daily
+    delta_values: true
+    periodically_resetting: true
+    always_available: true
+
+
+# =============================================================================
+# AUTOMATIONS - CDD daily updates
+# =============================================================================
+
+automation:
+  # Local gateway CDD
+  - id: "weather_station_1_cdd_automation"
+    alias: Weather Station 1 Cumulative Degree Days Automation
+    mode: single
+    description: Adds todays Degree Day value to running total
+    trigger:
+      - platform: time
+        at: "23:59:30"
+    condition: []
+    action:
+      - variables:
+          today: "{{ states('sensor.weather_station_1_degree_day') | float(0) }}"
+          total: "{{ states('input_number.weather_station_1_cdd') | float(0) }}"
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.weather_station_1_cdd
+        data:
+          value: "{{ (total + today) | round(2) }}"
+
+  # API station CDD automations
+  - id: weather_api_station_1_cdd_automation
+    alias: Weather API Station 1 CDD Daily Update
+    mode: single
+    trigger:
+      - platform: time
+        at: "23:59:30"
+    condition:
+      - condition: template
+        value_template: "{{ is_number(states('sensor.weather_api_station_1_degree_day')) }}"
+    action:
+      - variables:
+          today: "{{ states('sensor.weather_api_station_1_degree_day') | float(0) }}"
+          total: "{{ states('input_number.weather_api_station_1_cdd') | float(0) }}"
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.weather_api_station_1_cdd
+        data:
+          value: "{{ (total + today) | round(2) }}"
+
+  - id: weather_api_station_2_cdd_automation
+    alias: Weather API Station 2 CDD Daily Update
+    mode: single
+    trigger:
+      - platform: time
+        at: "23:59:30"
+    condition:
+      - condition: template
+        value_template: "{{ is_number(states('sensor.weather_api_station_2_degree_day')) }}"
+    action:
+      - variables:
+          today: "{{ states('sensor.weather_api_station_2_degree_day') | float(0) }}"
+          total: "{{ states('input_number.weather_api_station_2_cdd') | float(0) }}"
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.weather_api_station_2_cdd
+        data:
+          value: "{{ (total + today) | round(2) }}"
+
+  - id: weather_api_station_3_cdd_automation
+    alias: Weather API Station 3 CDD Daily Update
+    mode: single
+    trigger:
+      - platform: time
+        at: "23:59:30"
+    condition:
+      - condition: template
+        value_template: "{{ is_number(states('sensor.weather_api_station_3_degree_day')) }}"
+    action:
+      - variables:
+          today: "{{ states('sensor.weather_api_station_3_degree_day') | float(0) }}"
+          total: "{{ states('input_number.weather_api_station_3_cdd') | float(0) }}"
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.weather_api_station_3_cdd
+        data:
+          value: "{{ (total + today) | round(2) }}"
+
+  - id: weather_api_station_4_cdd_automation
+    alias: Weather API Station 4 CDD Daily Update
+    mode: single
+    trigger:
+      - platform: time
+        at: "23:59:30"
+    condition:
+      - condition: template
+        value_template: "{{ is_number(states('sensor.weather_api_station_4_degree_day')) }}"
+    action:
+      - variables:
+          today: "{{ states('sensor.weather_api_station_4_degree_day') | float(0) }}"
+          total: "{{ states('input_number.weather_api_station_4_cdd') | float(0) }}"
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.weather_api_station_4_cdd
+        data:
+          value: "{{ (total + today) | round(2) }}"
+
+
+# =============================================================================
+# SCRIPTS
+# =============================================================================
+
+script:
+  # Local gateway scripts
+  reset_weather_station_1_cdd:
+    alias: Reset Weather Station 1 Cumulative Degree Days
+    mode: single
+    sequence:
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.weather_station_1_cdd
+        data:
+          value: 0
+
+  # API scripts
+  weather_api_init_system:
+    alias: Weather API Initialize System
+    mode: single
+    sequence:
+      - service: shell_command.weather_api_init
+      - delay: "00:00:01"
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.weather_api_data
+      - service: persistent_notification.create
+        data:
+          title: "Weather API"
+          message: "System initialized successfully."
+
+  weather_api_refresh_data:
+    alias: Weather API Refresh Data
+    mode: single
+    sequence:
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.weather_api_data
+      - service: persistent_notification.create
+        data:
+          title: "Weather API"
+          message: "Data refreshed."
+
+  weather_api_add_station:
+    alias: Weather API Add Station
+    mode: single
+    fields:
+      slot:
+        description: Station slot (1-4)
+      name:
+        description: Station name
+      imei:
+        description: Station IMEI
+      latitude:
+        description: Station latitude
+      longitude:
+        description: Station longitude
+      elevation:
+        description: Station elevation
+    sequence:
+      - variables:
+          slot: "{{ slot | default(states('input_number.weather_api_station_slot') | int) }}"
+          name: "{{ name | default(states('input_text.weather_api_station_name')) }}"
+          imei: "{{ imei | default(states('input_text.weather_api_station_imei')) }}"
+          latitude: "{{ latitude | default(states('input_number.weather_api_station_latitude')) }}"
+          longitude: "{{ longitude | default(states('input_number.weather_api_station_longitude')) }}"
+          elevation: "{{ elevation | default(states('input_number.weather_api_station_elevation') | int) }}"
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ name | trim == '' }}"
+            sequence:
+              - service: persistent_notification.create
+                data:
+                  title: "Weather API"
+                  message: "Station name is required."
+              - stop: "No name"
+          - conditions:
+              - condition: template
+                value_template: "{{ imei | trim == '' }}"
+            sequence:
+              - service: persistent_notification.create
+                data:
+                  title: "Weather API"
+                  message: "Station IMEI is required."
+              - stop: "No IMEI"
+      - service: shell_command.weather_api_add_station
+        data:
+          slot: "{{ slot }}"
+          name: "{{ name | trim }}"
+          imei: "{{ imei | trim }}"
+          latitude: "{{ latitude }}"
+          longitude: "{{ longitude }}"
+          elevation: "{{ elevation }}"
+      - delay: "00:00:01"
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.weather_api_data
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.weather_api_station_name
+        data:
+          value: ""
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.weather_api_station_imei
+        data:
+          value: ""
+      - service: persistent_notification.create
+        data:
+          title: "Weather API"
+          message: "Station '{{ name }}' added to slot {{ slot }}."
+
+  weather_api_remove_station:
+    alias: Weather API Remove Station
+    mode: single
+    fields:
+      slot:
+        description: Station slot to remove
+    sequence:
+      - service: shell_command.weather_api_remove_station
+        data:
+          slot: "{{ slot }}"
+      - delay: "00:00:01"
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.weather_api_data
+      - service: persistent_notification.create
+        data:
+          title: "Weather API"
+          message: "Station removed from slot {{ slot }}."
+
+  weather_api_enable_station:
+    alias: Weather API Enable Station
+    mode: single
+    fields:
+      slot:
+        description: Station slot to enable
+    sequence:
+      - service: shell_command.weather_api_enable_station
+        data:
+          slot: "{{ slot }}"
+      - delay: "00:00:01"
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.weather_api_data
+
+  weather_api_disable_station:
+    alias: Weather API Disable Station
+    mode: single
+    fields:
+      slot:
+        description: Station slot to disable
+    sequence:
+      - service: shell_command.weather_api_disable_station
+        data:
+          slot: "{{ slot }}"
+      - delay: "00:00:01"
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.weather_api_data
+
+  weather_api_reset_cdd:
+    alias: Weather API Reset CDD
+    mode: single
+    fields:
+      slot:
+        description: Station slot to reset CDD
+    sequence:
+      - service: input_number.set_value
+        target:
+          entity_id: "input_number.weather_api_station_{{ slot }}_cdd"
+        data:
+          value: 0
+      - service: persistent_notification.create
+        data:
+          title: "Weather API"
+          message: "CDD reset for station {{ slot }}."
+
+  weather_api_load_station:
+    alias: Weather API Load Station
+    description: Load station details into the form for editing
+    mode: single
+    fields:
+      slot:
+        description: Station slot to load (1-4)
+    sequence:
+      - variables:
+          stations: "{{ state_attr('sensor.weather_api_data', 'stations') or {} }}"
+          s: "{{ stations.get(slot | string) or stations.get(slot | int) or {} }}"
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ not s }}"
+            sequence:
+              - service: persistent_notification.create
+                data:
+                  title: "Weather API"
+                  message: "No station found in slot {{ slot }}."
+              - stop: "No station"
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.weather_api_station_slot
+        data:
+          value: "{{ slot }}"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.weather_api_station_name
+        data:
+          value: "{{ s.get('name', '') }}"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.weather_api_station_imei
+        data:
+          value: "{{ s.get('imei', '') }}"
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.weather_api_station_latitude
+        data:
+          value: "{{ s.get('latitude', -35.0) }}"
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.weather_api_station_longitude
+        data:
+          value: "{{ s.get('longitude', 149.0) }}"
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.weather_api_station_elevation
+        data:
+          value: "{{ s.get('elevation', 0) }}"
+      - service: persistent_notification.create
+        data:
+          title: "Weather API"
+          message: "Loaded station '{{ s.get('name', 'Unknown') }}' from slot {{ slot }}."
+
+  weather_api_clear_form:
+    alias: Weather API Clear Form
+    description: Clear the station form inputs and set to next available slot
+    mode: single
+    sequence:
+      - variables:
+          next_slot: "{{ state_attr('sensor.weather_api_slot_status', 'next_slot') | int(1) }}"
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.weather_api_station_slot
+        data:
+          value: "{{ next_slot if next_slot > 0 else 1 }}"
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.weather_api_station_name
+        data:
+          value: ""
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.weather_api_station_imei
+        data:
+          value: ""
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.weather_api_station_latitude
+        data:
+          value: -35.0
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.weather_api_station_longitude
+        data:
+          value: 149.0
+      - service: input_number.set_value
+        target:
+          entity_id: input_number.weather_api_station_elevation
+        data:
+          value: 0
+
+  # Local station scripts
+  weather_local_init:
+    alias: Weather Local Initialize
+    mode: single
+    sequence:
+      - service: shell_command.weather_local_init
+      - delay: "00:00:01"
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.weather_local_config
+      - service: persistent_notification.create
+        data:
+          title: "Weather Local"
+          message: "Local station configuration initialized."
+
+  weather_local_refresh:
+    alias: Weather Local Refresh Config
+    mode: single
+    sequence:
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.weather_local_config
+
+  weather_local_set_station_name:
+    alias: Weather Local Set Station Name
+    mode: single
+    fields:
+      slot:
+        description: Station slot (default 1)
+      name:
+        description: Station name
+    sequence:
+      - variables:
+          slot: "{{ slot | default('1') }}"
+          name: "{{ name | default(states('input_text.weather_local_station_name')) }}"
+          enabled: true
+          entity_prefix: "ecowittgateway_1"
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ name | trim == '' }}"
+            sequence:
+              - service: persistent_notification.create
+                data:
+                  title: "Weather Local"
+                  message: "Station name is required."
+              - stop: "No name"
+      - service: shell_command.weather_local_set_station
+        data:
+          slot: "{{ slot }}"
+          name: "{{ name | trim }}"
+          enabled: "{{ enabled }}"
+          entity_prefix: "{{ entity_prefix }}"
+      - delay: "00:00:01"
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.weather_local_config
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.weather_local_station_name
+        data:
+          value: ""
+      - service: persistent_notification.create
+        data:
+          title: "Weather Local"
+          message: "Station name updated to '{{ name }}'."
+
+  weather_local_enable_station:
+    alias: Weather Local Enable Station
+    mode: single
+    fields:
+      slot:
+        description: Station slot to enable
+    sequence:
+      - service: shell_command.weather_local_enable_station
+        data:
+          slot: "{{ slot | default('1') }}"
+      - delay: "00:00:01"
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.weather_local_config
+
+  weather_local_disable_station:
+    alias: Weather Local Disable Station
+    mode: single
+    fields:
+      slot:
+        description: Station slot to disable
+    sequence:
+      - service: shell_command.weather_local_disable_station
+        data:
+          slot: "{{ slot | default('1') }}"
+      - delay: "00:00:01"
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.weather_local_config
+
+
+# =============================================================================
+# INPUT HELPERS - For Settings UI
+# =============================================================================
+
+input_text:
+  bom_location_prefix:
+    name: BOM Location Prefix
+    icon: mdi:map-marker
+    initial: "home"
+    max: 50
+
+  weather_api_station_name:
+    name: Weather API Station Name
+    icon: mdi:label
+    initial: ""
+    max: 100
+
+  weather_api_station_imei:
+    name: Weather API Station IMEI
+    icon: mdi:identifier
+    initial: ""
+    max: 20
+
+  weather_local_station_name:
+    name: Weather Local Station Name
+    icon: mdi:label
+    initial: ""
+    max: 100
+
+input_number:
+  weather_api_station_slot:
+    name: Weather API Station Slot
+    icon: mdi:numeric
+    min: 1
+    max: 4
+    step: 1
+    mode: box
+    initial: 1
+
+  weather_api_station_latitude:
+    name: Weather API Station Latitude
+    icon: mdi:latitude
+    min: -90
+    max: 90
+    step: 0.0001
+    mode: box
+    initial: -35.0
+
+  weather_api_station_longitude:
+    name: Weather API Station Longitude
+    icon: mdi:longitude
+    min: -180
+    max: 180
+    step: 0.0001
+    mode: box
+    initial: 149.0
+
+  weather_api_station_elevation:
+    name: Weather API Station Elevation
+    icon: mdi:elevation-rise
+    min: 0
+    max: 5000
+    step: 1
+    mode: box
+    unit_of_measurement: m
+    initial: 0
+
+  # CDD Accumulators
+  weather_station_1_cdd:
+    name: Weather Station 1 Cumulative Degree Days
+    icon: mdi:chart-line
+    min: 0
+    max: 10000
+    step: 0.01
+    mode: box
+    unit_of_measurement: "°C-d"
+    initial: 0
+
+  weather_api_station_1_cdd:
+    name: Weather API Station 1 CDD
+    icon: mdi:chart-line
+    min: 0
+    max: 10000
+    step: 0.01
+    mode: box
+    unit_of_measurement: "°C-d"
+    initial: 0
+
+  weather_api_station_2_cdd:
+    name: Weather API Station 2 CDD
+    icon: mdi:chart-line
+    min: 0
+    max: 10000
+    step: 0.01
+    mode: box
+    unit_of_measurement: "°C-d"
+    initial: 0
+
+  weather_api_station_3_cdd:
+    name: Weather API Station 3 CDD
+    icon: mdi:chart-line
+    min: 0
+    max: 10000
+    step: 0.01
+    mode: box
+    unit_of_measurement: "°C-d"
+    initial: 0
+
+  weather_api_station_4_cdd:
+    name: Weather API Station 4 CDD
+    icon: mdi:chart-line
+    min: 0
+    max: 10000
+    step: 0.01
+    mode: box
+    unit_of_measurement: "°C-d"
+    initial: 0
