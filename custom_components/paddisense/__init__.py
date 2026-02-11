@@ -1007,11 +1007,22 @@ async def _async_update_sensors(hass: HomeAssistant) -> None:
 
 async def _async_install_required_hacs(hass: HomeAssistant) -> None:
     """Install required HACS cards if HACS is available."""
+    import asyncio
     from pathlib import Path
 
-    # Check if HACS is available
-    if not hass.services.has_service("hacs", "install"):
-        _LOGGER.debug("HACS not available, skipping automatic card installation")
+    # Wait for HACS to be ready (it loads after most integrations)
+    max_retries = 6
+    retry_delay = 10  # seconds
+
+    for attempt in range(max_retries):
+        if hass.services.has_service("hacs", "install"):
+            _LOGGER.debug("HACS is available (attempt %d)", attempt + 1)
+            break
+        if attempt < max_retries - 1:
+            _LOGGER.debug("HACS not ready yet, waiting %ds (attempt %d/%d)", retry_delay, attempt + 1, max_retries)
+            await asyncio.sleep(retry_delay)
+    else:
+        _LOGGER.info("HACS not available after %d attempts, skipping automatic card installation", max_retries)
         return
 
     # Check what's already installed
@@ -1044,6 +1055,16 @@ async def _async_install_required_hacs(hass: HomeAssistant) -> None:
         return
 
     _LOGGER.info("Installing %d required HACS cards...", len(cards_to_install))
+
+    # Notify user that installation is starting
+    await hass.services.async_call(
+        "persistent_notification", "create",
+        {
+            "title": "PaddiSense Setup",
+            "message": f"Installing {len(cards_to_install)} required HACS cards...\n\nThis may take a minute.",
+            "notification_id": "paddisense_hacs_install",
+        },
+    )
 
     installed = []
     failed = []
