@@ -5,10 +5,11 @@
 #
 # Views:
 # 1. Forecast - BOM weather forecast (always visible)
-# 2. Temps - 7-day temperature forecast (always visible)
-# 3. Station - Local Ecowitt gateway data (visible if gateway available)
-# 4. Stations - API stations overview (visible if API stations configured)
-# 5. Settings - Combined settings for gateway and API
+# 2. BOM - Bureau of Meteorology current observations (visible if BOM configured)
+# 3. Temps - 7-day temperature forecast (always visible)
+# 4. Station - Local Ecowitt gateway data (visible if gateway available)
+# 5. Stations - API stations overview (visible if API stations configured)
+# 6. Settings - Combined settings for gateway and API
 #
 ##############################################################################
 
@@ -171,6 +172,59 @@ button_card_templates:
         - text-align: left
 
   ###########################################################################
+  # Slot card - for API station slots (configured/empty states)
+  ###########################################################################
+  wapi_slot_card:
+    show_icon: true
+    show_name: true
+    show_state: true
+    show_label: false
+    variables:
+      slot: 1
+      configured: false
+    styles:
+      card:
+        - border-radius: 16px
+        - padding: 14px
+        - height: 90px
+        - box-shadow: 0 8px 20px rgba(0,0,0,0.12)
+        - overflow: hidden
+        - background: >
+            [[[
+              return variables.configured
+                ? 'linear-gradient(135deg, #1565c0 0%, #0d47a1 100%)'
+                : 'linear-gradient(135deg, #616161 0%, #424242 100%)';
+            ]]]
+      grid:
+        - grid-template-areas: '"i n" "i s"'
+        - grid-template-columns: 44px 1fr
+        - grid-template-rows: 1fr auto
+        - column-gap: 10px
+      icon:
+        - color: white
+        - width: 32px
+        - opacity: >
+            [[[
+              return variables.configured ? 1 : 0.6;
+            ]]]
+      name:
+        - color: white
+        - font-size: 15px
+        - font-weight: 800
+        - align-self: end
+        - justify-self: start
+        - white-space: nowrap
+        - overflow: hidden
+        - text-overflow: ellipsis
+        - max-width: 100%
+      state:
+        - color: rgba(255,255,255,0.75)
+        - font-size: 11px
+        - font-weight: 600
+        - align-self: start
+        - justify-self: start
+
+  ###########################################################################
   # Station header (gradient) - for API stations
   ###########################################################################
   station_header:
@@ -306,32 +360,33 @@ views:
     path: forecast
 #   icon: mdi:weather-partly-cloudy
     type: sections
-    max_columns: 3
+    max_columns: 1
     sections:
       - type: grid
         cards:
+          # Platinum Weather Card - uses BOM template sensors
+          # Configure input_text.bom_location_prefix to match your BOM location
           - type: custom:platinum-weather-card
-            text_card_title_2: Old Coree
-            entity_temperature: sensor.home_forecast_now_temp_now
-            entity_apparent_temp: sensor.home_observations_temp_feels_like
-            entity_humidity: sensor.home_observations_humidity
-            entity_wind_speed: sensor.home_observations_wind_speed_kilometre
-            entity_wind_gust: sensor.home_observations_gust_speed_kilometre
-            entity_wind_bearing: sensor.home_observations_wind_direction
-            entity_pop: sensor.home_forecast_rain_chance_0
-            entity_pos: sensor.home_forecast_rain_amount_max_0
-            entity_summary: sensor.home_forecast_extended_text_0
-            entity_extended: sensor.home_forecast_extended_text_1
+            entity_temperature: sensor.bom_forecast_now_temperature
+            entity_apparent_temp: sensor.bom_observations_feels_like
+            entity_humidity: sensor.bom_observations_humidity
+            entity_wind_speed: sensor.bom_observations_wind_speed
+            entity_wind_gust: sensor.bom_observations_wind_gust
+            entity_wind_bearing: sensor.bom_observations_wind_direction
+            entity_pop: sensor.bom_forecast_rain_chance_0
+            entity_pos: sensor.bom_forecast_rain_amount_0
+            entity_summary: sensor.bom_forecast_extended_0
+            entity_extended: sensor.bom_forecast_extended_1
             entity_sun: sun.sun
-            entity_forecast_icon: sensor.home_forecast_icon_descriptor_0
-            entity_forecast_max: sensor.home_forecast_temp_max_0
-            entity_forecast_min: sensor.home_forecast_temp_min_0
-            entity_forecast_icon_1: sensor.home_forecast_icon_descriptor_1
-            entity_forecast_max_1: sensor.home_forecast_temp_max_1
-            entity_forecast_min_1: sensor.home_forecast_temp_min_1
-            entity_pop_1: sensor.home_forecast_rain_chance_1
-            entity_pos_1: sensor.home_forecast_rain_amount_range_1
-            entity_summary_1: sensor.home_forecast_extended_text_0
+            entity_forecast_icon: sensor.bom_forecast_icon_0
+            entity_forecast_max: sensor.bom_forecast_max_0
+            entity_forecast_min: sensor.bom_forecast_min_0
+            entity_forecast_icon_1: sensor.bom_forecast_icon_1
+            entity_forecast_max_1: sensor.bom_forecast_max_1
+            entity_forecast_min_1: sensor.bom_forecast_min_1
+            entity_pop_1: sensor.bom_forecast_rain_chance_1
+            entity_pos_1: sensor.bom_forecast_rain_range_1
+            entity_summary_1: sensor.bom_forecast_extended_0
             extended_use_attr: false
             option_static_icons: false
             option_time_format: 12hour
@@ -378,7 +433,259 @@ views:
 
 
   ###########################################################################
-  # VIEW 2: TEMPS (7-Day Temperature Forecast)
+  # VIEW 2: BOM OBSERVATIONS (Bureau of Meteorology Current Conditions)
+  ###########################################################################
+  - title: BOM
+    path: bom
+    type: sections
+    max_columns: 1
+    sections:
+
+      - type: grid
+        cards:
+
+          # Conditional: Only show if BOM is configured
+          - type: conditional
+            conditions:
+              - entity: binary_sensor.bom_observations_available
+                state: "on"
+            card:
+              type: vertical-stack
+              cards:
+
+                # Header
+                - type: custom:button-card
+                  template: station_header
+                  entity: binary_sensor.bom_observations_available
+                  icon: mdi:weather-cloudy
+                  name: "Bureau of Meteorology"
+                  state_display: >
+                    [[[
+                      const prefix = hass.states['input_text.bom_location_prefix']?.state || 'home';
+                      return `Location: ${prefix}`;
+                    ]]]
+                  styles:
+                    card:
+                      - background: "linear-gradient(135deg, #0288d1 0%, #01579b 100%)"
+
+                # Main stats (2x2 grid)
+                - type: grid
+                  columns: 2
+                  square: false
+                  cards:
+                    - type: custom:button-card
+                      template: big_stat
+                      entity: sensor.bom_observations_temperature
+                      name: Temperature
+                      icon: mdi:thermometer
+                      styles:
+                        icon:
+                          - color: "#e53935"
+                    - type: custom:button-card
+                      template: big_stat
+                      entity: sensor.bom_observations_rain_since_9am
+                      name: Rain Since 9am
+                      icon: mdi:water
+                      styles:
+                        icon:
+                          - color: "#1e88e5"
+                    - type: custom:button-card
+                      template: big_stat
+                      entity: sensor.bom_observations_humidity
+                      name: Humidity
+                      icon: mdi:water-percent
+                      styles:
+                        icon:
+                          - color: "#43a047"
+                    - type: custom:button-card
+                      template: big_stat
+                      entity: sensor.bom_observations_pressure
+                      name: Pressure
+                      icon: mdi:gauge
+                      styles:
+                        icon:
+                          - color: "#7e57c2"
+
+                # Secondary stats (2x2 grid)
+                - type: grid
+                  columns: 2
+                  square: false
+                  cards:
+                    - type: custom:button-card
+                      template: small_stat
+                      entity: sensor.bom_observations_feels_like
+                      name: Feels Like
+                      icon: mdi:thermometer-check
+                    - type: custom:button-card
+                      template: small_stat
+                      entity: sensor.bom_observations_dew_point
+                      name: Dew Point
+                      icon: mdi:water-thermometer
+                    - type: custom:button-card
+                      template: small_stat
+                      entity: sensor.bom_observations_delta_t
+                      name: Delta T
+                      icon: mdi:delta
+                    - type: custom:button-card
+                      template: small_stat
+                      entity: sensor.bom_observations_wind_speed
+                      name: Wind Speed
+                      icon: mdi:weather-windy
+
+                # Wind section title
+                - type: custom:mushroom-title-card
+                  title: Wind Data
+
+                # Wind Rose
+                - type: custom:windrose-card
+                  wind_direction_entity:
+                    entity: sensor.bom_observations_wind_direction
+                    use_statistics: false
+                    direction_unit: letters
+                  windspeed_entities:
+                    - entity: sensor.bom_observations_wind_speed
+                      name: Speed
+                      speed_unit: kph
+                      output_speed_unit: kph
+                      use_statistics: false
+                      speed_range_beaufort: false
+                      current_speed_arrow: true
+                      speed_ranges:
+                        - from_value: 0
+                          color: blue
+                        - from_value: 10
+                          color: green
+                        - from_value: 25
+                          color: orange
+                        - from_value: 40
+                          color: red
+                    - entity: sensor.bom_observations_wind_gust
+                      name: Gusts
+                      speed_unit: kph
+                      output_speed_unit: kph
+                      use_statistics: false
+                      speed_range_beaufort: false
+                      current_speed_arrow: true
+                      speed_ranges:
+                        - from_value: 0
+                          color: blue
+                        - from_value: 10
+                          color: green
+                        - from_value: 25
+                          color: orange
+                        - from_value: 40
+                          color: red
+                  data_period:
+                    period_selector:
+                      location: top
+                      active_color: white
+                      active_bg_color: "var(--primary-color)"
+                      color: grey
+                      buttons:
+                        - hours: 1
+                          title: 1 hour
+                        - hours: 6
+                          title: 6 hours
+                        - hours: 12
+                          title: 12 hours
+                        - hours: 24
+                          title: 1 day
+                  center_calm_percentage: false
+                  windspeed_bar_location: right
+                  direction_labels:
+                    show_intercardinal_directions: true
+                    intercardinal_directions_text_size: 30
+                  current_direction:
+                    show_arrow: true
+                    arrow_size: 50
+                    centre_circle_size: 10
+                  corner_info:
+                    top_left:
+                      label: "Current Wind Speed"
+                      entity: sensor.bom_observations_wind_speed
+                      value_text_size: 100
+                    top_right:
+                      label: Current Gusts
+                      entity: sensor.bom_observations_wind_gust
+                      value_text_size: 100
+                    bottom_left:
+                      label: Current Direction
+                      entity: sensor.bom_observations_wind_direction
+                      direction_letters: NESWx
+                      value_text_size: 80
+                  colors:
+                    rose_current_direction_arrow: "#dd3322"
+
+                # Wind chart
+                - type: custom:apexcharts-card
+                  cache: false
+                  header:
+                    show: true
+                    show_states: true
+                  experimental:
+                    color_threshold: true
+                  graph_span: 6h
+                  series:
+                    - entity: sensor.bom_observations_wind_speed
+                      name: Wind Speed
+                      group_by:
+                        func: max
+                        duration: 30min
+                      show:
+                        in_chart: true
+                        in_header: false
+                      color_threshold:
+                        - value: 0
+                          color: "#008000"
+                        - value: 15
+                          color: "#ffa500"
+                        - value: 30
+                          color: "#ff0000"
+                    - entity: sensor.bom_observations_wind_gust
+                      name: Gusts
+                      type: line
+                      color: lightskyblue
+                      group_by:
+                        func: max
+                        duration: 30min
+                      show:
+                        in_chart: true
+                        in_header: false
+                  apex_config:
+                    legend:
+                      show: false
+                    yaxis:
+                      labels:
+                        formatter: |
+                          EVAL:function (val) {
+                            return Math.floor(val) + " km/h"
+                          }
+                      tickAmount: 3
+                      min: 0
+                    stroke:
+                      curve: smooth
+
+          # Not configured message
+          - type: conditional
+            conditions:
+              - entity: binary_sensor.bom_observations_available
+                state: "off"
+            card:
+              type: markdown
+              content: |
+                ## BOM Integration Not Configured
+
+                To use BOM observations:
+
+                1. Install the **Bureau of Meteorology** integration via HACS
+                2. Configure it with your location name (e.g., "home", "farm")
+                3. Set the location prefix in **Settings** > **Helpers** > **bom_location_prefix**
+
+                The prefix must match exactly what you used when setting up the BOM integration.
+
+
+  ###########################################################################
+  # VIEW 3: TEMPS (7-Day Temperature Forecast)
   ###########################################################################
   - title: Temp
     path: temps
@@ -526,12 +833,11 @@ views:
 
 
   ###########################################################################
-  # VIEW 3: LOCAL STATION (Ecowitt Gateway Data)
+  # VIEW 4: LOCAL STATIONS (Ecowitt Gateway Data)
   # Conditional: Only shows content when local station is enabled
   ###########################################################################
-  - title: Local
+  - title: Local Stations
     path: local-1
-    icon: mdi:home-thermometer
     type: sections
     max_columns: 1
     sections:
@@ -747,7 +1053,7 @@ views:
 
 
   ###########################################################################
-  # VIEW 4: API STATIONS (Remote Ecowitt API Stations)
+  # VIEW 5: API STATIONS (Remote Ecowitt API Stations)
   ###########################################################################
   - title: Remote Stations
     path: stations
@@ -1884,7 +2190,7 @@ views:
                           curve: smooth
 
   ###########################################################################
-  # VIEW 5: SETTINGS
+  # VIEW 6: SETTINGS
   ###########################################################################
   - title: Settings
     path: settings
@@ -1898,6 +2204,60 @@ views:
           - type: custom:mushroom-title-card
             title: Weather Settings
             subtitle: Local Gateway & API Stations
+
+          # API Setup Instructions (show when credentials missing)
+          - type: conditional
+            conditions:
+              - entity: sensor.weather_api_data
+                attribute: credentials_ok
+                state: "False"
+            card:
+              type: markdown
+              content: |
+                ## Ecowitt API Setup Required
+
+                To use remote weather stations, add your Ecowitt API credentials to `/config/secrets.yaml`:
+
+                ```yaml
+                ecowitt_app_key: "YOUR_APPLICATION_KEY"
+                ecowitt_api_key: "YOUR_API_KEY"
+                ```
+
+                **How to get your API keys:**
+                1. Go to [ecowitt.net](https://www.ecowitt.net/) and log in
+                2. Navigate to **Settings** > **API Keys**
+                3. Create an Application Key and API Key
+                4. Copy both keys to your secrets.yaml file
+                5. Restart Home Assistant
+
+                **Adding Stations:**
+                - Each station needs its **IMEI** number (found on the Ecowitt dashboard or device label)
+                - Use the form below to add up to 4 stations
+
+          # BOM Setup Instructions
+          - type: conditional
+            conditions:
+              - entity: binary_sensor.bom_observations_available
+                state: "off"
+            card:
+              type: markdown
+              content: |
+                ## BOM Integration Setup
+
+                To use Bureau of Meteorology observations:
+
+                1. Install **Bureau of Meteorology** from HACS
+                2. Configure with your location name (e.g., "home", "farm")
+                3. Set the location prefix below to match
+
+          # BOM Location Prefix Setting
+          - type: entities
+            title: BOM Configuration
+            show_header_toggle: false
+            entities:
+              - entity: input_text.bom_location_prefix
+                name: BOM Location Prefix
+                icon: mdi:map-marker
 
           - type: entities
             title: API System Status
@@ -1944,33 +2304,172 @@ views:
 
           - type: custom:button-card
             template: wapi_section_title
-            name: Add API Station
+            name: Manage API Stations
 
+          # Slot Status Cards - 2x2 grid showing all slots
+          - type: grid
+            columns: 2
+            square: false
+            cards:
+              # Slot 1
+              - type: custom:button-card
+                template: wapi_slot_card
+                entity: sensor.weather_api_slot_status
+                icon: mdi:numeric-1-circle
+                variables:
+                  slot: 1
+                  configured: >
+                    [[[
+                      return !!(entity?.attributes?.slot_1_name);
+                    ]]]
+                name: >
+                  [[[
+                    const n = entity?.attributes?.slot_1_name;
+                    return n ? n : 'Empty';
+                  ]]]
+                state_display: >
+                  [[[
+                    const n = entity?.attributes?.slot_1_name;
+                    return n ? 'Slot 1 • Configured' : 'Slot 1 • Available';
+                  ]]]
+                tap_action:
+                  action: call-service
+                  service: script.weather_api_load_station
+                  service_data:
+                    slot: 1
+
+              # Slot 2
+              - type: custom:button-card
+                template: wapi_slot_card
+                entity: sensor.weather_api_slot_status
+                icon: mdi:numeric-2-circle
+                variables:
+                  slot: 2
+                  configured: >
+                    [[[
+                      return !!(entity?.attributes?.slot_2_name);
+                    ]]]
+                name: >
+                  [[[
+                    const n = entity?.attributes?.slot_2_name;
+                    return n ? n : 'Empty';
+                  ]]]
+                state_display: >
+                  [[[
+                    const n = entity?.attributes?.slot_2_name;
+                    return n ? 'Slot 2 • Configured' : 'Slot 2 • Available';
+                  ]]]
+                tap_action:
+                  action: call-service
+                  service: script.weather_api_load_station
+                  service_data:
+                    slot: 2
+
+              # Slot 3
+              - type: custom:button-card
+                template: wapi_slot_card
+                entity: sensor.weather_api_slot_status
+                icon: mdi:numeric-3-circle
+                variables:
+                  slot: 3
+                  configured: >
+                    [[[
+                      return !!(entity?.attributes?.slot_3_name);
+                    ]]]
+                name: >
+                  [[[
+                    const n = entity?.attributes?.slot_3_name;
+                    return n ? n : 'Empty';
+                  ]]]
+                state_display: >
+                  [[[
+                    const n = entity?.attributes?.slot_3_name;
+                    return n ? 'Slot 3 • Configured' : 'Slot 3 • Available';
+                  ]]]
+                tap_action:
+                  action: call-service
+                  service: script.weather_api_load_station
+                  service_data:
+                    slot: 3
+
+              # Slot 4
+              - type: custom:button-card
+                template: wapi_slot_card
+                entity: sensor.weather_api_slot_status
+                icon: mdi:numeric-4-circle
+                variables:
+                  slot: 4
+                  configured: >
+                    [[[
+                      return !!(entity?.attributes?.slot_4_name);
+                    ]]]
+                name: >
+                  [[[
+                    const n = entity?.attributes?.slot_4_name;
+                    return n ? n : 'Empty';
+                  ]]]
+                state_display: >
+                  [[[
+                    const n = entity?.attributes?.slot_4_name;
+                    return n ? 'Slot 4 • Configured' : 'Slot 4 • Available';
+                  ]]]
+                tap_action:
+                  action: call-service
+                  service: script.weather_api_load_station
+                  service_data:
+                    slot: 4
+
+          # Station Form
           - type: entities
             title: Station Details
             show_header_toggle: false
             entities:
               - entity: input_number.weather_api_station_slot
-                name: Slot (1-4)
+                name: Target Slot
               - entity: input_text.weather_api_station_name
                 name: Name
               - entity: input_text.weather_api_station_imei
                 name: IMEI
               - entity: input_number.weather_api_station_latitude
                 name: Latitude
+              - entity: input_number.weather_api_station_longitude
+                name: Longitude
               - entity: input_number.weather_api_station_elevation
                 name: Elevation (m)
 
-          - type: custom:button-card
-            template: wapi_action
-            name: Add Station
-            icon: mdi:plus
-            styles:
-              card:
-                - background: "#2e7d32"
-            tap_action:
-              action: call-service
-              service: script.weather_api_add_station
+          - type: horizontal-stack
+            cards:
+              - type: custom:button-card
+                template: wapi_action
+                name: Save Station
+                icon: mdi:content-save
+                styles:
+                  card:
+                    - background: "#2e7d32"
+                tap_action:
+                  action: call-service
+                  service: script.weather_api_add_station
+
+              - type: custom:button-card
+                template: wapi_action
+                entity: sensor.weather_api_slot_status
+                name: Add New
+                icon: mdi:plus-circle
+                state_display: >
+                  [[[
+                    const next = entity?.attributes?.next_slot || 0;
+                    return next > 0 ? `Slot ${next}` : 'Full';
+                  ]]]
+                styles:
+                  card:
+                    - background: >
+                        [[[
+                          const next = entity?.attributes?.next_slot || 0;
+                          return next > 0 ? '#1565c0' : '#757575';
+                        ]]]
+                tap_action:
+                  action: call-service
+                  service: script.weather_api_clear_form
 
           - type: custom:button-card
             template: wapi_section_title
@@ -1986,21 +2485,43 @@ views:
               cards:
                 - type: markdown
                   content: >
-                    {% set s = (state_attr('sensor.weather_api_data', 'stations') or {}).get('1', {}) %}
+                    {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+                    {% set s = stations.get('1') or stations.get(1) or {} %}
                     **Slot 1: {{ s.get('name') or '—' }}**
                     {{ 'Enabled' if s.get('enabled') else 'Disabled' }} - {{ 'Online' if s.get('connected') else 'Offline' }}
-                    IMEI: ****{{ (s.get('imei','')|string)[-4:] }} - Lat: {{ s.get('latitude') }} - Elev: {{ s.get('elevation') }}m
+                    IMEI: ****{{ (s.get('imei','')|string)[-4:] }} | Lat: {{ s.get('latitude') }} | Lon: {{ s.get('longitude') }} | Elev: {{ s.get('elevation') }}m
                 - type: horizontal-stack
                   cards:
                     - type: custom:button-card
+                      name: Edit
+                      icon: mdi:pencil
+                      styles:
+                        card:
+                          - height: 42px
+                          - border-radius: 12px
+                          - background: "#1565c0"
+                        name:
+                          - font-size: 12px
+                          - font-weight: 700
+                          - color: white
+                        icon:
+                          - color: white
+                      tap_action:
+                        action: call-service
+                        service: script.weather_api_load_station
+                        service_data:
+                          slot: 1
+                    - type: custom:button-card
                       name: >
                         [[[
-                          const s = hass.states['sensor.weather_api_data']?.attributes?.stations?.['1'] || {};
+                          const stations = hass.states['sensor.weather_api_data']?.attributes?.stations || {};
+                          const s = stations['1'] || stations[1] || {};
                           return s.enabled ? 'Disable' : 'Enable';
                         ]]]
                       icon: >
                         [[[
-                          const s = hass.states['sensor.weather_api_data']?.attributes?.stations?.['1'] || {};
+                          const stations = hass.states['sensor.weather_api_data']?.attributes?.stations || {};
+                          const s = stations['1'] || stations[1] || {};
                           return s.enabled ? 'mdi:pause-circle' : 'mdi:play-circle';
                         ]]]
                       styles:
@@ -2014,7 +2535,8 @@ views:
                         action: call-service
                         service: >
                           [[[
-                            const s = hass.states['sensor.weather_api_data']?.attributes?.stations?.['1'] || {};
+                            const stations = hass.states['sensor.weather_api_data']?.attributes?.stations || {};
+                            const s = stations['1'] || stations[1] || {};
                             return s.enabled ? 'script.weather_api_disable_station' : 'script.weather_api_enable_station';
                           ]]]
                         service_data:
@@ -2050,21 +2572,43 @@ views:
               cards:
                 - type: markdown
                   content: >
-                    {% set s = (state_attr('sensor.weather_api_data', 'stations') or {}).get('2', {}) %}
+                    {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+                    {% set s = stations.get('2') or stations.get(2) or {} %}
                     **Slot 2: {{ s.get('name') or '—' }}**
                     {{ 'Enabled' if s.get('enabled') else 'Disabled' }} - {{ 'Online' if s.get('connected') else 'Offline' }}
-                    IMEI: ****{{ (s.get('imei','')|string)[-4:] }} - Lat: {{ s.get('latitude') }} - Elev: {{ s.get('elevation') }}m
+                    IMEI: ****{{ (s.get('imei','')|string)[-4:] }} | Lat: {{ s.get('latitude') }} | Lon: {{ s.get('longitude') }} | Elev: {{ s.get('elevation') }}m
                 - type: horizontal-stack
                   cards:
                     - type: custom:button-card
+                      name: Edit
+                      icon: mdi:pencil
+                      styles:
+                        card:
+                          - height: 42px
+                          - border-radius: 12px
+                          - background: "#1565c0"
+                        name:
+                          - font-size: 12px
+                          - font-weight: 700
+                          - color: white
+                        icon:
+                          - color: white
+                      tap_action:
+                        action: call-service
+                        service: script.weather_api_load_station
+                        service_data:
+                          slot: 2
+                    - type: custom:button-card
                       name: >
                         [[[
-                          const s = hass.states['sensor.weather_api_data']?.attributes?.stations?.['2'] || {};
+                          const stations = hass.states['sensor.weather_api_data']?.attributes?.stations || {};
+                          const s = stations['2'] || stations[2] || {};
                           return s.enabled ? 'Disable' : 'Enable';
                         ]]]
                       icon: >
                         [[[
-                          const s = hass.states['sensor.weather_api_data']?.attributes?.stations?.['2'] || {};
+                          const stations = hass.states['sensor.weather_api_data']?.attributes?.stations || {};
+                          const s = stations['2'] || stations[2] || {};
                           return s.enabled ? 'mdi:pause-circle' : 'mdi:play-circle';
                         ]]]
                       styles:
@@ -2078,7 +2622,8 @@ views:
                         action: call-service
                         service: >
                           [[[
-                            const s = hass.states['sensor.weather_api_data']?.attributes?.stations?.['2'] || {};
+                            const stations = hass.states['sensor.weather_api_data']?.attributes?.stations || {};
+                            const s = stations['2'] || stations[2] || {};
                             return s.enabled ? 'script.weather_api_disable_station' : 'script.weather_api_enable_station';
                           ]]]
                         service_data:
@@ -2114,21 +2659,43 @@ views:
               cards:
                 - type: markdown
                   content: >
-                    {% set s = (state_attr('sensor.weather_api_data', 'stations') or {}).get('3', {}) %}
+                    {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+                    {% set s = stations.get('3') or stations.get(3) or {} %}
                     **Slot 3: {{ s.get('name') or '—' }}**
                     {{ 'Enabled' if s.get('enabled') else 'Disabled' }} - {{ 'Online' if s.get('connected') else 'Offline' }}
-                    IMEI: ****{{ (s.get('imei','')|string)[-4:] }} - Lat: {{ s.get('latitude') }} - Elev: {{ s.get('elevation') }}m
+                    IMEI: ****{{ (s.get('imei','')|string)[-4:] }} | Lat: {{ s.get('latitude') }} | Lon: {{ s.get('longitude') }} | Elev: {{ s.get('elevation') }}m
                 - type: horizontal-stack
                   cards:
                     - type: custom:button-card
+                      name: Edit
+                      icon: mdi:pencil
+                      styles:
+                        card:
+                          - height: 42px
+                          - border-radius: 12px
+                          - background: "#1565c0"
+                        name:
+                          - font-size: 12px
+                          - font-weight: 700
+                          - color: white
+                        icon:
+                          - color: white
+                      tap_action:
+                        action: call-service
+                        service: script.weather_api_load_station
+                        service_data:
+                          slot: 3
+                    - type: custom:button-card
                       name: >
                         [[[
-                          const s = hass.states['sensor.weather_api_data']?.attributes?.stations?.['3'] || {};
+                          const stations = hass.states['sensor.weather_api_data']?.attributes?.stations || {};
+                          const s = stations['3'] || stations[3] || {};
                           return s.enabled ? 'Disable' : 'Enable';
                         ]]]
                       icon: >
                         [[[
-                          const s = hass.states['sensor.weather_api_data']?.attributes?.stations?.['3'] || {};
+                          const stations = hass.states['sensor.weather_api_data']?.attributes?.stations || {};
+                          const s = stations['3'] || stations[3] || {};
                           return s.enabled ? 'mdi:pause-circle' : 'mdi:play-circle';
                         ]]]
                       styles:
@@ -2142,7 +2709,8 @@ views:
                         action: call-service
                         service: >
                           [[[
-                            const s = hass.states['sensor.weather_api_data']?.attributes?.stations?.['3'] || {};
+                            const stations = hass.states['sensor.weather_api_data']?.attributes?.stations || {};
+                            const s = stations['3'] || stations[3] || {};
                             return s.enabled ? 'script.weather_api_disable_station' : 'script.weather_api_enable_station';
                           ]]]
                         service_data:
@@ -2178,21 +2746,43 @@ views:
               cards:
                 - type: markdown
                   content: >
-                    {% set s = (state_attr('sensor.weather_api_data', 'stations') or {}).get('4', {}) %}
+                    {% set stations = state_attr('sensor.weather_api_data', 'stations') or {} %}
+                    {% set s = stations.get('4') or stations.get(4) or {} %}
                     **Slot 4: {{ s.get('name') or '—' }}**
                     {{ 'Enabled' if s.get('enabled') else 'Disabled' }} - {{ 'Online' if s.get('connected') else 'Offline' }}
-                    IMEI: ****{{ (s.get('imei','')|string)[-4:] }} - Lat: {{ s.get('latitude') }} - Elev: {{ s.get('elevation') }}m
+                    IMEI: ****{{ (s.get('imei','')|string)[-4:] }} | Lat: {{ s.get('latitude') }} | Lon: {{ s.get('longitude') }} | Elev: {{ s.get('elevation') }}m
                 - type: horizontal-stack
                   cards:
                     - type: custom:button-card
+                      name: Edit
+                      icon: mdi:pencil
+                      styles:
+                        card:
+                          - height: 42px
+                          - border-radius: 12px
+                          - background: "#1565c0"
+                        name:
+                          - font-size: 12px
+                          - font-weight: 700
+                          - color: white
+                        icon:
+                          - color: white
+                      tap_action:
+                        action: call-service
+                        service: script.weather_api_load_station
+                        service_data:
+                          slot: 4
+                    - type: custom:button-card
                       name: >
                         [[[
-                          const s = hass.states['sensor.weather_api_data']?.attributes?.stations?.['4'] || {};
+                          const stations = hass.states['sensor.weather_api_data']?.attributes?.stations || {};
+                          const s = stations['4'] || stations[4] || {};
                           return s.enabled ? 'Disable' : 'Enable';
                         ]]]
                       icon: >
                         [[[
-                          const s = hass.states['sensor.weather_api_data']?.attributes?.stations?.['4'] || {};
+                          const stations = hass.states['sensor.weather_api_data']?.attributes?.stations || {};
+                          const s = stations['4'] || stations[4] || {};
                           return s.enabled ? 'mdi:pause-circle' : 'mdi:play-circle';
                         ]]]
                       styles:
@@ -2206,7 +2796,8 @@ views:
                         action: call-service
                         service: >
                           [[[
-                            const s = hass.states['sensor.weather_api_data']?.attributes?.stations?.['4'] || {};
+                            const stations = hass.states['sensor.weather_api_data']?.attributes?.stations || {};
+                            const s = stations['4'] || stations[4] || {};
                             return s.enabled ? 'script.weather_api_disable_station' : 'script.weather_api_enable_station';
                           ]]]
                         service_data:
