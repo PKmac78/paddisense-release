@@ -341,7 +341,35 @@ class PaddiSenseConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 description_placeholders={"error": result.get("error", "Unknown error")},
             )
 
+        # Install required HACS cards in background
+        self.hass.async_create_task(self._async_install_hacs_cards())
+
         return await self.async_step_install()
+
+    async def _async_install_hacs_cards(self) -> None:
+        """Install required HACS cards."""
+        import asyncio
+        from .const import REQUIRED_HACS_CARDS
+
+        # Check if HACS is available
+        if not self.hass.services.has_service("hacs", "install"):
+            _LOGGER.info("HACS not available during setup, cards will be installed on restart")
+            return
+
+        _LOGGER.info("Installing required HACS cards...")
+
+        for card in REQUIRED_HACS_CARDS:
+            try:
+                await self.hass.services.async_call(
+                    "hacs", "install",
+                    {
+                        "repository": card["repository"],
+                        "category": card["category"],
+                    },
+                )
+                _LOGGER.info("Installed HACS card: %s", card["repository"])
+            except Exception as e:
+                _LOGGER.warning("Could not install %s: %s", card["repository"], e)
 
     def _cleanup_old_install(self) -> None:
         """Clean up old installation while preserving local data."""
