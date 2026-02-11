@@ -165,6 +165,170 @@ button_card_templates:
         - color: white
         - width: 32px
 
+  #---------------------------------------------------------------------------
+  # Module row template - reactive module install/remove UI
+  #---------------------------------------------------------------------------
+  pds_module_row:
+    entity: sensor.paddisense_version
+    triggers_update:
+      - sensor.paddisense_version
+    show_state: false
+    show_icon: true
+    show_name: true
+    show_label: true
+    icon: |
+      [[[
+        return variables.icon || 'mdi:puzzle';
+      ]]]
+    name: |
+      [[[
+        return variables.title || variables.module_id;
+      ]]]
+    label: |
+      [[[
+        const modId = variables.module_id;
+        const attrs = entity?.attributes || {};
+        const installedList = attrs.installed_modules || [];
+        const installedData = installedList.find(m => m.id === modId);
+        const version = installedData?.version || '';
+
+        const licensed = (attrs.licensed_modules || attrs.license_modules || []).includes(modId);
+        const available = (attrs.available_modules || []).some(m => m.id === modId);
+        const installed = !!installedData;
+
+        const base = variables.desc || '';
+
+        if (installed) return `${base}${version ? ` • v${version}` : ''}`;
+        if (!licensed) return `${base} • Not licensed`;
+        if (available) return `${base} • Available`;
+        return `${base} • Unavailable`;
+      ]]]
+    tap_action:
+      action: call-service
+      service: |
+        [[[
+          const modId = variables.module_id;
+          const attrs = entity?.attributes || {};
+          const installed = (attrs.installed_modules || []).some(m => m.id === modId);
+          const licensed = (attrs.licensed_modules || attrs.license_modules || []).includes(modId);
+          const available = (attrs.available_modules || []).some(m => m.id === modId);
+
+          if (installed) return 'paddisense.remove_module';
+          if (licensed && available) return 'paddisense.install_module';
+          return 'script.turn_on';
+        ]]]
+      service_data: |
+        [[[
+          return { module_id: variables.module_id };
+        ]]]
+    confirmation:
+      text: |
+        [[[
+          const modId = variables.module_id;
+          const attrs = entity?.attributes || {};
+          const installed = (attrs.installed_modules || []).some(m => m.id === modId);
+          return installed
+            ? `Remove module: ${variables.title || modId}?`
+            : `Install module: ${variables.title || modId}?`;
+        ]]]
+    custom_fields:
+      action: |
+        [[[
+          const modId = variables.module_id;
+          const attrs = entity?.attributes || {};
+          const installedList = attrs.installed_modules || [];
+          const installedData = installedList.find(m => m.id === modId);
+
+          const installed = !!installedData;
+          const licensed = (attrs.licensed_modules || attrs.license_modules || []).includes(modId);
+          const available = (attrs.available_modules || []).some(m => m.id === modId);
+
+          let text = '';
+          let bg = '';
+          let fg = '';
+          let ico = '';
+          let opacity = '1';
+
+          if (installed) {
+            text = 'Remove';
+            bg = '#dc3545';
+            fg = 'white';
+            ico = 'mdi:trash-can-outline';
+          } else if (licensed && available) {
+            text = 'Install';
+            bg = '#28a745';
+            fg = 'white';
+            ico = 'mdi:download';
+          } else if (!licensed) {
+            text = 'Locked';
+            bg = 'transparent';
+            fg = 'var(--secondary-text-color)';
+            ico = 'mdi:lock-outline';
+            opacity = '0.8';
+          } else {
+            text = 'N/A';
+            bg = 'transparent';
+            fg = 'var(--secondary-text-color)';
+            ico = 'mdi:minus-circle-outline';
+            opacity = '0.8';
+          }
+
+          return `
+            <div style="
+              display:flex;align-items:center;gap:8px;
+              padding:8px 12px;border-radius:10px;
+              background:${bg};color:${fg};
+              font-size:13px;font-weight:700;
+              opacity:${opacity};
+            ">
+              <ha-icon icon="${ico}" style="--mdc-icon-size:18px;"></ha-icon>
+              <span>${text}</span>
+            </div>
+          `;
+        ]]]
+    styles:
+      card:
+        - border-radius: 12px
+        - padding: 12px 14px
+        - background: var(--card-background-color)
+        - box-shadow: 0 1px 3px rgba(0,0,0,0.08)
+        - border-left: |
+            [[[
+              return `4px solid ${variables.color || '#0066cc'}`;
+            ]]]
+        - opacity: |
+            [[[
+              const modId = variables.module_id;
+              const attrs = entity?.attributes || {};
+              const installed = (attrs.installed_modules || []).some(m => m.id === modId);
+              const licensed = (attrs.licensed_modules || attrs.license_modules || []).includes(modId);
+              const available = (attrs.available_modules || []).some(m => m.id === modId);
+              return (installed || (licensed && available)) ? '1' : '0.75';
+            ]]]
+      grid:
+        - grid-template-areas: '"i n action" "i l action"'
+        - grid-template-columns: 48px 1fr auto
+        - grid-template-rows: min-content min-content
+        - column-gap: 12px
+      icon:
+        - width: 26px
+        - color: |
+            [[[
+              return variables.color || '#0066cc';
+            ]]]
+      name:
+        - font-size: 15px
+        - font-weight: 700
+        - align-self: end
+      label:
+        - font-size: 12px
+        - color: var(--secondary-text-color)
+        - align-self: start
+      custom_fields:
+        action:
+          - align-self: center
+          - justify-self: end
+
 views:
   # ===========================================================================
   # View 1: Module Management
@@ -274,180 +438,71 @@ views:
                       }
                     ]]]
 
-              # Module Cards - Compact row layout with integrated actions
+              # Module Cards - Using pds_module_row template
               - type: custom:button-card
-                entity: sensor.paddisense_version
-                show_icon: false
-                show_name: false
-                show_state: false
-                tap_action:
-                  action: none
-                hold_action:
-                  action: none
-                styles:
-                  card:
-                    - background: transparent
-                    - box-shadow: none
-                    - padding: 0
-                  grid:
-                    - display: block
-                custom_fields:
-                  modules: |
-                    [[[
-                      try {
-                        // Create a helper function that gets fresh hass reference
-                        if (!window._pdsCallService) {
-                          window._pdsCallService = function(domain, service, data) {
-                            const ha = document.querySelector('home-assistant');
-                            if (!ha || !ha.hass) {
-                              console.error('PaddiSense: Home Assistant not found');
-                              return Promise.reject(new Error('Home Assistant not available'));
-                            }
-                            console.log('PaddiSense: Calling service', domain + '.' + service, data);
-                            return ha.hass.callService(domain, service, data);
-                          };
-                        }
-
-                        if (!entity || !entity.attributes) {
-                          return `<div style="text-align:center;padding:30px;color:var(--secondary-text-color);">Loading...</div>`;
-                        }
-
-                        const installedModules = entity.attributes.installed_modules || [];
-                        const availableModules = entity.attributes.available_modules || [];
-                        const licensedModules = entity.attributes.license_modules || [];
-
-                        // Module metadata
-                        const moduleInfo = {
-                          'ipm': { name: 'Inventory Manager', icon: 'mdi:warehouse', desc: 'Chemicals, fertilizers & consumables', color: '#4caf50' },
-                          'asm': { name: 'Asset Service Manager', icon: 'mdi:tractor', desc: 'Equipment, parts & service history', color: '#ff9800' },
-                          'weather': { name: 'Weather Stations', icon: 'mdi:weather-cloudy', desc: 'Local gateway & API weather data', color: '#2196f3' },
-                          'pwm': { name: 'Water Management', icon: 'mdi:water', desc: 'Irrigation scheduling & bay monitoring', color: '#00bcd4' },
-                          'rtr': { name: 'Real Time Rice', icon: 'mdi:rice', desc: 'Crop growth predictions', color: '#43a047' },
-                          'str': { name: 'Stock Tracker', icon: 'mdi:cow', desc: 'Livestock inventory & movement', color: '#8d6e63' },
-                          'wss': { name: 'Worker Safety', icon: 'mdi:account-hard-hat', desc: 'Worker check-in/check-out', color: '#e53935' },
-                          'hfm': { name: 'Hey Farmer', icon: 'mdi:chart-areaspline', desc: 'Community insights', color: '#7b1fa2' },
-                        };
-
-                        let html = `<style>
-                          @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-                          .pds-module-row {
-                            display: flex;
-                            align-items: center;
-                            background: var(--card-background-color);
-                            border-radius: 12px;
-                            padding: 12px 16px;
-                            margin-bottom: 8px;
-                            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-                            transition: box-shadow 0.2s;
-                          }
-                          .pds-module-row:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
-                          .pds-module-icon {
-                            width: 44px; height: 44px; border-radius: 10px;
-                            display: flex; align-items: center; justify-content: center;
-                            flex-shrink: 0; margin-right: 14px;
-                          }
-                          .pds-module-info { flex: 1; min-width: 0; margin-right: 12px; }
-                          .pds-module-name { font-size: 15px; font-weight: 600; color: var(--primary-text-color); margin-bottom: 2px; }
-                          .pds-module-desc { font-size: 12px; color: var(--secondary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-                          .pds-module-badges { display: flex; gap: 6px; align-items: center; margin-right: 16px; flex-shrink: 0; }
-                          .pds-badge { padding: 4px 8px; border-radius: 6px; font-size: 10px; font-weight: 700; text-transform: uppercase; white-space: nowrap; }
-                          .pds-module-action { flex-shrink: 0; }
-                          .pds-btn {
-                            border: none; border-radius: 8px; padding: 10px 16px;
-                            font-size: 13px; font-weight: 600; cursor: pointer;
-                            display: flex; align-items: center; gap: 6px;
-                            transition: opacity 0.2s, transform 0.1s;
-                          }
-                          .pds-btn:hover { opacity: 0.9; }
-                          .pds-btn:active { transform: scale(0.97); }
-                          .pds-btn-install { background: #28a745; color: white; }
-                          .pds-btn-remove { background: #dc3545; color: white; }
-                          .pds-btn-disabled { background: transparent; color: var(--secondary-text-color); cursor: default; padding: 10px 12px; }
-                          @media (max-width: 600px) {
-                            .pds-module-row { flex-wrap: wrap; gap: 10px; }
-                            .pds-module-info { flex-basis: calc(100% - 60px); margin-right: 0; }
-                            .pds-module-badges { margin-right: 0; }
-                          }
-                        </style>`;
-
-                        html += `<div style="padding: 4px 0;">`;
-
-                        const allModules = ['ipm', 'asm', 'weather', 'pwm', 'rtr', 'str', 'wss', 'hfm'];
-
-                        for (const modId of allModules) {
-                          const info = moduleInfo[modId] || { name: modId, icon: 'mdi:puzzle', desc: '', color: '#666' };
-                          const installedData = installedModules.find(m => m.id === modId);
-                          const isInstalled = !!installedData;
-                          const isLicensed = licensedModules.includes(modId);
-                          const isAvailable = availableModules.some(m => m.id === modId);
-                          const version = installedData?.version || '';
-
-                          let statusBg, statusColor, statusText;
-                          if (isInstalled) {
-                            statusBg = 'rgba(76,175,80,0.15)'; statusColor = '#4caf50'; statusText = 'Installed';
-                          } else if (!isLicensed) {
-                            statusBg = 'rgba(158,158,158,0.12)'; statusColor = '#9e9e9e'; statusText = 'Not Licensed';
-                          } else if (isAvailable) {
-                            statusBg = 'rgba(33,150,243,0.15)'; statusColor = '#2196f3'; statusText = 'Available';
-                          } else {
-                            statusBg = 'rgba(158,158,158,0.12)'; statusColor = '#9e9e9e'; statusText = 'Unavailable';
-                          }
-
-                          // Action button
-                          let actionBtn = '';
-                          if (isInstalled) {
-                            actionBtn = `<button class="pds-btn pds-btn-remove" onclick="
-                              event.stopPropagation();
-                              const btn = this;
-                              const origHtml = btn.innerHTML;
-                              btn.innerHTML = '<ha-icon icon=\\'mdi:loading\\' style=\\'--mdc-icon-size:16px;animation:spin 1s linear infinite;\\'></ha-icon>';
-                              btn.disabled = true;
-                              btn.style.opacity = '0.7';
-                              window._pdsCallService('paddisense', 'remove_module', { module_id: '${modId}' })
-                                .then(() => { btn.innerHTML = '<ha-icon icon=\\'mdi:check\\' style=\\'--mdc-icon-size:16px;\\'></ha-icon>'; btn.style.background = '#28a745'; })
-                                .catch((e) => { btn.innerHTML = origHtml; btn.disabled = false; btn.style.opacity = '1'; });
-                            "><ha-icon icon="mdi:trash-can-outline" style="--mdc-icon-size:16px;"></ha-icon>Remove</button>`;
-                          } else if (isLicensed && isAvailable) {
-                            actionBtn = `<button class="pds-btn pds-btn-install" onclick="
-                              event.stopPropagation();
-                              const btn = this;
-                              const origHtml = btn.innerHTML;
-                              btn.innerHTML = '<ha-icon icon=\\'mdi:loading\\' style=\\'--mdc-icon-size:16px;animation:spin 1s linear infinite;\\'></ha-icon>';
-                              btn.disabled = true;
-                              btn.style.opacity = '0.7';
-                              window._pdsCallService('paddisense', 'install_module', { module_id: '${modId}' })
-                                .then(() => { btn.innerHTML = '<ha-icon icon=\\'mdi:check\\' style=\\'--mdc-icon-size:16px;\\'></ha-icon>'; })
-                                .catch((e) => { btn.innerHTML = origHtml; btn.disabled = false; btn.style.opacity = '1'; });
-                            "><ha-icon icon="mdi:download" style="--mdc-icon-size:16px;"></ha-icon>Install</button>`;
-                          } else {
-                            actionBtn = `<span class="pds-btn pds-btn-disabled"><ha-icon icon="mdi:lock-outline" style="--mdc-icon-size:14px;"></ha-icon></span>`;
-                          }
-
-                          html += `
-                            <div class="pds-module-row">
-                              <div class="pds-module-icon" style="background:${info.color}15;">
-                                <ha-icon icon="${info.icon}" style="--mdc-icon-size:24px;color:${info.color};"></ha-icon>
-                              </div>
-                              <div class="pds-module-info">
-                                <div class="pds-module-name">${info.name}</div>
-                                <div class="pds-module-desc">${info.desc}</div>
-                              </div>
-                              <div class="pds-module-badges">
-                                <span class="pds-badge" style="background:${statusBg};color:${statusColor};">${statusText}</span>
-                                ${isInstalled && version ? `<span class="pds-badge" style="background:rgba(0,102,204,0.1);color:#0066cc;">v${version}</span>` : ''}
-                              </div>
-                              <div class="pds-module-action">
-                                ${actionBtn}
-                              </div>
-                            </div>`;
-                        }
-
-                        html += `</div>`;
-                        return html;
-                      } catch (e) {
-                        return `<div style="padding:14px;border-radius:12px;background:rgba(244,67,54,0.12);">Error: ${e}</div>`;
-                      }
-                    ]]]
+                template: pds_module_row
+                variables:
+                  module_id: ipm
+                  title: Inventory Manager
+                  desc: Chemicals, fertilizers & consumables
+                  icon: mdi:warehouse
+                  color: '#4caf50'
+              - type: custom:button-card
+                template: pds_module_row
+                variables:
+                  module_id: asm
+                  title: Asset Service Manager
+                  desc: Equipment, parts & service history
+                  icon: mdi:tractor
+                  color: '#ff9800'
+              - type: custom:button-card
+                template: pds_module_row
+                variables:
+                  module_id: weather
+                  title: Weather Stations
+                  desc: Local gateway & API weather data
+                  icon: mdi:weather-cloudy
+                  color: '#2196f3'
+              - type: custom:button-card
+                template: pds_module_row
+                variables:
+                  module_id: pwm
+                  title: Water Management
+                  desc: Irrigation scheduling & bay monitoring
+                  icon: mdi:water
+                  color: '#00bcd4'
+              - type: custom:button-card
+                template: pds_module_row
+                variables:
+                  module_id: rtr
+                  title: Real Time Rice
+                  desc: Crop growth predictions
+                  icon: mdi:rice
+                  color: '#43a047'
+              - type: custom:button-card
+                template: pds_module_row
+                variables:
+                  module_id: str
+                  title: Stock Tracker
+                  desc: Livestock inventory & movement
+                  icon: mdi:cow
+                  color: '#8d6e63'
+              - type: custom:button-card
+                template: pds_module_row
+                variables:
+                  module_id: wss
+                  title: Worker Safety
+                  desc: Worker check-in/check-out
+                  icon: mdi:account-hard-hat
+                  color: '#e53935'
+              - type: custom:button-card
+                template: pds_module_row
+                variables:
+                  module_id: hfm
+                  title: Hey Farmer
+                  desc: Community insights
+                  icon: mdi:chart-areaspline
+                  color: '#7b1fa2'
 
   # ===========================================================================
   # View 2: Farm Management
