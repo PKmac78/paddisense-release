@@ -8,6 +8,6 @@
   "integration_type": "hub",
   "iot_class": "local_polling",
   "requirements": ["ruamel.yaml>=0.18.0", "cryptography>=41.0.0"],
-  "version": "1.0.0-rc.1",
+  "version": "1.0.0-rc.2",
   "single_config_entry": true
 }
