@@ -21,7 +21,7 @@
       },
       "registration": {
         "title": "Account Registration",
-        "description": "Enter your details to register.\n\nYour email is used for verification and important notifications.\n\nDev mode: {dev_mode}",
+        "description": "Enter your details to register.\n\nYour email is used for verification and important notifications.",
         "data": {
           "grower_name": "Your Name",
           "grower_email": "Email Address"

@@ -12,6 +12,7 @@ from typing import Any
 import yaml
 
 from .const import (
+    LOCAL_CREDENTIALS_FILE,
     MODULE_FOLDERS,
     PADDISENSE_DIR,
     REGISTRY_BACKUP_DIR,
@@ -216,3 +217,36 @@ def cleanup_unlicensed_modules(licensed_modules: list[str]) -> dict[str, Any]:
         "removed": removed,
         "errors": errors,
     }
+
+
+def load_local_credentials() -> dict[str, Any]:
+    """Load locally stored credentials (license key, etc)."""
+    if not LOCAL_CREDENTIALS_FILE.exists():
+        return {}
+    try:
+        return json.loads(LOCAL_CREDENTIALS_FILE.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, IOError):
+        return {}
+
+
+def save_local_credentials(credentials: dict[str, Any]) -> None:
+    """Save credentials to local storage."""
+    LOCAL_CREDENTIALS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    LOCAL_CREDENTIALS_FILE.write_text(
+        json.dumps(credentials, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+    _LOGGER.debug("Saved local credentials to %s", LOCAL_CREDENTIALS_FILE)
+
+
+def get_saved_license_key() -> str:
+    """Get the saved license key, if any."""
+    creds = load_local_credentials()
+    return creds.get("license_key", "")
+
+
+def save_license_key(license_key: str) -> None:
+    """Save a valid license key to local storage."""
+    creds = load_local_credentials()
+    creds["license_key"] = license_key
+    creds["saved_at"] = datetime.now().isoformat(timespec="seconds")
+    save_local_credentials(creds)

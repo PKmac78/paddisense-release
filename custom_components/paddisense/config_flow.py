@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import re
+from pathlib import Path
 from typing import Any
 
 import voluptuous as vol
@@ -43,7 +44,9 @@ from .helpers import (
     extract_grower,
     get_existing_data_summary,
     get_repo_summary,
+    get_saved_license_key,
     load_server_yaml,
+    save_license_key,
 )
 from .installer import BackupManager, ConfigWriter, GitManager, ModuleManager
 from .license import LicenseError, track_activation, validate_license
@@ -234,6 +237,9 @@ class PaddiSenseConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Handle license key entry (optional)."""
         errors = {}
 
+        # Load saved license key for pre-fill
+        saved_license = await self.hass.async_add_executor_job(get_saved_license_key)
+
         if user_input is not None:
             license_key = user_input.get("license_key", "").strip()
 
@@ -252,6 +258,11 @@ class PaddiSenseConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         self._data[CONF_LICENSE_MODULES] = license_info.modules
                         if license_info.github_token:
                             self._data[CONF_GITHUB_TOKEN] = license_info.github_token
+
+                        # Save license key locally for future reinstalls
+                        await self.hass.async_add_executor_job(
+                            save_license_key, license_key
+                        )
 
                         # Track activation (fire-and-forget)
                         try:
@@ -283,7 +294,7 @@ class PaddiSenseConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="license",
             data_schema=vol.Schema({
-                vol.Optional("license_key", default=""): str,
+                vol.Optional("license_key", default=saved_license): str,
             }),
             errors=errors,
             description_placeholders={
@@ -316,14 +327,13 @@ class PaddiSenseConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self, user_input: dict | None = None
     ) -> FlowResult:
         """Clone the PaddiSense repository."""
+        # Clean up old installation first (preserves local_data)
+        await self.hass.async_add_executor_job(self._cleanup_old_install)
+
         git_manager = GitManager(token=self._data.get(CONF_GITHUB_TOKEN))
 
-        is_cloned = await self.hass.async_add_executor_job(git_manager.is_repo_cloned)
-
-        if is_cloned:
-            result = await self.hass.async_add_executor_job(git_manager.pull)
-        else:
-            result = await self.hass.async_add_executor_job(git_manager.clone)
+        # Always do fresh clone after cleanup
+        result = await self.hass.async_add_executor_job(git_manager.clone)
 
         if not result.get("success"):
             return self.async_abort(
@@ -332,6 +342,54 @@ class PaddiSenseConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
 
         return await self.async_step_install()
+
+    def _cleanup_old_install(self) -> None:
+        """Clean up old installation while preserving local data."""
+        import shutil
+        from .const import PADDISENSE_DIR, PACKAGES_DIR, DATA_DIR, LOVELACE_DASHBOARDS_YAML
+
+        _LOGGER.info("Cleaning up old PaddiSense installation...")
+
+        # Backup local_data if it exists inside PaddiSense dir
+        local_data_backup = None
+        old_local_data = PADDISENSE_DIR / "local_data"
+        if old_local_data.exists():
+            local_data_backup = Path("/config/.paddisense_data_backup")
+            if local_data_backup.exists():
+                shutil.rmtree(local_data_backup)
+            shutil.copytree(old_local_data, local_data_backup)
+            _LOGGER.info("Backed up local_data")
+
+        # Remove old PaddiSense directory
+        if PADDISENSE_DIR.exists():
+            shutil.rmtree(PADDISENSE_DIR)
+            _LOGGER.info("Removed old PaddiSense directory")
+
+        # Clean old package symlinks
+        if PACKAGES_DIR.exists():
+            for item in PACKAGES_DIR.iterdir():
+                if item.is_symlink() or item.suffix == ".yaml":
+                    item.unlink()
+            _LOGGER.info("Cleaned old package symlinks")
+
+        # Clear lovelace_dashboards.yaml
+        if LOVELACE_DASHBOARDS_YAML.exists():
+            LOVELACE_DASHBOARDS_YAML.unlink()
+            _LOGGER.info("Removed old lovelace_dashboards.yaml")
+
+        # Restore local_data to proper location
+        if local_data_backup and local_data_backup.exists():
+            DATA_DIR.mkdir(parents=True, exist_ok=True)
+            for item in local_data_backup.iterdir():
+                target = DATA_DIR / item.name
+                if item.is_dir():
+                    if target.exists():
+                        shutil.rmtree(target)
+                    shutil.copytree(item, target)
+                else:
+                    shutil.copy2(item, target)
+            shutil.rmtree(local_data_backup)
+            _LOGGER.info("Restored local_data to %s", DATA_DIR)
 
     async def async_step_install(
         self, user_input: dict | None = None
@@ -354,10 +412,59 @@ class PaddiSenseConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if not config_result.get("success"):
             _LOGGER.warning("Could not update configuration.yaml: %s", config_result)
 
+        # Install core registry module (Manager dashboard)
+        await self.hass.async_add_executor_job(self._install_core_registry)
+
         return self.async_create_entry(
             title=self._data.get(CONF_GROWER_NAME, "PaddiSense"),
             data=self._data,
         )
+
+    def _install_core_registry(self) -> None:
+        """Install the core registry module with Manager dashboard."""
+        from .const import PADDISENSE_DIR, PACKAGES_DIR, LOVELACE_DASHBOARDS_YAML
+        import yaml
+
+        # Create packages directory if needed
+        PACKAGES_DIR.mkdir(parents=True, exist_ok=True)
+
+        # Create symlink for registry package
+        registry_symlink = PACKAGES_DIR / "registry.yaml"
+        if not registry_symlink.exists() and not registry_symlink.is_symlink():
+            relative_target = Path("..") / "registry" / "package.yaml"
+            try:
+                registry_symlink.symlink_to(relative_target)
+                _LOGGER.info("Installed registry package")
+            except OSError as e:
+                _LOGGER.warning("Could not create registry symlink: %s", e)
+
+        # Register Manager dashboard
+        dashboards = {}
+        if LOVELACE_DASHBOARDS_YAML.exists():
+            try:
+                content = LOVELACE_DASHBOARDS_YAML.read_text(encoding="utf-8")
+                dashboards = yaml.safe_load(content) or {}
+            except (yaml.YAMLError, IOError):
+                dashboards = {}
+
+        # Add manager dashboard
+        dashboards["paddisense-manager"] = {
+            "mode": "yaml",
+            "title": "PaddiSense",
+            "icon": "mdi:view-dashboard",
+            "show_in_sidebar": True,
+            "filename": "PaddiSense/registry/dashboards/manager.yaml",
+        }
+
+        # Write dashboards file
+        header = """# Auto-generated by PaddiSense
+# Do not edit manually - changes may be overwritten
+# Manage modules via PaddiSense Manager
+
+"""
+        content = header + yaml.dump(dashboards, default_flow_style=False, sort_keys=False)
+        LOVELACE_DASHBOARDS_YAML.write_text(content, encoding="utf-8")
+        _LOGGER.info("Registered PaddiSense Manager dashboard")
 
     @staticmethod
     @callback

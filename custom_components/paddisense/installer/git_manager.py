@@ -9,11 +9,15 @@ from pathlib import Path
 from typing import Any
 
 from ..const import (
+    CONFIG_DIR,
     PADDISENSE_DIR,
     PADDISENSE_REPO_URL,
     PADDISENSE_REPO_BRANCH,
     PADDISENSE_VERSION_FILE,
 )
+
+# Path to integration www folder (served at /paddisense/)
+INTEGRATION_WWW_DIR = CONFIG_DIR / "custom_components" / "paddisense" / "www"
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -130,6 +134,9 @@ class GitManager:
                 (self.repo_dir / "packages").mkdir(exist_ok=True)
                 _LOGGER.info("Copied modules to %s (packages excluded)", self.repo_dir)
 
+            # Sync www files to integration folder
+            self.sync_www_files()
+
             _LOGGER.info("Successfully cloned PaddiSense repository")
             return {
                 "success": True,
@@ -224,6 +231,9 @@ class GitManager:
 
                 _LOGGER.info("Updated modules at %s", self.repo_dir)
 
+            # Sync www files to integration folder
+            self.sync_www_files()
+
             _LOGGER.info("Successfully pulled latest changes")
             return {
                 "success": True,
@@ -245,6 +255,35 @@ class GitManager:
                 "success": False,
                 "error": f"Failed to update modules: {e}",
             }
+
+    def sync_www_files(self) -> dict[str, Any]:
+        """Sync www files from PaddiSense/registry/www to integration www folder.
+
+        This allows UI card updates to be deployed via the installer
+        instead of requiring HACS redownload.
+        """
+        source_dir = self.repo_dir / "registry" / "www"
+        target_dir = INTEGRATION_WWW_DIR
+
+        if not source_dir.exists():
+            _LOGGER.debug("No www folder in registry module")
+            return {"success": True, "files_copied": 0}
+
+        try:
+            target_dir.mkdir(parents=True, exist_ok=True)
+            files_copied = 0
+
+            for src_file in source_dir.glob("*.js"):
+                dst_file = target_dir / src_file.name
+                shutil.copy2(src_file, dst_file)
+                files_copied += 1
+                _LOGGER.info("Updated frontend card: %s", src_file.name)
+
+            return {"success": True, "files_copied": files_copied}
+
+        except (OSError, shutil.Error) as e:
+            _LOGGER.warning("Failed to sync www files: %s", e)
+            return {"success": False, "error": str(e)}
 
     def get_local_version(self) -> str | None:
         """Get the local version from VERSION file."""

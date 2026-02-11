@@ -18,6 +18,9 @@ REGISTRY_DATA_DIR = DATA_DIR / "registry"
 REGISTRY_CONFIG_FILE = REGISTRY_DATA_DIR / "config.json"
 REGISTRY_BACKUP_DIR = REGISTRY_DATA_DIR / "backups"
 
+# Local credentials (stored locally, never in git)
+LOCAL_CREDENTIALS_FILE = DATA_DIR / "paddisense" / "credentials.json"
+
 # Configuration files
 SERVER_YAML = CONFIG_DIR / "server.yaml"
 CONFIGURATION_YAML = CONFIG_DIR / "configuration.yaml"
